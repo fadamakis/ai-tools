@@ -1,0 +1,65 @@
+plugins/workbench/README.md
+  s_fdd038876479aa::t_ee9ec2a8572e1c 3
+plugins/workbench/shared/launch-states.mjs
+  s_fdd038876479aa::t_182011e179ecb4 1
+plugins/workbench/server/persistence.mjs
+  s_fdd038876479aa::t_a06bfb39dba159 24-35,38,45,58-62
+plugins/workbench/tests/mcp.test.mjs
+  s_fdd038876479aa::t_d0398afde771fe 106-129
+  s_fdd038876479aa::t_a24f2f14914f03 36
+plugins/workbench/server/launches.mjs
+  s_fdd038876479aa::t_c095eb2e4b55cc 21,49-50,84-85
+  s_fdd038876479aa::t_8dcd75741e7ebf 80-83,98
+  s_fdd038876479aa::t_182011e179ecb4 1-20,22-48,51-79,86-97,99-104
+plugins/workbench/tests/controller.test.mjs
+  s_fdd038876479aa::t_a24f2f14914f03 91-100
+plugins/workbench/tests/persistence.test.mjs
+  s_fdd038876479aa::t_a06bfb39dba159 51,58-59,68-69
+plugins/workbench/app/controller.mjs
+  s_fdd038876479aa::t_182011e179ecb4 126-131
+  s_fdd038876479aa::t_470dca476ec7d4 125
+plugins/workbench/tests/launch-recovery.test.mjs
+  s_fdd038876479aa::t_c095eb2e4b55cc 52-64
+  s_fdd038876479aa::t_def262f7633751 1-51
+plugins/workbench/app/App.jsx
+  s_fdd038876479aa::t_182011e179ecb4 7,57,150,225-235,263
+plugins/workbench/references/board-launch.md
+  s_fdd038876479aa::t_8dcd75741e7ebf 37-39,61-65
+docs/compatibility.md
+  s_fdd038876479aa::t_ee9ec2a8572e1c 13-28
+plugins/workbench/tests/ui/board.spec.mjs
+  s_fdd038876479aa::t_d0398afde771fe 662-684
+plugins/workbench/server/index.mjs
+  s_fdd038876479aa::t_8dcd75741e7ebf 59
+  s_fdd038876479aa::t_182011e179ecb4 8,77-79
+plugins/workbench/server/store.mjs
+  s_fdd038876479aa::t_8dcd75741e7ebf 8-9,35,166,172,189,225-230
+plugins/workbench/.codex-plugin/plugin.json
+  s_fdd038876479aa::t_d26622ca0d2abe 3
+plugins/workbench/assets/task.md
+  s_fdd038876479aa::t_49baf226ac6f4f 7
+plugins/workbench/plugin.json
+  s_fdd038876479aa::t_4ac2bd2860eaac 4
+plugins/workbench/references/workflow.md
+  s_fdd038876479aa::t_aab2a8ef5ce97a 135
+plugins/workbench/skills/review/SKILL.md
+  s_fdd038876479aa::t_e33cad1067f652 26-27
+plugins/workbench/skills/verify/SKILL.md
+  s_fdd038876479aa::t_9f649ecc9a2a7d 25-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "00743c0a1bdc52e71070cc8d7be47619b2400cce",
+  "prompts": {},
+  "sessions": {
+    "s_fdd038876479aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15a74-9309-71b1-967c-27e9c8b98240",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
