@@ -50,7 +50,7 @@ jobs:
             plugins/sauron/test-results/ui-results.json
             dist/release/release.json
   publish:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: vars.AI_TOOLS_PUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: validate
     runs-on: macos-14
     timeout-minutes: 15

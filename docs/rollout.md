@@ -1,5 +1,11 @@
 # Release and acceptance
 
+## Publication gate
+
+The repository variable `AI_TOOLS_PUBLISH_ENABLED` must equal `true` before the trusted publishing job can run. Keep it unset or `false` during private release preparation. Validation, including a manually dispatched workflow, still runs with publication disabled.
+
+Enable the variable only during the approved launch after the privacy, native acceptance and repository-control checks are complete. Passing `main` changes then publish through the normal release job. Setting the variable to `false` stops future publishing jobs; it does not cancel an already-running job or change installed versions. Check live runs when stopping publication.
+
 ## Validate before publication
 
 Use the pinned pnpm/lockfile and run `pnpm verify`, `pnpm audit:secrets`, and `pnpm audit`. Package against the previous published marketplace when checking version continuity. Validate the extracted candidate with:
