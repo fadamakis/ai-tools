@@ -1,0 +1,29 @@
+{
+  "name": "ai-tools",
+  "interface": {
+    "displayName": "AI Tools"
+  },
+  "plugins": [
+    {
+      "name": "shelob",
+      "source": {
+        "source": "local",
+        "path": "./plugins/shelob"
+      }
+    },
+    {
+      "name": "sauron",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sauron"
+      }
+    },
+    {
+      "name": "workbench",
+      "source": {
+        "source": "local",
+        "path": "./plugins/workbench"
+      }
+    }
+  ]
+}

@@ -1,0 +1,665 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shelob report 1.2.0 (reads 1.0.0 and 1.1.0)",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "pluginVersion",
+    "generatedAt",
+    "status",
+    "repository",
+    "snapshot",
+    "rulePack",
+    "description",
+    "analysis",
+    "results",
+    "files",
+    "notices",
+    "limitations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ]
+    },
+    "pluginVersion": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "needs_review",
+        "incomplete",
+        "no_findings"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "required": [
+        "root",
+        "name",
+        "branch",
+        "head",
+        "base",
+        "baseCommit",
+        "mergeBase",
+        "scope",
+        "untracked",
+        "added",
+        "deleted"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        },
+        "base": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseCommit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mergeBase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "all",
+            "branch",
+            "staged",
+            "unstaged"
+          ]
+        },
+        "untracked": {
+          "$ref": "#/$defs/strings"
+        },
+        "added": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deleted": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "id",
+        "engineDigest",
+        "gitDigest",
+        "rulePackDigest",
+        "descriptionDigest"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/digest"
+        },
+        "engineDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "gitDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "rulePackDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "descriptionDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "rulePack": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "version",
+        "source",
+        "digest",
+        "exclude"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "exclude": {
+          "$ref": "#/$defs/strings"
+        }
+      }
+    },
+    "description": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "source",
+            "text"
+          ],
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "analysis": {
+      "type": "object",
+      "required": [
+        "deterministic",
+        "contextual",
+        "testsExecuted",
+        "runtime"
+      ],
+      "properties": {
+        "deterministic": {
+          "const": true
+        },
+        "contextual": {
+          "type": "boolean"
+        },
+        "testsExecuted": {
+          "const": false
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "codeReview": {
+          "type": "object",
+          "required": [
+            "required",
+            "status",
+            "engine"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "const": true
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "running",
+                "completed",
+                "failed"
+              ]
+            },
+            "engine": {
+              "const": "codex exec review"
+            },
+            "outputDigest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "required": [
+            "state",
+            "label",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "enum": [
+                "pending",
+                "completed",
+                "incomplete",
+                "failed",
+                "interrupted"
+              ]
+            },
+            "label": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "title",
+          "category",
+          "severity",
+          "mode",
+          "rationale",
+          "instructions",
+          "matchedFiles",
+          "status",
+          "reason",
+          "findings"
+        ],
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/$defs/severity"
+          },
+          "mode": {
+            "enum": [
+              "deterministic",
+              "contextual",
+              "codex"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchedFiles": {
+            "$ref": "#/$defs/strings"
+          },
+          "status": {
+            "enum": [
+              "assessed",
+              "findings",
+              "not_assessed",
+              "not_applicable",
+              "error"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reviewMethod": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/finding"
+            }
+          },
+          "findingRefs": {
+            "$ref": "#/$defs/strings"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "added",
+          "deleted",
+          "binary",
+          "patch",
+          "limitation",
+          "test",
+          "excluded"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "added": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deleted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "binary": {
+            "type": "boolean"
+          },
+          "patch": {
+            "type": "string"
+          },
+          "limitation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "test": {
+            "type": "boolean"
+          },
+          "excluded": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "notices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "title",
+          "message"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "$ref": "#/$defs/strings"
+    },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "local"
+            },
+            "requester": {
+              "$ref": "#/$defs/requester"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "url",
+            "repository",
+            "number",
+            "title",
+            "author",
+            "baseRef",
+            "headRef",
+            "baseSha",
+            "headSha"
+          ],
+          "properties": {
+            "kind": {
+              "const": "github_pr"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https://github\\.com/"
+            },
+            "repository": {
+              "type": "string"
+            },
+            "number": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "title": {
+              "type": "string"
+            },
+            "author": {
+              "type": "string"
+            },
+            "baseRef": {
+              "type": "string"
+            },
+            "headRef": {
+              "type": "string"
+            },
+            "baseSha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40,64}$"
+            },
+            "headSha": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40,64}$"
+            },
+            "reviewMode": {
+              "enum": [
+                "pr_only",
+                "local_copy"
+              ]
+            },
+            "requester": {
+              "$ref": "#/$defs/requester"
+            }
+          }
+        }
+      ]
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "checkedAt",
+        "message"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "current",
+            "outdated",
+            "unknown"
+          ]
+        },
+        "checkedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "path",
+        "side",
+        "line",
+        "snippet"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "side": {
+          "enum": [
+            "before",
+            "after"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "snippet": {
+          "type": "string"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "ruleId",
+        "severity",
+        "category",
+        "title",
+        "message",
+        "nextAction",
+        "evidence",
+        "origin"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ruleId": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "category": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "nextAction": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "origin": {
+          "enum": [
+            "deterministic",
+            "contextual",
+            "codex"
+          ]
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "sources": {
+          "$ref": "#/$defs/strings"
+        },
+        "duplicateOf": {
+          "type": "string"
+        }
+      }
+    },
+    "requester": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "enum": [
+              "1.1.0",
+              "1.2.0"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "source"
+        ]
+      }
+    }
+  ]
+}
