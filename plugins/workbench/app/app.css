@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@openai/apps-sdk-ui/css";
+@import "@ai-tools/ui/theme.css";
 @source "../../../node_modules/@openai/apps-sdk-ui/dist/es";
 @source "./**/*.{jsx,mjs}";
 @source "../../../packages/ui";
@@ -19,7 +20,8 @@
   color: var(--ink);
   background: var(--bg);
 }
-:root[data-theme=dark] { color-scheme: dark; }
+:root[data-theme=dark] { --warning: var(--orange-400); color-scheme: dark; }
+:root[data-theme=dark] [data-variant="soft"][data-color="warning"] { --badge-text-color: var(--orange-300); }
 * { box-sizing: border-box; }
 body { margin: 0; padding: var(--safe-top, 0px) var(--safe-right, 0px) var(--safe-bottom, 0px) var(--safe-left, 0px); font-size: var(--font-text-sm-size, 14px); color: var(--ink); background: var(--bg); }
 button, input, select, textarea { font: inherit; }
@@ -28,6 +30,7 @@ button:disabled { cursor: default; }
 h1, h2, h3, h4, p { margin: 0; }
 button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+[data-variant="soft"][data-color="success"] { --badge-text-color: var(--color-text-success); }
 
 .app-header { min-height: 64px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; gap: 16px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
