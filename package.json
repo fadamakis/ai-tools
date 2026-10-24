@@ -1,0 +1,63 @@
+{
+  "name": "ai-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-all.mjs",
+    "test": "node scripts/test-all.mjs",
+    "test:ui": "node scripts/test-ui.mjs",
+    "validate": "node scripts/validate.mjs && node scripts/check-public.mjs",
+    "package": "node scripts/release.mjs",
+    "verify": "pnpm build && pnpm test && pnpm validate && pnpm test:ui",
+    "shelob:preview": "node scripts/preview.mjs",
+    "workbench:preview": "node scripts/workbench-preview.mjs",
+    "sauron:migrate": "node plugins/sauron/scripts/migrate-data.mjs",
+    "check:public": "node scripts/check-public.mjs",
+    "audit:secrets": "node scripts/scan-secrets.mjs --history"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "@openai/apps-sdk-ui": "0.2.2",
+    "@openai/mcp-extensions": "0.2.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "postcss": "8.5.23",
+    "proper-lockfile": "4.1.2",
+    "radix-ui": "1.8.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwindcss": "4.3.3",
+    "zod": "4.6.7",
+    "@ai-tools/ui": "workspace:*",
+    "@modelcontextprotocol/client": "2.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.3",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "@types/node": "22.15.30",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "yaml": "2.8.3"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/fadamakis/ai-tools.git",
+  "pnpm": {
+    "overrides": {
+      "lodash": "4.18.0",
+      "zod": "4.6.7",
+      "body-parser": "2.4.0",
+      "fast-uri": "3.1.9",
+      "katex": "0.18.2"
+    }
+  }
+}

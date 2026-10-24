@@ -1,0 +1,43 @@
+---
+name: workbench-translations
+description: >
+  Explicit-only translation workflow: discover the repository localization process, request translations, and track the result. Use only when the user explicitly names this skill or asks specifically to request/track translations for a PR or issue — never invoked automatically by autopilot, publish, or greenlight, even when a PR changes copy.
+---
+
+# Request and track translations
+
+A standalone utility, outside the normal delivery-stage sequence. Requires Jira (or your org's ticket tracker) and GitHub access. Run this **only** when the user explicitly asks for it by name or clearly requests this exact translation workflow for a named PR or localization ticket — autopilot, publish, greenlight, monitoring, and a PR merely changing copy do NOT invoke it or grant its permissions.
+
+This skill was written against a specific org's process (Jira custom fields, a `/request-translations` PR-comment bot, and a tracking-ticket convention). Treat the specifics below as a template — confirm the actual field IDs, bot command, and tracker project/labels for your org before relying on them; they will differ if you're not the original org this was built for.
+
+## Resolve the request
+
+1. Fetch the named PR/localization ticket and its linked implementation ticket. Read the PR description, the actual copy changes, and any existing translation-request comments/results.
+2. Check the PR's full comment history (paginated) for an existing translation-request command and its result. If one already exists and is pending/failed, report that state rather than submitting a duplicate request.
+3. Search the tracker for an existing translation-tracking ticket linked to this feature before creating a new one — a linked implementation ticket is not itself a translation tracker.
+
+## Required-language scope — confirm before acting
+
+Establish the actual intended audience from the ticket/PR, not just habit:
+
+| Intended scope | Field value | Request type |
+| --- | --- | --- |
+| Full standard-feature coverage | "all" | Generic |
+| Explicitly limited language set | (the named set) | Generic |
+| A genuine A/B experiment | Experiment language set | Experiment |
+
+If the sources don't establish the audience, ask which one is intended before posting or changing anything. Fetch the ticket's actual current field values before trusting a bot comment or the ticket's stated status — live fields are the source of truth.
+
+## Request translations only if none exists
+
+Only after confirming no prior request or matching ticket exists, post the request comment with the org's actual command syntax, concise translator-facing context, and an explicit language scope (don't rely on the bot's default). Then read the resulting workflow output for the actual localization ticket key — posting the comment isn't success by itself. Don't manually create a duplicate ticket as a workaround for a pending/failed automated request; report the blocker instead.
+
+## Create or reuse the tracking ticket
+
+Follow your org's existing tracking pattern (project, issue type, labels, summary convention). Resolve the parent epic/owner from the implementation ticket. Keep the description short: link the localization request, implementation ticket, epic, and PR; state acceptance criteria and definition of done (translations available, no unresolved gaps); note this ticket is coordination-only, not implementation work. Link it to the localization ticket. For an active request, move the tracker to an "in progress"/"in translation" status if your workflow has one.
+
+## Verify and finish
+
+Re-fetch the localization ticket's fields and the tracking ticket to confirm summary, links, and status match what you intended. Return both ticket links, the verified language scope, status, and any remaining gap.
+
+Don't send chat notifications, change PR readiness, push code, or schedule monitoring as part of this skill.

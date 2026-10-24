@@ -1,0 +1,46 @@
+---
+name: workbench-implement
+description: >
+  Implement a Workbench change optimized for code reviewability: smallest clear design, traceable state ownership, reuse over new abstractions, and a simplified final diff. Use for the Workbench "implement" stage. Do not use to publish or start a separate feature workflow.
+---
+
+# Implement for reviewability
+
+Part of the Workbench delivery workflow (see `workbench-start` for shared rules, including the 800-line hard limit and frontend/backend PR separation).
+
+Confirm the plan, target branch, and acceptance criteria against current code before editing. If no plan exists, reconstruct a minimal scope yourself; use `workbench-plan` if there's a material unanswered question. For a visual change, capture an available before-change screenshot now if practical — you'll need it for the Before/After table later (see `workbench-verify` and `workbench-publish`).
+
+Optimize for how much effort it takes to understand and safely change the code, not line count. A reviewer should be able to trace an action to its result, see who owns each state transition, and see why each changed file exists.
+
+## Choose the shape before editing
+
+1. Read the real entry point, callers, and the closest existing implementation of similar behavior. Reuse existing types, queries, copy, components, and test helpers where their semantics fit. Prefer the repo's established pattern over a new generic mechanism.
+2. Before adding custom async/lifecycle management, check whether the existing framework or client library already owns it (e.g. don't hand-roll loading/error/retry state if `useQuery`/equivalent already covers the required scenarios). If a library pattern genuinely fails a required scenario, add only the missing piece — don't switch APIs for style.
+3. Sketch the smallest responsibility map (entry point, state/side-effect owner, rendering/domain helpers) in a few lines in the task note or your reply — no new README for this.
+4. Add a layer only when it removes a real responsibility from a caller, enforces an invariant, or serves an actual reuse need. Compare against extending the existing owner first.
+5. Keep one independently reviewable behavior per slice; separate unrelated cleanup from behavior changes when useful.
+
+## Design and copy
+
+- Treat the actual design reference and approved ticket behavior as sources of truth — check spacing, states, and responsive behavior against them rather than from memory. If sources conflict or the design is inaccessible, raise the specific discrepancy and keep working on unblocked parts.
+- Ask before diverging from an accessible design (dimensions, breakpoints, states, component choice).
+- Prefer existing design-system components/tokens; raise a specific gap before adding custom UI.
+- Never invent user-facing copy or translations, including loading/empty/error/success/accessibility text. Search for existing wording with the same meaning first. Missing copy is an open question, not license to write placeholder text.
+
+## Build a flow a reviewer can trace
+
+- **One owner per mutable fact/transition.** Derive values instead of syncing copies. Only add states the actual contract requires.
+- **Explicit control flow.** Prefer named operations and direct branches over callback chains or dispatch tables when the direct version is clearer. Remove a guard only after proving the invariant it protected is gone.
+- **Visible async coordination.** One explicit request/selection identity; don't stack ad hoc flags, memoized-identity tricks, and retry counters when the library's own lifecycle already resolves it.
+- **Small, presentational components welcomed.** Give each component one clear UI responsibility; extract even for a single caller when it improves readability. Avoid trivial forwarding wrappers and splits made only to dodge the line-count limit.
+- **Cohesive hooks**, not grab-bags of setters.
+- **No explanatory comments by default** — only for a genuinely crucial, non-obvious constraint (backend requirement, ordering invariant, necessary workaround). Never narrate what code does or leave commented-out code.
+- **Tests that explain behavior**, sourced from the Acceptance proof table, one appropriate layer per behavior (no duplicated proof across unit/component/E2E without a concrete reason). If no meaningful test is possible, say why. For a bug fix, prove it fails before the fix and passes after (see reproduction notes below) — report honestly if that's not possible.
+
+## Simplify, then read the actual diff
+
+After each meaningful slice, remove speculative branches, duplicated state, obsolete comments, and unused code. Before handing off, read the full diff in reviewer order (entry point → state/side effects → rendering → tests) and check: can the main/failure/success paths be followed without hopping through forwarding helpers? Is each custom loading/error/retry state actually needed beyond the library's own lifecycle? Does every new file/abstraction justify itself? Does every changed block support a real requirement or test? Are UI responsibilities small and well-named? For each comment, does it protect a real crucial constraint — or should it go?
+
+Run the repo's formatting, lint, and focused tests after simplifying — don't weaken tests or lengthen timeouts to get a pass. Don't commit or push without being asked to (that's `workbench-publish`'s job).
+
+**Next:** `workbench-verify` once the diff is simplified and checks pass locally; otherwise name what's still unresolved.

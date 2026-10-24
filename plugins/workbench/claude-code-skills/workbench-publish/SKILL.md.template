@@ -1,0 +1,19 @@
+---
+name: workbench-publish
+description: Commit, push, and create or update a draft PR for a Workbench task. Use for the Workbench "publish" stage, only once verification and any requested review are done. Never merges, deploys, marks a PR ready, or force-pushes.
+---
+
+# Publish the reviewed change
+
+Part of the Workbench delivery workflow. Requires GitHub access (`gh` CLI or a connected GitHub MCP tool) — ask the user to set one up if neither is available.
+
+1. Resolve the exact repo, branch, remote, and PR base. Verify branch ownership from the task/git state before touching it — if ambiguous, finish local reviewable work and ask rather than guessing or pushing someone else's branch.
+2. Confirm the final content matches the verification evidence from `workbench-verify` — fix and rerun affected checks if not. Inspect the intended diff and stage only task-owned changes (never blanket `add -A` over someone else's edits). Follow existing commit-hook policy; don't bypass hooks.
+3. **Before pushing, recheck the remote head.** `git fetch` and compare. Push with a normal `git push` (never `--force` as a shortcut) — if the remote has moved, fetch, inspect the new commits, and reconcile before retrying.
+4. After pushing, read back the remote head and confirm it matches your local commit. Reuse an existing open PR for this branch if one exists rather than creating a duplicate (`gh pr list --head <branch>`).
+5. **Create a draft PR** (`gh pr create --draft`, never mark it ready) or update the existing PR's description using the repo's PR template if it has one. Describe the concrete problem, the final behavior, how it was validated, and any material dependencies. Rewrite stale description sections if scope changed while preserving unrelated human edits, template comments and checkboxes. For visual changes, follow [PR visual evidence](../../references/visual-evidence.md): prefer `gh --body-file` and supported `--attach` uploads to put reviewed Before/After captures directly into the template's table. Report the CLI upgrade requirement when attachment support is missing, and preserve placeholders for blocked images. Once the PR number exists, add direct links to the relevant new/changed and existing stories recorded by `workbench-verify`; use the repository's preview convention without waiting for the build and state when deployment is pending or unverified.
+6. Read back the final body and account for every required image as attached or blocked; confirm the correct asset URLs occupy the correct Before/After cells, relevant story links are present once, and unrelated content is preserved without duplicate embeds or unresolved local image references. Read back the PR's head/base/draft state and current CI status. Report local check results separately from pending/failed CI and from anything only verified in a browser locally (not staging/prod).
+
+Don't post review replies, notify anyone, change the PR base, merge, or deploy unless separately asked to. If you were only authorized to commit (not push), stop there.
+
+**Next:** `workbench-greenlight <PR>` to handle CI results and review comments as they come in.

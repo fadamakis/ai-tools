@@ -1,0 +1,31 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sauron",
+  "version": "0.6.12",
+  "description": "Source-backed dot updates, Slack and Granola checks, replies, and personal tasks.",
+  "author": {
+    "name": "Fotis"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Sauron",
+        "shortDescription": "Your attention list",
+        "longDescription": "Keep source-backed Slack, Jira, GitHub, Calendar and meeting actions together, with saved decisions, manual checks and Slack replies.",
+        "developerName": "Fotis",
+        "category": "Productivity",
+        "capabilities": [
+          "Interactive"
+        ],
+        "defaultPrompt": "Open my Sauron task list.",
+        "logo": "./assets/sauron.png",
+        "composerIcon": "./assets/sauron.png",
+        "websiteURL": "https://github.com/fadamakis/ai-tools/tree/main/plugins/sauron"
+      },
+      "requires_local_executor": true
+    }
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/fadamakis/ai-tools",
+  "repository": "https://github.com/fadamakis/ai-tools.git"
+}

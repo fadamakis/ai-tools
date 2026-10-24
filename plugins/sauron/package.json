@@ -1,0 +1,45 @@
+{
+  "name": "@ai-tools/sauron",
+  "version": "0.6.12",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "start": "node dist/server/index.js",
+    "preview": "node dist/server/preview.js",
+    "test": "node --import tsx --test tests/store.test.ts tests/scan.test.ts tests/sync.test.ts tests/coordination.test.ts tests/reply.test.ts tests/codex-worker.test.ts tests/mcp.test.ts tests/local-plugin.test.ts tests/local-update.test.ts tests/discussions.test.ts",
+    "prepare:local-plugin": "node scripts/prepare-local-plugin.mjs",
+    "test:ui": "playwright test",
+    "refresh": "node scripts/check-attention.mjs --manual-scan",
+    "check:scheduled": "node scripts/check-attention.mjs",
+    "probe:local": "node scripts/probe-local-runtime.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/server": "2.3.1",
+    "@openai/apps-sdk-ui": "0.2.2",
+    "@openai/mcp-extensions": "0.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.0.0",
+    "@ai-tools/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "postcss": "8.5.23"
+  },
+  "license": "MIT"
+}

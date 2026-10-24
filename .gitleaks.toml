@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact React DOM variable assignment, not a credential; verified against the public dependency"
+regexTarget = "secret"
+regexes = ['^internalPropsKey=$']

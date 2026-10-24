@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shelob contextual assessments",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "snapshotId",
+    "assessments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "snapshotId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "status",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "assessed",
+              "findings",
+              "not_assessed",
+              "not_applicable"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "title",
+                "message",
+                "nextAction",
+                "evidence"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nextAction": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidence": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "line"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "line": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "side": {
+                        "enum": [
+                          "before",
+                          "after"
+                        ]
+                      },
+                      "snippet": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "severity": {
+                  "enum": [
+                    "info",
+                    "warning",
+                    "error"
+                  ]
+                },
+                "comment": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600
+                },
+                "duplicateOf": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An existing finding ID, or CODEX-REVIEW#1 (one-based native finding in this submission), for the same root cause."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "codeReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outputDigest",
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "outputDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "status": {
+          "enum": [
+            "assessed",
+            "findings",
+            "not_assessed"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "message",
+              "nextAction",
+              "evidence"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nextAction": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "path",
+                    "line"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "side": {
+                      "enum": [
+                        "before",
+                        "after"
+                      ]
+                    },
+                    "snippet": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "severity": {
+                "enum": [
+                  "info",
+                  "warning",
+                  "error"
+                ]
+              },
+              "comment": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600
+              },
+              "duplicateOf": {
+                "type": "string",
+                "minLength": 1,
+                "description": "An existing finding ID, or CODEX-REVIEW#1 (one-based native finding in this submission), for the same root cause."
+              }
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "incomplete"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+---
+name: workbench-help
+description: Explain the Workbench delivery-workflow skills and when to use each stage. Use when the user asks "how does Workbench work", "what workbench skills are there", "which workbench stage should I use", or similar. Does not start any work itself.
+---
+
+# Workbench help
+
+Workbench is a personal ticket-to-PR delivery workflow, ported from a Codex plugin into standalone skills. It takes work from a ticket through a reviewed, published pull request using whatever repo/Jira/Figma/GitHub access is actually connected in this session. There is no automatic orchestrator here — the user (or you, once asked) invokes the stage skill that's needed.
+
+## Stages
+
+| Skill | Purpose | Result |
+| --- | --- | --- |
+| `workbench-start` | Figure out which stage a task is at and resume there | Identified stage + next action |
+| `workbench-prepare` | Confirm branch, base, and local environment are safe to work in | Known target and clean starting point |
+| `workbench-plan` | Reconcile ticket, design, and existing code into a small slice | Acceptance-proof table, scope, open questions |
+| `workbench-implement` | Build and simplify the change | Reviewable diff with focused tests |
+| `workbench-run` | Launch the app/Storybook for a preview (utility, any stage) | Running preview + stop instructions |
+| `workbench-verify` | Check behavior against acceptance criteria and CI | Evidence: passed/failed/blocked per criterion |
+| `workbench-review` | Independent read-only review via a subagent | Findings or a clean bill |
+| `workbench-publish` | Commit, push, open/update a draft PR | Draft PR with description and evidence |
+| `workbench-greenlight` | Triage PR comments, CI failures, conflicts | Addressed issues, refreshed evidence |
+| `workbench-autopilot` | Run prepare → plan → implement → verify → review → publish → greenlight continuously for one explicit request | Draft PR, stops at pending CI/review |
+| `workbench-translations` | Explicit-only: request translations on a PR and track in Jira | Translation request + tracker, only when asked by name |
+| `workbench-improve` | Explicit approval gate for changing Workbench itself | One validated, source-first improvement or a read-only proposal |
+
+## How it's different from the original Codex plugin
+
+- No native worktree/checkout manager exists here. Work happens in whatever repository folder/checkout you already have open using plain git.
+- The independent "review" stage uses a fresh subagent (Claude Code's Task/subagent tool) instead of a host-native reviewer tool.
+- "Clickable next-step" suggestions become plain written **Next:** lines — you read and can redirect.
+- Read-only PR monitoring is a manual/periodic check rather than a host automation feature, unless you have your own scheduling set up.
+- Ticket/design/PR access (Jira, Figma, GitHub) depends on whatever CLI tools or MCP connectors you actually have configured — each stage says what it needs and asks you to set it up if missing, rather than assuming it's there.
+
+## Using it
+
+Say things like "use Workbench for TICKET-123", "resume Workbench on this PR", or invoke a stage skill directly (e.g. "run workbench-verify"). Each stage is independently usable — you don't have to go through `workbench-start`. Simplification is part of `workbench-implement`, not a separate step. Publishing commits/pushes and opens or updates a *draft* PR only; nothing in this suite marks a PR ready or merges it — that stays a human decision. `workbench-autopilot` explicitly authorizes the full sequence including ordinary pushes and addressed-review-thread replies for one active run, and stops when only pending CI or future review remains — it never schedules itself to keep running. Before handoff it may show one read-only improvement proposal; only an explicit `workbench-improve` approval may change the skills.
+
+Keep the overview under ~250 words when explaining verbally; answer a specific question about one stage directly instead of repeating the whole table.
+
+**Next:** ask which ticket, PR, or stage the user wants to start from — don't guess.

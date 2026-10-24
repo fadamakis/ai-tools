@@ -1,0 +1,19 @@
+---
+name: workbench-prepare
+description: >
+  Prepare the workspace for a Workbench task: check git branch, base, remote state, and local environment before any editing begins. Use for the Workbench "prepare" stage. Do not use for unrelated git questions, and do not overwrite existing work.
+---
+
+# Prepare the workspace
+
+Part of the Workbench delivery workflow (see `workbench-start` for the shared rules on authorization, task notes, and reviewability — read it first if this is a fresh task).
+
+1. **Inspect current state.** In the repo, check: repo root, any applicable AGENTS.md/CONTRIBUTING/CLAUDE.md instructions, current branch, HEAD, upstream, and staged/unstaged/untracked files (`git status`, `git branch -vv`, `git log --oneline -5`). Identify the task branch and requested base (main/develop/etc.) from live evidence — don't assume the current checkout is already the right target.
+2. **Resolve the base without disturbing the checkout.** Fetch the relevant refs for comparison (`git fetch origin <base>`) without resetting or rebasing onto the latest default branch unless that was explicitly requested. Report stale refs if fetching fails.
+3. **Reuse or create the task branch.** If a suitable branch already exists for this ticket, use it as-is — preserve any local changes on it. If a new branch is genuinely needed, create it from the current verified HEAD after checking for name/ownership collisions and the repo's branch-naming convention. Never silently rebase onto a different base than what was agreed.
+4. **Check the local environment.** Inspect the project's setup docs/scripts (README, package.json scripts, `.nvmrc`/`.tool-versions`, lockfiles) and verify prerequisites are actually installed rather than assuming setup already ran (correct Node/Python/etc. version, `node_modules` present, env vars documented). Don't blindly rerun a full install if it's already done; don't copy env files from another checkout or invent secrets. Keep any secret values out of your output.
+5. **Record state.** Note the repo, branch, base, HEAD, and any setup gaps in the task note (create `<repo>/.workbench/<task-key>.md` if this is a multi-session task). Preserve hooks, lockfiles, and any pre-existing unrelated changes.
+
+Stop and ask only if branch ownership or which dirty files belong to this task genuinely cannot be determined — otherwise keep investigating read-only and proceed.
+
+**Next:** `workbench-plan` once the target is unambiguous and existing work is preserved; otherwise name the specific blocker (ambiguous branch, failed setup step, missing tool access).

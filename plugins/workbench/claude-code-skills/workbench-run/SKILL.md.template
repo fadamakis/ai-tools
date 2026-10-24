@@ -1,0 +1,16 @@
+---
+name: workbench-run
+description: Launch the app or Storybook from the current Workbench checkout for a quick preview. Use for a request to preview the active change, at any Workbench stage. This is an optional utility, not full behavior verification.
+---
+
+# Run the checkout
+
+Part of the Workbench delivery workflow. Available at any stage — doesn't require a ticket, a completed plan, or a clean working tree, and doesn't by itself advance the delivery stage.
+
+1. **Identify the target.** Confirm the current branch/HEAD/dirty state in the repo. Ask only if the app to launch (main app vs. Storybook) is genuinely ambiguous; otherwise infer from context, defaulting to the app.
+2. **Find the launch command.** Read the repo's README/package scripts for the actual start command, port, and any backend/proxy target it needs, rather than assuming a framework or port. Check dependencies are installed. Keep secrets out of your output; don't copy env files from elsewhere or point at production by assumption.
+3. **Check for an existing instance.** Look for a process already listening on the expected port with a matching working directory before starting a new one. Reuse a healthy matching instance; leave any other/unidentified instance alone. If the port's taken by something unrelated, use a supported port override rather than killing the other process.
+4. **Launch and confirm readiness.** Start it with an explicit working directory, wait for a real readiness signal (not just "the command didn't error"), and open the target route/story if known via available browser tooling. Report an auth redirect or backend failure as exactly that — a server that's up isn't proof the feature works.
+5. **Hand back the preview.** Report the URL, branch, mode (app/Storybook), readiness, and a concrete stop instruction tied to the actual process/session you started (never suggest a broad kill of everything matching a process name). Note launch details in the task note if one exists, without touching the recorded delivery stage.
+
+**Next:** `workbench-verify` for a working preview of already-implemented changes; `workbench-implement` if the preview is for work still to build; or re-run this skill after naming the fix for a startup blocker.

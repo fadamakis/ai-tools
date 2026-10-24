@@ -1,0 +1,22 @@
+---
+name: workbench-plan
+description: Turn a ticket and designs into a small, evidence-based implementation plan for the Workbench workflow. Use for the Workbench "plan" stage — reconciling acceptance criteria, existing code, API contracts, and copy before implementation. Do not use as a replacement for a directly requested ticket-refinement or design-review task outside Workbench.
+---
+
+# Plan a reviewable change
+
+Part of the Workbench delivery workflow (see `workbench-start` for shared rules).
+
+1. **Gather requirements.** Read the full ticket, out-of-scope notes, relevant comments, linked tickets, and exact design references (Figma or equivalent). If Jira/Figma/GitHub access isn't available, ask the user to paste the ticket text/design or set up the relevant CLI/MCP tool rather than guessing. Inspect linked PRs and their merge status. Record missing or conflicting requirements instead of silently picking one.
+2. **Build an Acceptance proof table** *before* looking at implementation details: columns for criterion/source, preconditions, user action, expected observable result, and verification method. Include only states the requirements actually support; mark missing expectations as open questions.
+3. **Trace the existing code.** Find the real entry point, callers, state ownership, and API schema for the affected area. Check recent changes on the verified base. Distinguish an API that's merely declared in a schema from one actually implemented and deployed.
+4. **Check for reusable copy.** Search existing components and the relevant translation/copy source for exact or equivalent messages before assuming new text is needed. Don't invent state-specific wording.
+5. **Define the smallest coherent slice.** For each user-visible transition, identify its owner and its success/loading/empty/failure behavior where relevant. Sketch a short reading order (entry point → state/side-effect owner → rendering/tests) in the task note — prefer extending an existing owner over adding a new layer. List backend dependencies, flags, rollout conditions, and what can be tested now.
+6. **Check size and split.** Reassess the slice at 600 changed lines; at 800, stop and propose independently deployable stacked PRs (frontend/backend stay separate by default). Specify base and merge order for dependent PRs.
+7. **Surface open questions.** Check the ticket/design/code for an answer first. For each remaining question, state the affected behavior, why it matters, and an evidence-backed recommendation labeled clearly as a proposal — plus whether it blocks work. Don't ask about routine choices the repo's conventions already settle. Keep working on unblocked parts while waiting for answers.
+
+Produce a short plan: outcome, scope/non-goals, existing pieces to reuse, changed responsibilities, the Acceptance proof table, dependencies, and Open questions (say "None" if the sources fully settle it). Keep it in the task note rather than a new README unless the repo requires a committed design doc.
+
+For an implementation request, proceed once material ambiguity is resolved — no ceremonial approval gate needed. For a plan-only request, just return the plan.
+
+**Next:** `workbench-implement`, naming any blocking missing decision/contract first if one exists.

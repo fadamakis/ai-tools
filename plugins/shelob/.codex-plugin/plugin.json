@@ -1,0 +1,26 @@
+{
+  "name": "shelob",
+  "version": "0.11.9",
+  "description": "Review code correctness and explicit rules for local changes or GitHub pull requests in Codex.",
+  "skills": "./skills/",
+  "requires_local_executor": true,
+  "author": {
+    "name": "Fotis Adamakis"
+  },
+  "interface": {
+    "displayName": "Shelob",
+    "shortDescription": "Review changes against rules",
+    "longDescription": "Review local changes in your working conversation, or start a dedicated review of a GitHub pull request. Inspect findings and saved reports in the Shelob sidebar.",
+    "developerName": "Fotis Adamakis",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": "Use Shelob to review my changes or a GitHub pull request against its rules.",
+    "logo": "./assets/logo.png",
+    "composerIcon": "./assets/logo.png",
+    "websiteURL": "https://github.com/fadamakis/ai-tools/tree/main/plugins/shelob"
+  },
+  "mcpServers": "./mcp.json"
+}

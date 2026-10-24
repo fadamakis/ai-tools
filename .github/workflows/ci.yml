@@ -1,0 +1,77 @@
+name: Validate and release
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ai-tools-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check high-severity dependency advisories
+        run: pnpm audit --audit-level high
+      - name: Check source and history for secrets
+        run: pnpm audit:secrets
+      - run: pnpm exec playwright install chromium
+      - run: pnpm verify
+      - name: Validate portable packages
+        run: |
+          pnpm package --source-commit "$GITHUB_SHA"
+          node scripts/validate.mjs dist/release --packaged
+          node scripts/check-public.mjs dist/release --packaged
+          node scripts/scan-secrets.mjs --packages dist/release
+          node scripts/smoke-packages.mjs dist/release
+      - name: Retain validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validation-${{ github.sha }}
+          path: |
+            dist/releases/**/ui-results.json
+            dist/workbench-preview-verification/ui-results.json
+            plugins/sauron/test-results/ui-results.json
+            dist/release/release.json
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: macos-14
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Publish verified marketplace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          node scripts/publish-release.mjs

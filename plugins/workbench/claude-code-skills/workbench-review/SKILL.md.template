@@ -1,0 +1,28 @@
+---
+name: workbench-review
+description: Get an independent, read-only review of a Workbench diff using a fresh subagent before publishing. Use for the Workbench "review" stage. Do not use for every PR review request in general, and do not post comments automatically — this only produces findings for the main agent to validate.
+---
+
+# Review before publishing
+
+Part of the Workbench delivery workflow. This stage is read-only unless the user also asked for fixes. You delegate the *review*, not ownership of the change.
+
+1. Establish the exact repo, branch, base, and HEAD, including staged/unstaged/untracked files. For a PR review, fetch current metadata, commits, checks, and every open discussion thread (paginate — a partial fetch isn't a complete triage). If there's no diff to review, say so; don't spawn a subagent for nothing.
+2. **Launch exactly one independent reviewer** using Claude Code's Task tool (a fresh subagent with its own context) with the brief below. Give it a self-contained prompt — it has no memory of this conversation — supplying:
+   - Absolute repo path, branch, base, HEAD, and the exact diff (including untracked task files), excluding unrelated user work.
+   - The user's requirements and Acceptance proof table, with ticket/design links or verified excerpts.
+   - Accepted non-goals and dependency decisions, distinguished from unverified assumptions.
+   - Applicable repo review-guidance paths (CONTRIBUTING, AGENTS.md, CLAUDE.md, etc.).
+   - Existing PR discussion context, to avoid duplicate findings.
+
+   Instruct the subagent explicitly: **work read-only** — inspect files, callers, history, schemas, and existing tests; do not edit source, commit, push, post replies, resolve threads, or spawn further agents. Ask for reproduction steps rather than performing risky mutations itself.
+
+   Ask it to: trace changed behavior through callers/data sources; for bug fixes check the before/after proof; report only introduced, discrete issues affecting correctness/performance/security/maintainability that the author would actually fix, each with file/line, scenario, impact, evidence, and remedy; separately note reviewability issues (duplicated ownership, forwarding layers, oversized components, unnecessary custom async orchestration vs. the library's own lifecycle) with a concrete simplification, not taste-based nitpicks; explicitly say when there are no actionable findings.
+3. While it works, don't re-review the same files yourself or edit them — collect verification evidence instead.
+4. Wait for the subagent to finish before calling review complete. If the Task tool is unavailable for some reason, say so explicitly and perform the same checklist yourself, labeling it a main-agent review rather than an independent one.
+5. **Validate the findings** against the current code and requirements yourself — reproduce when feasible, deduplicate against existing PR discussions, and reject speculative feedback with a concrete reason (don't dismiss something just because it conflicts with your original rationale, though). Flag invented copy, unrelated refactors, or out-of-scope behavior as scope defects, and distinguish behavior this change caused from pre-existing behavior (recommend a separate ticket for the latter).
+6. For an end-to-end implementation request, fix confirmed issues yourself and rerun affected checks — optionally send the same reviewer a focused recheck of just those changes. Don't spawn a new reviewer repeatedly hoping for a different verdict. For a review-only request, stop after reporting findings.
+
+State what revision was reviewed, whether the review was independent or a fallback, and any remaining verification/deployment dependencies. Being mergeable and being ready to enable in production are different claims — don't conflate them.
+
+**Next:** `workbench-publish` once review findings (if any) are addressed and affected checks pass again.

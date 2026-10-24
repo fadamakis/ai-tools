@@ -1,0 +1,36 @@
+---
+name: workbench-autopilot
+description: >
+  Run the Workbench stages continuously for one explicitly requested task: prepare, plan, implement, verify, review, publish, greenlight. Use only for an explicit "autopilot"/"run this end to end" request. Stops when only pending CI or future review remains; never schedules itself to keep running.
+---
+
+# Workbench autopilot
+
+An opt-in coordinator over the other Workbench skills, not a separate implementation workflow. Load each stage only as you reach it. Translation requests (`workbench-translations`) are explicitly excluded — never invoke that stage from autopilot.
+
+If this run was triggered by an automated wake-up rather than a live request, follow the read-only monitoring section of `workbench-greenlight` and stop after reporting — do not run the delivery stages, and do not inherit edit/push/reply permission from an earlier autopilot run.
+
+## What one explicit invocation authorizes
+
+For the active run only: local implementation and fixes, commits, ordinary pushes to the task's own branch, creating/updating its draft PR, and replying to/resolving review threads whose concerns are demonstrably addressed. Re-verify the actual repo, branch ownership, remote, and PR before each external action. This never extends to someone else's branch or an unrelated PR, and a scope/target change needs to be checked with the user. Respect any narrower instruction the user gave (e.g. "local only", "no replies").
+
+Autopilot never marks a PR ready, merges, bypasses branch protections, force-pushes, touches staging/production data, or deploys.
+
+## Sequence
+
+1. `workbench-prepare`, then `workbench-plan`. Give a brief plan update and continue without a ceremonial approval gate. Ask only for unresolved decisions that materially affect the work; keep working on the rest while waiting.
+2. `workbench-implement`, including simplification. A missing backend contract stays an explicit dependency — autopilot doesn't authorize inventing one.
+3. `workbench-verify`, using `workbench-run` if a preview is needed. Fix failures caused by this change and rerun affected checks. Don't manufacture a pass via mocks, longer timeouts, or weakened assertions.
+4. `workbench-review` with its independent subagent. Fix confirmed defects, rerun affected checks, and request a focused recheck if warranted. If the Task tool is unavailable, report the main-agent fallback rather than skipping review silently.
+5. `workbench-publish`, once review and affected checks are done. A failing required check blocks automatic publication. Reuse the task's existing PR rather than duplicating it.
+6. `workbench-greenlight` on that PR: fetch current checks/conflicts/discussions, triage rather than obeying blindly, fix confirmed in-scope issues, rerun affected checks, push one coherent update per round, and reply/resolve only what's actually addressed. Leave disputed or product-scope questions open for the user. Before each round, confirm the PR is still open and still points at the expected branch.
+7. Before the final handoff, run the proposal phase of `workbench-improve`, including when stopping on pending CI or future review. This is read-only: show at most one evidence-backed reusable candidate, and prefer no proposal over a one-off rule. Never edit Workbench unless the user later gives direct approval for that exact proposal.
+8. Keep going while there's a concrete next action likely to make progress. If the same failure recurs after two materially different attempts with no new evidence, stop repeating it, preserve the work, and report the cause, what you tried, and the precise unblock needed.
+
+## Stopping condition
+
+"Green" means: fresh evidence for the current PR head — required CI checks passed, no other relevant failures, no unresolved actionable review feedback, no merge conflicts. Pending/queued checks are not green. When only asynchronous CI/review results remain, **stop the run**, run the read-only improvement retrospective, and report the pending checks and PR head — don't create a monitor or keep polling. "Autopilot" and "until green" are not permission for unattended future edits; a later explicit request (including "watch this and notify me") can pick it back up via `workbench-greenlight`'s read-only monitoring mode.
+
+Finish each handoff with: PR/revision, completed stages, check results, independent-review status, and remaining decisions.
+
+**Next:** for pending results, suggest a later `workbench-greenlight` check; for confirmed findings, offer an explicit fix round naming the PR and findings; once green, hand the ready/merge decision to the user rather than suggesting anything further.

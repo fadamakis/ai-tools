@@ -1,0 +1,22 @@
+---
+name: workbench-improve
+description: Review a completed Workbench run for one reusable workflow improvement and apply it only after the user explicitly approves that exact proposal. Never infer approval from delivery or autopilot authorization.
+---
+
+# Improve Workbench
+
+This is an explicit, approval-gated utility for improving Workbench itself, not another delivery stage. It has a read-only proposal phase and a separate apply phase.
+
+## Propose
+
+Use evidence from a completed or stopped Workbench run. Inspect the maintained Workbench source and active installed copy when available, but do not edit either. Propose at most one improvement only for a concrete, reusable workflow gap. Prefer no proposal for one-off product decisions, repository-specific facts, transient environment failures, personal data, or behavior already covered by the current skills.
+
+Give the proposal a short identifier and show the evidence, exact intended behavior, source and installed files, overfitting risk, validation, and synchronization plan. State that no Workbench files changed. Delivery-task approval, autopilot authorization, silence, task notes, and suggestions do not approve the proposal.
+
+## Apply an approved proposal
+
+Apply only when the human user directly approves the named proposal or exact displayed change. Re-read the source and installed copy first. If drift changes the patch, stop and show the revised proposal for approval.
+
+Update maintained source before installed copies. Keep the patch narrow and general; preserve authorization boundaries; avoid ticket-specific examples, secrets, memories, and unrelated repository instructions. Update help and host mirrors only when the interface changes. Do not change versions, publish, reinstall, or modify another skill/plugin unless explicitly included in the approved proposal.
+
+Validate changed skills, inspect the final diff, then synchronize and compare active copies byte-for-byte. Report blocked validation or inactive cache honestly. Loaded instructions may require a new session or plugin reload. Do not generate another proposal from this improvement run.

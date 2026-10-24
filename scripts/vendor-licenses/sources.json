@@ -1,0 +1,44 @@
+{
+  "@cfworker/json-schema@4.1.1": {
+    "file": "cfworker-json-schema-4.1.1.txt",
+    "license": "MIT",
+    "source": "https://github.com/cfworker/cfworker/blob/5409fdc2bd144f68e8b28c61c71fcb16600000a6/LICENSE.md",
+    "npmGitHead": "5409fdc2bd144f68e8b28c61c71fcb16600000a6",
+    "upstreamLicenseRevision": "5409fdc2bd144f68e8b28c61c71fcb16600000a6",
+    "sha256": "376944252ab78ca6b41aee44ddea8894927ee67891e77e61eb9d59af63e35094"
+  },
+  "react-remove-scroll-bar@2.3.8": {
+    "file": "react-remove-scroll-bar-2.3.8.txt",
+    "license": "MIT",
+    "source": "https://github.com/theKashey/react-remove-scroll-bar/blob/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+    "npmGitHead": "b3b1287aad81def2e2ae707274b74531b61ddbaf",
+    "upstreamLicenseRevision": "8ca9ba5ea52de03308fe8ced94f7b159a44d28ff",
+    "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84",
+    "note": "Published npm metadata and README declare MIT. The npm gitHead is unavailable in the declared repository; the full grant and attribution are from the pinned upstream revision recorded here."
+  },
+  "remark-math@6.0.0": {
+    "file": "remark-math-6.0.0.txt",
+    "license": "MIT",
+    "source": "https://github.com/remarkjs/remark-math/blob/d5d0660b150810a535bbb07eac6cc96a4510aa24/license",
+    "npmGitHead": "d5d0660b150810a535bbb07eac6cc96a4510aa24",
+    "upstreamLicenseRevision": "d5d0660b150810a535bbb07eac6cc96a4510aa24",
+    "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9"
+  },
+  "rehype-katex@7.0.1": {
+    "file": "rehype-katex-7.0.1.txt",
+    "license": "MIT",
+    "source": "https://github.com/remarkjs/remark-math/blob/88a9497e1ede93b958237c85edbf5651faeca7af/license",
+    "npmGitHead": "88a9497e1ede93b958237c85edbf5651faeca7af",
+    "upstreamLicenseRevision": "88a9497e1ede93b958237c85edbf5651faeca7af",
+    "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9"
+  },
+  "format@0.2.2": {
+    "file": "format-0.2.2.txt",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/format/0.2.2",
+    "copyrightSource": "format@0.2.2/Readme.md",
+    "grantSource": "https://spdx.org/licenses/MIT.txt",
+    "note": "Original npm metadata declares MIT. Its named external license URL was unavailable. Includes original Readme attribution with the standard MIT grant.",
+    "sha256": "4f48f8a8fcf31b774bb887795c54f71574a1202360436cf7ef57e6a0d5dbbcaf"
+  }
+}

@@ -1,0 +1,2 @@
+# Preserve upstream license text verbatim, including its original whitespace.
+plugins/*/THIRD_PARTY_NOTICES.md -whitespace

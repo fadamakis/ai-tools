@@ -1,0 +1,23 @@
+---
+name: workbench-verify
+description: Verify a Workbench change against its acceptance criteria, real runtime behavior, and CI-equivalent checks. Use for the Workbench "verify" stage. Reports passed/failed/blocked separately and never authorizes a push by itself.
+---
+
+# Verify the behavior
+
+Part of the Workbench delivery workflow. Bind every check to the current branch/HEAD/diff before running it — a pass on stale code doesn't count.
+
+1. **Start from the Acceptance proof table** produced by `workbench-plan` (reconstruct it from ticket/design/decisions if it's missing). Verify each in-scope criterion against its expected observable result — passing implementation tests alone doesn't establish acceptance. Mark each passed / failed / blocked / not run, and explain any excluded criterion. Run the repo's actual lint/format/type/test commands (read them from the repo, don't guess); use one proof layer per behavior, no duplicated coverage across unit/component/E2E without a concrete reason.
+2. **Check the real thing when it's a UI change.** Use `workbench-run` to get the app/Storybook running, then inspect the real route, not just stories, at the relevant viewport sizes: spacing, states, hover/focus, loading layout, empty/error states, stale-response handling. For a visual change, capture Before/After screenshots (see below) — report a missing baseline honestly rather than fabricating a pair.
+3. **For write flows,** check the actual submit → disable → error/retry → success sequence and confirm success/navigation comes from real data, not an assumption.
+4. **For bug fixes,** prove it fails before the fix and passes after, on the correct base revision, when practical. A nonzero exit, missing fixture, or auth wall is not proof of the bug — it's a blocked check; report it as such.
+5. **For CI-style failures,** fetch the exact failed command and log, reproduce with the same runtime, and identify environment mismatch vs. flaky ordering vs. a real defect. Don't fix a flaky test by lengthening its timeout.
+6. **Record evidence:** exact commands, results, revision, and scope in the task note. For UI changes, hand publish the reviewed screenshot inventory with paths, provenance and missing images, plus relevant new/changed or existing Storybook stories with source, actual ID, demonstrated state and local proof. Follow [PR visual evidence](../../references/visual-evidence.md); captured files are unattached until publication confirms PR body readback. A command has to actually complete successfully to count as passed. Mark browser/staging checks unverified when auth or environment blocks them, rather than skipping silently.
+
+### Visual evidence (only for user-visible UI changes)
+
+Capture the specific state that demonstrates the change, at the real route when possible (Storybook is fine for component-level evidence, label it as such). Use the same surface/viewport/theme/locale/route for Before and After. Save files outside the tracked source diff (e.g. `<repo>/.workbench/artifacts/<task-key>/`) with clear names like `<scenario>-before-app.png` / `<scenario>-after-app.png`. Record each pair's paths, revisions, and scenario in the task note. Never fabricate a screenshot or relabel current code as "before."
+
+Report a compact evidence summary: local checks / runtime-design checks / CI-and-deployment dependencies, each separated, with what remains unverified and why. If you make a fix, rerun only the affected checks before updating the evidence.
+
+**Next:** `workbench-review` once verification is as complete as it can be; otherwise `workbench-implement` for code-level failures, or name the specific environment fix needed for a blocked check.

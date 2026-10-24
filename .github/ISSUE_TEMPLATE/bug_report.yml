@@ -1,0 +1,25 @@
+name: Bug report
+description: Report a reproducible problem using sanitized examples.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities use Security → Report a vulnerability. Do not include tokens, databases, private source, or personal task content here."
+  - type: input
+    id: version
+    attributes:
+      label: Plugin and version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: macOS, architecture, Codex host/CLI, and Node versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction, expected result, and observed result
+      description: Use a small synthetic example and sanitized errors.
+    validations:
+      required: true

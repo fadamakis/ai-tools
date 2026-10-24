@@ -1,0 +1,21 @@
+{
+  "name": "@ai-tools/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.jsx"
+    },
+    "./theme.css": "./theme.css",
+    "./dialogs": "./dialogs.jsx"
+  },
+  "dependencies": {
+    "@openai/apps-sdk-ui": "0.2.2",
+    "radix-ui": "1.8.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "license": "MIT"
+}
