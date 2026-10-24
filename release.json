@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "7394edc0d41d57e173dd833ae58e6fdd431e7374",
+  "sourceCommit": "71dbd16eb292e4ec6046aaae5c0ff73054854bdd",
   "products": {
     "shelob": {
       "version": "0.11.9",
@@ -17,9 +17,5 @@
       "packageDigest": "ab5b515a5aabaaf026e4eef72ddf195913c57d91f2fa2bf105a0289a6eb123ec"
     }
   },
-  "changed": [
-    "shelob",
-    "sauron",
-    "workbench"
-  ]
+  "changed": []
 }
