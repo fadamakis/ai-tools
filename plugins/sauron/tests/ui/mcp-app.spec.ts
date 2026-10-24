@@ -9,6 +9,7 @@ import { join,resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 test('official AppBridge harness renders Inbox and completes through stdio tools',async({page})=>{
+  await page.emulateMedia({colorScheme:'dark'});
   await page.setViewportSize({width:1440,height:1100});
   const dir=mkdtempSync(join(tmpdir(),'attention-app-bridge-'));
   const runtime=join(dir,'runtime.cjs');
@@ -51,6 +52,7 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     await page.evaluate(html=>(window as any).startSauronHarness(html),html);
     const app=page.frameLocator('iframe');
     await expect(app.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();
+    await expect(app.locator('html')).toHaveAttribute('data-theme','light');
     await expect(app.getByRole('heading',{name:'Start with one task',exact:true})).toBeVisible();
     await app.getByRole('button',{name:'Refresh',exact:true}).click();
     await expect(app.getByRole('button',{name:'Refreshing…',exact:true})).toBeDisabled();

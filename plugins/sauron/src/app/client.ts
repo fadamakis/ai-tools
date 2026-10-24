@@ -5,17 +5,20 @@ import type { Result, Task } from '../shared/contracts.js';
 
 export type Client = {call:(name:string,args?:unknown)=>Promise<Result>; open:(url:string)=>Promise<void>; mode:string; discuss?:(task:Task,storeId:string)=>Promise<void>};
 export async function connect(onView:(view:Result)=>void):Promise<Client> {
-  if(window.parent === window) return {
-    mode:'Local preview',
-    call:async(name,args={})=>{
-      const response=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({name,arguments:args})});
-      const data=await response.json();
-      if(!response.ok || data.error)throw Error(data.error ?? 'Request failed');
-      return data;
-    },
-    open:async url=>{window.open(url,'_blank','noopener,noreferrer');},
-  };
+  if(window.parent === window) {
+    applyDocumentTheme(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    return {
+      mode:'Local preview',
+      call:async(name,args={})=>{
+        const response=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({name,arguments:args})});
+        const data=await response.json();
+        if(!response.ok || data.error)throw Error(data.error ?? 'Request failed');
+        return data;
+      },
+      open:async url=>{window.open(url,'_blank','noopener,noreferrer');},
+    };
+  }
   const app=new App({name:'Sauron',version:'0.6.6'});
   const extensions=new OpenAIExtensions(app);
   app.ontoolresult=result=>{

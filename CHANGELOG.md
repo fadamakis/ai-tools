@@ -1,5 +1,13 @@
 # Changelog
 
+## Public preparation: interface fixes
+
+- Improve active field hints, success and warning badge contrast, and repository-filter readability in light and dark themes.
+- Give Shelob disclosures larger targets and visible focus; make code evidence regions keyboard focusable and horizontally scrollable.
+- Remove the nested hidden control from Workbench's repository selector while preserving its accessible name and controlled selection.
+- Initialize Sauron's standalone preview from the system theme while preserving embedded host themes.
+- Add the confirmed product context, contributor audit tooling and scoped automated accessibility coverage. Native activation/chat delivery and narrow WebKit keyboard behavior remain unverified.
+
 ## Public distribution preparation — unreleased
 
 - Add independent Git marketplace installation, update, privacy, support, and contribution documentation.

@@ -17,7 +17,13 @@ function Severity({finding,advisory,discussed}){
   return <span className={`severity ${severity}`} title={severityLevels[severity].description}>{discussed?'Marked discussed':advisory?'Advisory':`${severityLevels[severity].label} · ${severity==='error'?'Blocking':'Optional'}`}</span>;
 }
 function Evidence({item}){
-  return <figure className="evidence"><figcaption><code>{item.path}{item.line?`:${item.line}`:''}</code><span>{item.side==='before'?'Before change':'After change'}</span></figcaption>{item.snippet&&<pre><code>{item.snippet}</code></pre>}</figure>;
+  const scroll=event=>{
+    if(event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||!['ArrowLeft','ArrowRight'].includes(event.key))return;
+    const region=event.currentTarget;
+    if(region.scrollWidth<=region.clientWidth)return;
+    event.preventDefault();region.scrollLeft+=event.key==='ArrowRight'?40:-40;
+  };
+  return <figure className="evidence"><figcaption><code>{item.path}{item.line?`:${item.line}`:''}</code><span>{item.side==='before'?'Before change':'After change'}</span></figcaption>{item.snippet&&<pre tabIndex={0} role="region" aria-label={`Code evidence for ${item.path}${item.line?`:${item.line}`:''}, ${item.side==='before'?'before':'after'} change`} onKeyDown={scroll}><code>{item.snippet}</code></pre>}</figure>;
 }
 function CommentCard({finding,result,session,change,receipt,discussed,busy,embedded,isPr,canPostComments,canRewrite,onPostReview,onDiscussed,onRewrite,copy,enhanced}){
   const id=finding.id,advisory=isAdvisory(finding,result),disabled=Boolean(receipt||discussed);

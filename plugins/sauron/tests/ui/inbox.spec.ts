@@ -6,6 +6,7 @@ import { mkdtempSync,rmSync,writeFileSync,mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { syntheticObservation, type Result } from '../../src/shared/contracts.js';
+import { contrastRatio } from '../../../../tests/ui/contrast.mjs';
 let child:ChildProcess,dir:string,origin:string;let port=4610;
 test.beforeEach(async()=>{
   dir=mkdtempSync(join(tmpdir(),'sauron-inbox-test-'));origin=`http://127.0.0.1:${++port}`;
@@ -19,6 +20,20 @@ async function call(request:APIRequestContext,name:string,args:unknown={}):Promi
 async function open(page:Page){await page.goto(origin);await expect(page.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();}
 async function add(request:APIRequestContext,title='Review launch notes'){return call(request,'create_personal_task',{title,nextAction:'Decide the next step after reviewing the meeting notes.',sourceState:'needs_you',operationId:crypto.randomUUID()});}
 async function actions(page:Page,title:string,action:string){await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).click();await page.getByRole('menuitem',{name:action,exact:true}).click();}
+
+for(const theme of ['light','dark'] as const){
+  test(`preview starts with the system ${theme} theme and readable field hints`,async({page})=>{
+    await page.emulateMedia({colorScheme:theme});await open(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme);
+    const toggle=page.getByRole('button',{name:`Switch to ${theme==='dark'?'light':'dark'} theme`});
+    await expect(toggle).toBeVisible();
+    await page.getByRole('button',{name:'Add task',exact:true}).click();
+    expect(await contrastRatio(page.getByRole('textbox',{name:'Task name',exact:true}),'::placeholder')).toBeGreaterThanOrEqual(4.5);
+    expect(await contrastRatio(page.getByRole('textbox',{name:'Notes (optional)',exact:true}),'::placeholder')).toBeGreaterThanOrEqual(4.5);
+    await toggle.click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme',theme==='dark'?'light':'dark');
+  });
+}
 const evidence='docs/evidence/inbox-0.5.0';
 test('Inbox opens directly after reopening and has no layout selector',async({page,request})=>{
   await add(request);await open(page);mkdirSync(evidence,{recursive:true});
