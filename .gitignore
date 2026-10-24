@@ -22,3 +22,9 @@ plugins/*/evidence/
 *.pem
 *.p12
 workspace-plugins.local.json
+.agents/skills/impeccable/scripts/bin/
+.impeccable/config.local.json
+.impeccable/live/
+.impeccable/cache/
+.impeccable/sessions/
+.impeccable/telemetry/

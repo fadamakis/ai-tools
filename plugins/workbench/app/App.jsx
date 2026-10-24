@@ -20,9 +20,9 @@ function BusyStatus({ vm }) {
 }
 
 function RepositoryTrigger({ label }) { return <><span className="sr-only">Repository: </span>{label}</>; }
-function RepositorySelect({ repositories, value, onChange, id, disabled }) {
-  return <Select id={id} name={id} value={value} options={[
-    ...(!id ? [{ value: '', label: 'All repositories' }] : []),
+function RepositorySelect({ repositories, value, onChange, includeAll = true, disabled }) {
+  return <Select value={value} options={[
+    ...(includeAll ? [{ value: '', label: 'All repositories' }] : []),
     ...repositories.map(repository => ({ value: repository.id, label: repository.name }))
   ]} onChange={option => onChange(option.value)} TriggerView={RepositoryTrigger} pill={false} size="lg" disabled={disabled}/>;
 }
@@ -212,7 +212,7 @@ function LaunchForm({ vm, task, initialRepositoryId }) {
     <form onSubmit={event => submitForm(event, submit)} onKeyDown={event => enterSubmits(event, submit)}>
       {task ? <div className="resume-task"><span className="task-key">{task.key}</span><h3>{displayTitle(task)}</h3><p className="dialog-copy">{description}</p></div> : <>
         <label className="field-label" htmlFor="task-description">Ticket or desired outcome</label><Textarea id="task-description" size="lg" rows={2} maxRows={8} autoResize required maxLength={2000} value={title} onChange={event => setTitle(event.target.value)} placeholder="A ticket, link, or what you want to build" disabled={vm.busy}/>
-        <label className="field-label" htmlFor="task-repository">Repository</label><RepositorySelect id="task-repository" repositories={vm.board.repositories} value={repositoryId} onChange={setRepositoryId} disabled={vm.busy}/>
+        <p className="field-label">Repository</p><RepositorySelect includeAll={false} repositories={vm.board.repositories} value={repositoryId} onChange={setRepositoryId} disabled={vm.busy}/>
       </>}
       <LaunchDestination task={task} continuation={continuation} setContinuation={setContinuation} environment={environment} setEnvironment={setEnvironment} busy={vm.busy}/>
       <div className="autopilot-field"><Checkbox id="autopilot" checked={autopilot} onCheckedChange={setAutopilot} label="Autopilot" disabled={vm.busy}/><p>{autopilot ? 'Authorizes commits, ordinary pushes, a draft PR and addressed review replies during this run. Stops when waiting for CI or review. Never merges.' : 'Continue the next Workbench stage. Commits, pushes, PR publication and review replies require separate authorization.'}</p></div>

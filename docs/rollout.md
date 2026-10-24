@@ -4,7 +4,7 @@
 
 The repository variable `AI_TOOLS_PUBLISH_ENABLED` must equal `true` before the trusted publishing job can run. Keep it unset or `false` during private release preparation. Validation, including a manually dispatched workflow, still runs with publication disabled.
 
-Enable the variable only during the approved launch after the privacy, native acceptance and repository-control checks are complete. Passing `main` changes then publish through the normal release job. Setting the variable to `false` stops future publishing jobs; it does not cancel an already-running job or change installed versions. Check live runs when stopping publication.
+Enable the variable only during the approved launch after privacy, automated validation and repository-control checks are complete and remaining limitations are recorded. Passing `main` changes then publish through the normal release job. Setting the variable to `false` stops future publishing jobs; it does not cancel an already-running job or change installed versions. Check live runs when stopping publication.
 
 ## Validate before publication
 
@@ -22,9 +22,11 @@ The secret scanner is pinned by version and archive SHA-256 in `scripts/security
 
 Check project licenses and third-party notices in every ZIP, not only source. Verify unchanged versions/fingerprints, product/shared changes, interrupted builds, failed validation, and stale-main publication protection. PR validation is unprivileged; publishing credentials are used only by the trusted publish job. Do not commit generated bundles or user data to `main`.
 
-## Desktop acceptance
+## Desktop checks when available
 
 Record source/release commit, versions, macOS/architecture, host/CLI/Node versions, commands, and dated results. Use disposable data and a clean installation; preserve existing data before replacing an installation.
+
+The initial public release proceeds on automated validation and the reported successful Workbench installation on another Mac. Unverified native panel activation, chat delivery and keyboard behavior are disclosed limitations, not a request for the owner to perform manual QA. Maintainers can use the checks below when a suitable host is available; record a check as unverified until it has actually been observed.
 
 1. Install each product independently through the supported host/CLI installer. Check tool discovery, one harmless workflow, UI loading, missing prerequisites, and feature-specific connections.
 2. Verify native Workbench chat start/resume and the explicit command routes. Keep simulated bridge/browser results separate from native delivery.

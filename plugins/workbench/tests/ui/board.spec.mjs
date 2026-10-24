@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { contrastRatio } from '../../../../tests/ui/contrast.mjs';
 
 async function open(page, query = '') {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -400,6 +401,7 @@ test('SDK repository selector stays inside the modal focus flow and Escape close
   await close.press('Shift+Tab'); await expect(submit).toBeFocused();
   await submit.press('Tab'); await expect(close).toBeFocused();
   const repository = dialog.getByRole('button', { name: /^Repository:/ });
+  await expect(repository.locator('input,select,textarea,button,[role="button"]')).toHaveCount(0);
   await repository.press('Space');
   const option = app.getByRole('option').first();
   await expect(option).toBeVisible();
@@ -411,6 +413,19 @@ test('SDK repository selector stays inside the modal focus flow and Escape close
   await expect(app.getByRole('button', { name: 'New task', exact: true })).toBeFocused();
   expect(errors).toEqual([]);
 });
+
+for (const theme of ['light', 'dark']) {
+  test(`active field hints and merged status have readable contrast (${theme})`, async ({ page }) => {
+    const { app } = await open(page, `?theme=${theme}`);
+    expect(await contrastRatio(app.getByRole('button', { name: /^Repository: All repositories/ }))).toBeGreaterThanOrEqual(4.5);
+    expect(await contrastRatio(app.locator('[data-color="success"][data-variant="soft"]').filter({ hasText: 'Merged' }).first())).toBeGreaterThanOrEqual(4.5);
+    for (const label of await app.locator('[data-color="warning"][data-variant="soft"],.needs-attention').all()) {
+      expect(await contrastRatio(label)).toBeGreaterThanOrEqual(4.5);
+    }
+    await app.getByRole('button', { name: 'New task', exact: true }).click();
+    expect(await contrastRatio(app.locator('#task-description'), '::placeholder')).toBeGreaterThanOrEqual(4.5);
+  });
+}
 
 test('help keeps its close control visible after reading the last section and uses visible list markers', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

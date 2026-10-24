@@ -1,4 +1,6 @@
-/* Shared by Shelob and Sauron. Sync with scripts/sync-product-theme.mjs. */
+/* Shared product foundation, imported by all three panels. */
+:root{--input-placeholder-text-color:var(--color-text-secondary)}
+input:not(:disabled)::placeholder,textarea:not(:disabled)::placeholder{color:var(--input-placeholder-text-color);opacity:1}
 :root{--brand:#643b5b;--brand-soft:#f5f0f4;--focus:#3877c7;--bg:var(--color-background-primary,#fff);--ink:var(--color-text-primary,#202020);--muted:color-mix(in srgb,var(--ink) 70%,var(--bg));--line:var(--color-border-primary,#e5e5e5);--surface:var(--color-background-secondary,#fafafa);--product-width:1280px;--product-gutter:28px;font:14px/1.5 var(--font-sans,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif);color:var(--ink);background:var(--bg)}
 :root[data-theme=dark]{--brand:#d0a8c5;--brand-soft:#322931;--bg:var(--color-background-primary,#202020);--ink:var(--color-text-primary,#ededed);--line:var(--color-border-primary,#383838);--surface:var(--color-background-secondary,#262626);color-scheme:dark}
 body{margin:0;padding:var(--safe-top,0px) var(--safe-right,0px) var(--safe-bottom,0px) var(--safe-left,0px);background:var(--bg);color:var(--ink)}
