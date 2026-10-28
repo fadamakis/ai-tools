@@ -1,19 +1,19 @@
 [
   {
     "name": "shelob",
-    "version": "0.11.10",
+    "version": "0.11.11",
     "tools": 23,
     "status": "passed"
   },
   {
     "name": "sauron",
-    "version": "0.6.13",
+    "version": "0.6.14",
     "tools": 17,
     "status": "passed"
   },
   {
     "name": "workbench",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "tools": 17,
     "status": "passed"
   }

@@ -1,6 +1,6 @@
 {
   "name": "shelob",
-  "version": "0.11.10",
+  "version": "0.11.11",
   "description": "Review code correctness and explicit rules for local changes or GitHub pull requests in Codex.",
   "skills": "./skills/",
   "requires_local_executor": true,
