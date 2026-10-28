@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { taskNotes } from './repository-import.mjs';
 import { BoardPersistence } from './persistence.mjs';
 import { TaskEvidence } from './task-evidence.mjs';
+import { Publication } from './publication.mjs';
 import { LaunchLifecycle } from './launches.mjs';
 export { taskKey } from './launches.mjs';
 import { normalizeTaskEvidence, updateEvidence } from '../shared/evidence.mjs';
@@ -36,6 +37,7 @@ export class BoardStore {
     this.lockfile = this.persistence.lockfile;
     this.launches = new LaunchLifecycle(this);
     this.taskEvidence = new TaskEvidence(this);
+    this.publication = new Publication(this);
   }
 
   read() { const data = this.persistence.read(); return { ...data, tasks: data.tasks.map(normalizeTaskEvidence) }; }

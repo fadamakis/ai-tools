@@ -211,3 +211,4 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 }
 @media (max-width: 360px) { .brand-mark { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+ .delivery-attempt { margin-block: 16px; overflow-wrap: anywhere; }

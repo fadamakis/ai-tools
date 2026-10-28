@@ -6,6 +6,7 @@ import { McpServer, serveStdio, OpenAIExtensions, registerAppTool, registerAppRe
 import { BoardStore, stageColumn } from './store.mjs';
 import { discoverRepositories, pickRepositoryFolder } from './repository-import.mjs';
 import { unresolvedLaunchStates } from '../shared/launch-states.mjs';
+import { registerDeliveryTools } from './delivery-tools.mjs';
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const id = z.string().uuid();
@@ -30,6 +31,7 @@ export function createServer({ store = new BoardStore(), root = pluginRoot, appH
     return server.registerTool(name, config, guarded(callback));
   };
   const session = context => context?.mcpReq?._meta?.['openai/session'] || context?._meta?.['openai/session'];
+  registerDeliveryTools(register, z, store);
   const bind = async (context, task) => { const key = session(context); if (typeof key === 'string' && key.length <= 4096) await store.associate(key, task.id); return { task }; };
   registerAppResource(server, 'workbench-board', uri, {}, async () => ({ contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: html,
     _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } }, 'openai/ui': { preferredDisplayMode: 'fullscreen', availableDisplayModes: ['inline', 'fullscreen'] } } }] }));
