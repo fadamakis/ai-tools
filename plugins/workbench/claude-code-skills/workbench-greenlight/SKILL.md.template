@@ -15,7 +15,7 @@ Part of the Workbench delivery workflow. Requires GitHub access. If this is an a
 3. Group related findings by underlying cause and fix them together, tracing the sweep to related callers without turning it into unrelated cleanup. For CI, inspect the actual failing command and log rather than guessing from the job title. For conflicts, verify the intended base and follow the repo's history conventions — don't rewrite a published branch's history or change its base without being asked to.
 4. If a comment changes product behavior or needs an unknown API contract, name the concrete decision needed and keep fixing everything else meanwhile.
 5. Before pushing, re-read each fix against every comment it's meant to address and against the plan's Acceptance proof table. Rerun affected checks. Review the diff for accidental conflict-resolution artifacts or unrelated edits. Refresh the task note/evidence.
-6. Push once per review round (not once per comment) when pushing is authorized. If replying/resolving is authorized, post concise evidence-backed replies and resolve only threads whose concern is actually fixed — don't claim a local-only fix is pushed, and don't resolve a disputed or unanswered question.
+6. When publication is authorized, prepare and execute one coherent update per review round through the Workbench publication controller. Reconcile uncertainty before any retry. If replying/resolving is authorized, post concise evidence-backed replies and resolve only threads whose concern is actually fixed — don't claim a local-only fix is pushed, and don't resolve a disputed or unanswered question.
 
 Return a compact summary: PR/revision, addressed items, remaining decisions, check results, and whether changes are local-only or pushed. If nothing beyond review is authorized, give triage and draft replies only — don't push.
 
@@ -29,3 +29,7 @@ Only use this when the user explicitly asked to be watched/notified.
 - When findings appear, report them and offer one explicit next step ("want me to fix these?") rather than fixing anything automatically — a monitoring check never carries authorization to push or reply.
 
 **Next:** `workbench-publish` if fixes are ready to push; otherwise name the remaining pending checks/approvals/decisions. If truly nothing remains, say there's no further Workbench step and leave merge/ready-for-review to the user.
+
+Use Workbench PR refresh to distinguish observed checks from required CI. Treat missing checks as pending and unresolved policy as unknown; neither establishes green status.
+
+When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap. Remote observations are read-only and never authorize repairs.

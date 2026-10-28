@@ -21,3 +21,5 @@ Capture the specific state that demonstrates the change, at the real route when 
 Report a compact evidence summary: local checks / runtime-design checks / CI-and-deployment dependencies, each separated, with what remains unverified and why. If you make a fix, rerun only the affected checks before updating the evidence.
 
 **Next:** `workbench-review` once verification is as complete as it can be; otherwise `workbench-implement` for code-level failures, or name the specific environment fix needed for a blocked check.
+
+Use the Workbench requirements checkpoint and content evidence tools when available. Freeze accepted requirements during planning; capture the current content before verification or review, and reference its snapshot when recording results. Missing tooling leaves evidence unbound.

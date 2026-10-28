@@ -1,4 +1,4 @@
-import { evidenceChecks } from '../shared/evidence.mjs';
+import { evidenceChecks, evidenceFreshness } from '../shared/evidence.mjs';
 
 export function attentionReason(task, at = Date.now()) {
   if (task.archivedAt || task.stage === 'done') return '';
@@ -6,6 +6,8 @@ export function attentionReason(task, at = Date.now()) {
   if (task.status === 'unverified') return task.nextAction || 'Check the imported task against current evidence.';
   if (task.pr?.checks === 'failed') return 'CI failed. Check the pull request.';
   const checks = evidenceChecks(task);
+  const stale = ['verify', 'review'].map(kind => evidenceFreshness(task, kind)).find(item => item.status === 'stale' || item.status === 'unavailable');
+  if (stale) return stale.reason;
   if (['failed', 'blocked'].includes(checks.verify?.result)) return 'Verification needs attention.';
   if (['findings', 'blocked'].includes(checks.review?.result)) return 'Review findings need attention.';
   if (task.head && [task.pr?.head, ...Object.values(checks).map(check => check.head), task.evidence?.head].some(head => head && head !== task.head)) return 'Evidence is for an earlier revision. Check again.';
@@ -46,8 +48,9 @@ export function evidenceLabel(task, kind) {
   const check = evidenceChecks(task)[kind], value = check?.result;
   if (!value || value === 'unverified') return 'Not checked';
   if (task.stage === 'done') return `${value} · historical`;
-  if (!task.head || !check.head) return `${value} · revision not recorded`;
-  return check.head === task.head ? `${value} · recorded commit` : `${value} · earlier revision`;
+  if (check.snapshot) { const freshness = evidenceFreshness(task, kind); return `${value} · ${freshness.status} · ${freshness.reason}`; }
+  if (!task.head || !check.head) return `${value} · unbound · revision not recorded`;
+  return check.head === task.head ? `${value} · unbound · recorded commit only` : `${value} · unbound · earlier revision`;
 }
 
 export const launchStatus = { prepared: 'Chat requested', dispatching: 'Sending request', queued: 'Creating chat', sent: 'Waiting for task confirmation', accepted: 'Chat confirmed', uncertain: 'Receipt unconfirmed', failed: 'Handoff failed' };

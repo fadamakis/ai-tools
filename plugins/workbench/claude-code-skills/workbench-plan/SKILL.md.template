@@ -20,3 +20,5 @@ Produce a short plan: outcome, scope/non-goals, existing pieces to reuse, change
 For an implementation request, proceed once material ambiguity is resolved — no ceremonial approval gate needed. For a plan-only request, just return the plan.
 
 **Next:** `workbench-implement`, naming any blocking missing decision/contract first if one exists.
+
+Use the Workbench requirements checkpoint and content evidence tools when available. Freeze accepted requirements during planning; capture the current content before verification or review, and reference its snapshot when recording results. Missing tooling leaves evidence unbound.

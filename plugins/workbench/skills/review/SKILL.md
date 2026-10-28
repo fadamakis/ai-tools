@@ -25,3 +25,5 @@ Finish with the **Next-step handoff** defined in the shared contract, choosing t
 Record the current preview board checkpoint before handing back control, following **Preview board checkpoints** in the shared contract.
 
 In the structured checkpoint, submit only the `review` evidence actually checked, with its check time and tested HEAD when known. Preserve the other stage's independently recorded evidence. Detailed commands and working-tree context remain in the Markdown note.
+
+Follow [delivery evidence and recovery](../../references/delivery-recovery.md) to capture content before checking and bind the result to its snapshot.

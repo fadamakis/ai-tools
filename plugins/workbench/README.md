@@ -84,3 +84,11 @@ See [supported systems](https://github.com/fadamakis/ai-tools/blob/main/docs/sup
 Synthetic data in the browser preview; this image does not establish native-host acceptance.
 
 ![Workbench preview](https://raw.githubusercontent.com/fadamakis/ai-tools/main/docs/images/workbench.png)
+
+## Delivery evidence and recovery
+
+Verification and independent review can bind results to server-generated fingerprints of the actual checkout, tested content, base and accepted requirements. Legacy evidence remains readable as historical or unbound. The board displays the last explicit freshness observation; it does not watch the filesystem.
+
+PR checks distinguish observed outcomes from required CI, human review and mergeability. Publication tools validate each requested commit, ordinary push and draft-PR step, then retain receipts for interruption recovery. The existing local Git/GitHub credentials remain in use. A read-only remote-run view can link an existing configured GitHub Actions harness run without launching or resuming it.
+
+See [delivery evidence and recovery](references/delivery-recovery.md) for tool inputs, capability gaps and recovery. Installation starts none of these actions.

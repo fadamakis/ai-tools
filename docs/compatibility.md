@@ -16,6 +16,14 @@ Verify old and candidate readers against disposable saved-state copies before lo
 
 ## Workbench
 
+### Content-bound delivery and recovery
+
+Version 0.4.0 retains board schema 1, the existing data directory, task and repository IDs, chat links, notes, launches and archives. Requirements, content snapshots, required-CI observations, publication attempts and remote-run observations are optional versioned additions. No data migration or relocation is required.
+
+Reads normalize legacy evidence in memory without rewriting the board. Missing fingerprints remain historical or unbound; they do not become current verification after installation. Verification and independent review retain separate snapshots. Publication can rebind proof across a commit only when tested content and base remain unchanged.
+
+Before installation, back up the current board and compare old and candidate readers against disposable copies. Preserve any uncertain publication attempt and its receipts; updating or restarting the plugin never grants permission to retry an external action. Remote bindings and refreshes update local observations only. Reopen the panel after installation and confirm the server and UI both show the selected version.
+
 ### 0.3.0 reliability update
 
 Schema version 1, task IDs, chat ownership, archives and note locations remain unchanged. Reads normalize old flat evidence in memory; each updated verification/review kind is saved with its own result, timestamp and optional HEAD in `evidenceChecks`. The legacy `evidence` summary remains readable. A shared legacy HEAD is omitted when the two records have different or unknown revisions. Reads never rewrite board files or notes. Markdown remains the narrative record for scope, decisions, commands and working-tree evidence; structured checkpoints own progress and check results.
