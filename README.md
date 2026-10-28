@@ -49,6 +49,7 @@ State stays outside versioned caches. Installation does not create schedules, sc
 - [Troubleshooting](docs/troubleshooting.md) and [data compatibility](docs/compatibility.md)
 - [Contributing and local verification](CONTRIBUTING.md)
 - [Release procedure](docs/rollout.md) and [optional workspace import](docs/workspace-setup.md)
+- [Prepare verified release downloads](docs/rollout.md#prepare-an-existing-release)
 - [Security reports](SECURITY.md) and [changes](CHANGELOG.md)
 
 Source is maintained on `main`; validated packages are published to `releases`. Independent installations use that release channel. Official directory publication is a separate process.

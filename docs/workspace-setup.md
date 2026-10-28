@@ -9,3 +9,9 @@ Maintain a separate **private** catalog/configuration mapping names to the works
 Admin import supports daily sync and an explicit **Sync now** request. These workspace controls are separate from independent users' Git refresh procedure. Repository access and admin permission do not imply members have access to external services.
 
 Confirm identity, sharing, installed version, and native activation on a pilot computer after import. See [OpenAI workspace documentation](https://learn.chatgpt.com/docs/enterprise/plugin-management) and [updates](updates.md).
+
+## Optional manual account publication
+
+When the target account supports plugin ZIP uploads, a maintainer can use `$ai-tools-release` from this repository to update the verified existing listing. `pnpm update:prepare` only prepares verified downloads; it does not upload. Keep any listing-ID mapping in a separate private file and supply it with `--workspace-ids`. Never add a workspace binding to the public source or release catalog.
+
+An explicit upload request authorizes account publication. Preserve the existing listing ID, owner, audience and sharing, verify saved-state compatibility on disposable copies, and read back the resulting version and files. If supported update tools or account upload controls are unavailable, leave publication pending. Manual uploads do not establish automatic workspace synchronization or native activation. Independent Git users continue to follow [updates](updates.md).

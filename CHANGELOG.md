@@ -1,5 +1,10 @@
 # Changelog
 
+## Maintainer release preparation
+
+- Add verified GitHub Release downloads, package comparisons and disposable MCP smoke checks through `pnpm update:prepare`.
+- Add a maintainer skill for explicitly requested account uploads, with private listing mappings, compatibility checks and publication readback. The public Git marketplace remains the default installation channel.
+
 ## Public preparation: interface fixes
 
 - Improve active field hints, success and warning badge contrast, and repository-filter readability in light and dark themes.

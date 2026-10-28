@@ -8,6 +8,7 @@
     "test:ui": "node scripts/test-ui.mjs",
     "validate": "node scripts/validate.mjs && node scripts/check-public.mjs",
     "package": "node scripts/release.mjs",
+    "update:prepare": "node scripts/prepare-update.mjs",
     "verify": "pnpm build && pnpm test && pnpm validate && pnpm test:ui",
     "shelob:preview": "node scripts/preview.mjs",
     "workbench:preview": "node scripts/workbench-preview.mjs",
