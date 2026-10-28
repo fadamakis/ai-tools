@@ -256,6 +256,7 @@ function TaskDetail({ vm, selected }) {
     <div className="detail-actions">
       {task.stage !== 'done' && <Button disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>{taskLaunch(task).action}<Icon name="arrow"/></Button>}
       {task.stage === 'done' && <Button disabled={vm.busy} loading={vm.busy} onClick={() => vm.action(() => vm.archive([task], !task.archivedAt), task.archivedAt ? 'Restoring task…' : 'Archiving task…')}>{task.archivedAt ? 'Restore to Done' : 'Archive task'}</Button>}
+      {task.threadId && task.requirements && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.refreshEvidence(), 'Checking evidence freshness…')}>Recheck evidence</Secondary>}
       {task.prUrl && <><Secondary disabled={vm.busy} loading={vm.busy && vm.busyLabel === 'Checking pull request…'} onClick={() => vm.action(() => vm.refreshPr(), 'Checking pull request…')}>Check PR now</Secondary><TextLink href={task.prUrl} onClick={link(task.prUrl)}>Open pull request</TextLink></>}
     </div>
     <BusyStatus vm={vm}/>

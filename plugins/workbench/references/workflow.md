@@ -133,3 +133,7 @@ If the host does not support clickable follow-ups, fall back to **Next:** `/work
 If blocked, state the specific unblock action and the stage to resume afterward. Offer a clickable resume action only when its prompt preserves the blocker and requires rechecking it; clicking is not evidence that access, data or a dependency has been fixed. Do not recommend publishing before the requested review and affected checks are complete; disclose accepted verification gaps. Do not suggest merging when checks, approvals or dependencies remain unresolved. Do not invent a new skill command for a human action.
 
 A suggestion is not execution or new authorization. Continue already authorized work without inserting a permission gate at every stage. If several stages run in one turn, give brief transitions while working and end with the next step after the last completed stage. Keep the structured checkpoint's next action consistent with that recommendation. Do not start polling or monitoring simply because checks are pending.
+
+## Content-bound delivery
+
+Follow [delivery evidence and recovery](delivery-recovery.md) for accepted-requirements checkpoints and independent verification/review captures. Missing proof stays unbound or unavailable; these controls preserve active-run authorization.

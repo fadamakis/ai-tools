@@ -207,8 +207,8 @@ test('task details label passed evidence from an earlier revision after a new ch
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-115');
   await app.locator('.task-card').click();
   const details = app.getByRole('dialog', { name: 'Task details' });
-  await expect(details.locator('dt').filter({ hasText: /^Verification$/ }).locator('+ dd')).toHaveText('passed · earlier revision');
-  await expect(details.locator('dt').filter({ hasText: /^Code review$/ }).locator('+ dd')).toHaveText('passed · earlier revision');
+  await expect(details.locator('dt').filter({ hasText: /^Verification$/ }).locator('+ dd')).toHaveText('passed · unbound · earlier revision');
+  await expect(details.locator('dt').filter({ hasText: /^Code review$/ }).locator('+ dd')).toHaveText('passed · unbound · earlier revision');
   await expect(details.getByRole('button', { name: 'Resume original chat', exact: true })).toBeEnabled();
   await page.screenshot({ path: 'repair-evidence/evidence-revision-after.png', fullPage: true });
 });

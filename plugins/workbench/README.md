@@ -84,3 +84,9 @@ See [supported systems](https://github.com/fadamakis/ai-tools/blob/main/docs/sup
 Synthetic data in the browser preview; this image does not establish native-host acceptance.
 
 ![Workbench preview](https://raw.githubusercontent.com/fadamakis/ai-tools/main/docs/images/workbench.png)
+
+## Delivery evidence and recovery
+
+Verification and independent review can bind results to server-generated fingerprints of the actual checkout, tested content, base and accepted requirements. Legacy evidence remains readable as historical or unbound. The board displays the last explicit freshness observation; it does not watch the filesystem.
+
+See [delivery evidence and recovery](references/delivery-recovery.md) for tool inputs and capability gaps. Installation starts none of these actions.

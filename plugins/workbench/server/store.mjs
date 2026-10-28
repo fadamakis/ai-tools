@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { taskNotes } from './repository-import.mjs';
 import { BoardPersistence } from './persistence.mjs';
+import { TaskEvidence } from './task-evidence.mjs';
 import { LaunchLifecycle } from './launches.mjs';
 export { taskKey } from './launches.mjs';
 import { normalizeTaskEvidence, updateEvidence } from '../shared/evidence.mjs';
@@ -34,6 +35,7 @@ export class BoardStore {
     this.filename = this.persistence.filename;
     this.lockfile = this.persistence.lockfile;
     this.launches = new LaunchLifecycle(this);
+    this.taskEvidence = new TaskEvidence(this);
   }
 
   read() { const data = this.persistence.read(); return { ...data, tasks: data.tasks.map(normalizeTaskEvidence) }; }
@@ -177,6 +179,8 @@ export class BoardStore {
   }
 
   async progress({ taskId, expectedRevision, stage, status, summary, nextAction, branch, head, prUrl, threadId, evidence }) {
+    const initial = this.get(taskId).task;
+    const checkedEvidence = evidence ? await this.taskEvidence.validate(initial, evidence) : undefined;
     return this.mutate(data => {
       const task = this.task(data, taskId);
       if (task.revision !== expectedRevision) throw new Error('Task changed in another chat. Read it again before updating.');
@@ -186,7 +190,8 @@ export class BoardStore {
       if (prUrl) task.prUrl = githubPr(prUrl);
       Object.assign(task, { stage: stageColumn[stage], workbenchStage: stage, status, summary, nextAction, updatedAt: now(), revision: task.revision + 1 });
       for (const [key, value] of Object.entries({ branch, head, threadId })) if (value !== undefined) task[key] = value;
-      if (evidence) updateEvidence(task, evidence);
+      if (evidence) updateEvidence(task, checkedEvidence || evidence);
+      if (checkedEvidence) { task.workspace = { status: 'available', snapshot: checkedEvidence.snapshot }; task.head = checkedEvidence.head; }
       this.launches.acceptCheckpoint(data, task, threadId);
       return task;
     });

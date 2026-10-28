@@ -118,6 +118,12 @@ export class BoardController {
     }
     this.modal = null; await this.refresh();
   }
+  async refreshEvidence() {
+    const task = this.selected.task;
+    await this.call('workbench.evidence_capture', { taskId: task.id, expectedRevision: task.revision, threadId: task.threadId });
+    await this.refresh();
+  }
+
   async refreshPr() {
     const id = this.selected.task.id;
     await this.call('workbench.pr_refresh', { taskId: id });
