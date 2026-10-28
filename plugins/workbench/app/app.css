@@ -211,4 +211,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 }
 @media (max-width: 360px) { .brand-mark { display: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+ .remote-binding { display: grid; gap: var(--spacing-3, 12px); margin-block: 12px; }
+ .remote-binding label { display: grid; gap: 6px; }
  .delivery-attempt { margin-block: 16px; overflow-wrap: anywhere; }

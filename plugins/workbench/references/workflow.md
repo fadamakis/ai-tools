@@ -136,4 +136,4 @@ A suggestion is not execution or new authorization. Continue already authorized 
 
 ## Content-bound delivery
 
-Follow [delivery evidence and recovery](delivery-recovery.md) for accepted-requirements checkpoints, verification/review captures, required-CI reporting, publication receipts. These controls preserve the active-run authorization boundaries above. Missing proof stays unbound or unavailable.
+Follow [delivery evidence and recovery](delivery-recovery.md) for accepted-requirements checkpoints, verification/review captures, required-CI reporting, publication receipts and existing remote run observations. These controls preserve the active-run authorization boundaries above. Missing proof stays unbound or unavailable; remote observations never become local acceptance proof.

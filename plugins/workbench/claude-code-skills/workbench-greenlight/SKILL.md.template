@@ -32,4 +32,4 @@ Only use this when the user explicitly asked to be watched/notified.
 
 Use Workbench PR refresh to distinguish observed checks from required CI. Treat missing checks as pending and unresolved policy as unknown; neither establishes green status.
 
-When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap.
+When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap. Remote observations are read-only and never authorize repairs.

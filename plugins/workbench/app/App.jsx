@@ -4,7 +4,7 @@ import { stages } from './controller.mjs';
 import { attentionReason, cardNextAction, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskLaunch, taskStatus } from './presentation.mjs';
 import { Button, Secondary, Quiet, Input, Textarea, Menu, Checkbox, SegmentedControl, Badge, Icon, Dialog, Select, Tooltip, TextLink, Alert, EmptyMessage, LoadingIndicator, submitForm, enterSubmits } from './ui.jsx';
 import { HowItWorks } from './HowItWorks.jsx';
-import { PublicationDetails } from './DeliveryDetails.jsx';
+import { PublicationDetails, RemoteRunDetails } from './DeliveryDetails.jsx';
 import { unresolvedLaunchStates } from '../shared/launch-states.mjs';
 
 const tone = status => ['blocked', 'failed', 'findings', 'uncertain'].includes(status) ? 'warning' : ['passed', 'complete'].includes(status) ? 'success' : 'secondary';
@@ -265,6 +265,7 @@ function TaskDetail({ vm, selected }) {
     {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color="warning" variant="soft" key={launch.id} title={launchStatus[launch.state]} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review pending request</Quiet> : undefined}/>)}
     <TaskEvidence task={task}/>
     <PublicationDetails vm={vm} task={task}/>
+    <RemoteRunDetails key={task.id} vm={vm} task={task}/>
     <section className="task-note"><header><h4>Task note</h4>{noteIsLegacy && note && <Badge>Original · read-only</Badge>}</header>
       {note ? <Markdown includeMath={false} skipHtml components={{ a: ({ href, children }) => /^https?:\/\//.test(href || '') ? <TextLink href={href} onClick={link(href)}>{children}</TextLink> : <span>{children}</span>, img: ({ alt }) => <span>{alt || 'Image reference'}</span> }}>{note}</Markdown> : <p className="dialog-copy">No saved note yet. Scope and evidence will appear here when work starts.</p>}
     </section><TechnicalDetails task={task} repository={repository}/><ActionError vm={vm}/>

@@ -35,4 +35,4 @@ Finish each handoff with: PR/revision, completed stages, check results, independ
 
 **Next:** for pending results, suggest a later `workbench-greenlight` check; for confirmed findings, offer an explicit fix round naming the PR and findings; once green, hand the ready/merge decision to the user rather than suggesting anything further.
 
-When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap.
+When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap. Remote observations are read-only and never authorize repairs.

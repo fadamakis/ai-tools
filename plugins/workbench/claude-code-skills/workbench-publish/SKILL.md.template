@@ -18,4 +18,4 @@ Don't post review replies, notify anyone, change the PR base, merge, or deploy u
 
 **Next:** `workbench-greenlight <PR>` to handle CI results and review comments as they come in.
 
-When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap.
+When publication is authorized, use Workbench publication prepare/execute/reconcile tools for the exact task. They require current content-bound verification and review. Never replace uncertain controller operations with manual commits, pushes or PR creation. If the tools are unavailable, preserve work and report the capability gap. Remote observations are read-only and never authorize repairs.

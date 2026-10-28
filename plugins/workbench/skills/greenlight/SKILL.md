@@ -28,4 +28,4 @@ Record the current preview board checkpoint before handing back control, followi
 
 Use Workbench PR refresh to distinguish observed checks from required CI. Treat missing checks as pending and unresolved policy as unknown; neither establishes green status.
 
-For authorized publication, use the controller in [delivery evidence and recovery](../../references/delivery-recovery.md). It owns commits, pushes and draft-PR updates. Reconcile uncertainty before retrying; saved attempts never grant new authority.
+For authorized publication, use the controller in [delivery evidence and recovery](../../references/delivery-recovery.md). It owns commits, pushes and draft-PR updates. Reconcile uncertainty before retrying; saved attempts and remote run observations never grant new authority.

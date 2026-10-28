@@ -23,3 +23,9 @@ Use these tools only for publication the user requested in this active run. The 
 5. Finish with the confirmed receipts and remaining CI/review status. Replies and discussion resolution keep their separate authorization. Missing controller tools block automatic publication; preserve local work and report the missing capability rather than silently using unguarded commands.
 
 For an existing PR, supply only the reviewed Workbench delivery section as `body`; unrelated human text is preserved. If the template requires changes outside that section, prepare those edits for a separate explicitly authorized update instead of overwriting them. An unsupported visual attachment capability is a concrete verification/publication gap, never a reason to claim images were attached.
+
+## Existing remote runs
+
+Use `workbench.remote_bind` or the task panel to link an existing GitHub Actions run. Configure the exact workflow path and numeric trusted bot user ID for that repository; provide its PR URL when workflow dispatch does not declare a PR. Workbench owns no company-specific bot identity or workflow default. It verifies metadata and supported structured Autopilot checkpoints rather than trusting arbitrary comments or log text.
+
+Use `workbench.remote_refresh` only for an explicit check or a delivery stage already authorized to read it. It updates local observations only. Unknown checkpoint versions, ambiguous run/PR associations and reruns without an attempt-bound checkpoint remain unverified. Access failures retain the last successful observation and show its timestamp. Remote stage, head and evidence never replace local verification or move the task to Done. `workbench.remote_unbind` removes only the local link. No remote tool dispatches, retries, cancels or repairs a job.

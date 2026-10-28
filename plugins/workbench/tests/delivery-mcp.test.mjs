@@ -10,7 +10,7 @@ test('MCP exposes bounded delivery tools and binds a result to a server-generate
   const server = createServer({ store: s.store }); const client = new Client({ name: 'delivery-test', version: '1' });
   const [left, right] = InMemoryTransport.createLinkedPair(); await server.connect(right); await client.connect(left); t.after(() => client.close());
   const tools = (await client.listTools()).tools;
-  for (const suffix of ['requirements_set', 'evidence_capture', 'publication_prepare', 'publication_execute', 'publication_reconcile', 'publication_close']) assert.ok(tools.some(tool => tool.name === `workbench.${suffix}`));
+  for (const suffix of ['requirements_set', 'evidence_capture', 'publication_prepare', 'publication_execute', 'publication_reconcile', 'publication_close', 'remote_bind', 'remote_refresh', 'remote_unbind']) assert.ok(tools.some(tool => tool.name === `workbench.${suffix}`));
   assert.equal(tools.find(tool => tool.name === 'workbench.publication_execute').annotations.readOnlyHint, false);
   const call = (name, args) => client.callTool({ name: `workbench.${name}`, arguments: args });
   const worker = () => ({ taskId: task.id, expectedRevision: task.revision, threadId });
@@ -19,4 +19,5 @@ test('MCP exposes bounded delivery tools and binds a result to a server-generate
   const snapshotId = result.structuredContent.snapshot.id;
   result = await call('progress', { ...worker(), stage: 'verify', status: 'paused', summary: 'Fixture checked.', nextAction: 'Independent review', evidence: { verify: 'passed', checkedAt: new Date().toISOString(), snapshotId } });
   assert.equal(result.isError, undefined); assert.equal(result.structuredContent.task.evidenceChecks.verify.snapshot.id, snapshotId);
+  assert.equal((await call('remote_bind', { taskId: task.id, expectedRevision: 1, runUrl: 'javascript:alert(1)', workflowPath: '../outside.yml', botId: -1 })).isError, true);
 });

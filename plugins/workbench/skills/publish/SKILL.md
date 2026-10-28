@@ -23,4 +23,4 @@ Finish with the **Next-step handoff** defined in the shared contract, choosing t
 
 Record the current preview board checkpoint before handing back control, following **Preview board checkpoints** in the shared contract.
 
-For authorized publication, use the controller in [delivery evidence and recovery](../../references/delivery-recovery.md). It owns commits, pushes and draft-PR updates. Reconcile uncertainty before retrying; saved attempts never grant new authority.
+For authorized publication, use the controller in [delivery evidence and recovery](../../references/delivery-recovery.md). It owns commits, pushes and draft-PR updates. Reconcile uncertainty before retrying; saved attempts and remote run observations never grant new authority.

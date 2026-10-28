@@ -10,4 +10,11 @@ export function registerDeliveryTools(register, z, store) {
     z.object(attempt).strict(), args => store.publication.reconcile(args), { readOnly: false, openWorld: true });
   register('workbench.publication_close', 'Close a local publication attempt only after the user reviews its outcome. Preserves all receipts and never rolls back Git or GitHub. Does not authorize another publication.',
     z.object({ ...attempt, confirmedReviewed: z.literal(true) }).strict(), args => store.publication.close(args), { readOnly: false });
+  const remote = { taskId: id, expectedRevision: z.number().int().positive() };
+  register('workbench.remote_bind', 'Link an existing GitHub Actions run after an explicit user request. Configure its workflow and trusted bot ID. Reads GitHub and saves only local observations; never launches or resumes work.',
+    z.object({ ...remote, runUrl: z.string().url(), workflowPath: z.string().min(1).max(500), botId: z.number().int().positive(), prUrl: z.string().url().optional() }).strict(), args => store.remoteRuns.bind(args), { readOnly: false, openWorld: true });
+  register('workbench.remote_refresh', 'Explicitly read a linked remote run and save its timestamped observation. Never dispatches, retries, cancels or repairs a run; remote results never replace local verification.',
+    z.object(remote).strict(), args => store.remoteRuns.refresh(args), { readOnly: false, openWorld: true });
+  register('workbench.remote_unbind', 'Remove only the local link to a remote run. Does not modify GitHub, task progress, local evidence or chat ownership.',
+    z.object(remote).strict(), args => store.remoteRuns.unbind(args), { readOnly: false });
 }
