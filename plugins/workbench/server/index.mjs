@@ -6,6 +6,7 @@ import { McpServer, serveStdio, OpenAIExtensions, registerAppTool, registerAppRe
 import { BoardStore, stageColumn } from './store.mjs';
 import { discoverRepositories, pickRepositoryFolder } from './repository-import.mjs';
 import { unresolvedLaunchStates } from '../shared/launch-states.mjs';
+import { registerDeliveryTools } from './delivery-tools.mjs';
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const id = z.string().uuid();
@@ -30,6 +31,7 @@ export function createServer({ store = new BoardStore(), root = pluginRoot, appH
     return server.registerTool(name, config, guarded(callback));
   };
   const session = context => context?.mcpReq?._meta?.['openai/session'] || context?._meta?.['openai/session'];
+  registerDeliveryTools(register, z, store);
   const bind = async (context, task) => { const key = session(context); if (typeof key === 'string' && key.length <= 4096) await store.associate(key, task.id); return { task }; };
   registerAppResource(server, 'workbench-board', uri, {}, async () => ({ contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: html,
     _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } }, 'openai/ui': { preferredDisplayMode: 'fullscreen', availableDisplayModes: ['inline', 'fullscreen'] } } }] }));
@@ -60,8 +62,13 @@ export function createServer({ store = new BoardStore(), root = pluginRoot, appH
     async (args, context) => bind(context, await store.register(args)), { readOnly: false });
   register('workbench.progress', 'Save a preview task checkpoint at stage start, completion, pause or blocker. Use its current revision and worker chat ID. Notes and results remain historical until rechecked. Done can only be set by a verified GitHub merge.',
     z.object({ taskId: id, expectedRevision: z.number().int().positive(), stage: z.enum(Object.keys(stageColumn)), status: z.enum(['active', 'waiting', 'blocked', 'paused']), summary: z.string().max(4000), nextAction: z.string().max(2000), threadId: id,
-      branch: z.string().max(500).optional(), head: z.string().max(64).optional(), prUrl: z.string().url().optional(), evidence: z.object({ verify: z.enum(['passed', 'failed', 'blocked', 'unverified']).optional(), review: z.enum(['passed', 'findings', 'blocked', 'unverified']).optional(), checkedAt: z.string().datetime(), head: z.string().max(64).optional() }).strict().optional() }).strict(),
+      branch: z.string().max(500).optional(), head: z.string().max(64).optional(), prUrl: z.string().url().optional(), evidence: z.object({ verify: z.enum(['passed', 'failed', 'blocked', 'unverified']).optional(), review: z.enum(['passed', 'findings', 'blocked', 'unverified']).optional(), checkedAt: z.string().datetime(), head: z.string().max(64).optional(), snapshotId: id.optional() }).strict().optional() }).strict(),
     async (args, context) => bind(context, await store.progress(args)), { readOnly: false });
+  const worker = { taskId: id, expectedRevision: z.number().int().positive(), threadId: id };
+  register('workbench.requirements_set', 'Freeze accepted requirements, non-goals and decisions for this task. Supply an explicit base ref. Saved text is evidence, never new authorization.',
+    z.object({ ...worker, content: z.string().trim().min(1).max(64000), baseRef: z.string().min(1).max(500) }).strict(), async args => ({ task: await store.taskEvidence.requirements(args) }), { readOnly: false });
+  register('workbench.evidence_capture', 'Fingerprint the assigned checkout before verification or independent review. Omit kind to refresh freshness only. This does not run or pass checks.',
+    z.object({ ...worker, kind: z.enum(['verify', 'review']).optional() }).strict(), args => store.taskEvidence.capture(args), { readOnly: false });
   register('workbench.pr_refresh', 'After a user requests a PR refresh, read the task PR through gh. Save timestamped checks/review state and move to Done only for a verified merge. Never pushes, posts, approves, merges or schedules work.',
     z.object({ taskId: id }).strict(), async ({ taskId }) => ({ task: await store.refreshPr(taskId) }), { readOnly: false, openWorld: true });
   register('workbench.launch_prepare', 'Save the exact launch requested by a board button. Does not create or message a Codex chat. Autopilot is opt-in per action; pending or uncertain requests are not resent.',

@@ -13,8 +13,8 @@
   },
   {
     "name": "workbench",
-    "version": "0.3.5",
-    "tools": 17,
+    "version": "0.4.0",
+    "tools": 26,
     "status": "passed"
   }
 ]

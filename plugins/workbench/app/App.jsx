@@ -4,6 +4,7 @@ import { stages } from './controller.mjs';
 import { attentionReason, cardNextAction, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskLaunch, taskStatus } from './presentation.mjs';
 import { Button, Secondary, Quiet, Input, Textarea, Menu, Checkbox, SegmentedControl, Badge, Icon, Dialog, Select, Tooltip, TextLink, Alert, EmptyMessage, LoadingIndicator, submitForm, enterSubmits } from './ui.jsx';
 import { HowItWorks } from './HowItWorks.jsx';
+import { PublicationDetails, RemoteRunDetails } from './DeliveryDetails.jsx';
 import { unresolvedLaunchStates } from '../shared/launch-states.mjs';
 
 const tone = status => ['blocked', 'failed', 'findings', 'uncertain'].includes(status) ? 'warning' : ['passed', 'complete'].includes(status) ? 'success' : 'secondary';
@@ -236,7 +237,7 @@ function LaunchRecovery({ vm, launch }) {
 function TaskEvidence({ task }) {
   return <section className="task-evidence" aria-label="Verification and review"><h4>Evidence</h4><dl className="task-facts"><dt>Updated</dt><dd>{date(task.updatedAt)}</dd><dt>Verification</dt><dd>{evidenceLabel(task, 'verify')}</dd><dt>Code review</dt><dd>{evidenceLabel(task, 'review')}</dd>
     {['verify', 'review'].map(kind => task.evidenceChecks?.[kind]?.checkedAt && <React.Fragment key={kind}><dt>{kind === 'verify' ? 'Verification checked' : 'Review checked'}</dt><dd>{date(task.evidenceChecks[kind].checkedAt)}</dd></React.Fragment>)}
-    {task.pr && <><dt>PR snapshot</dt><dd>{date(task.pr.checkedAt)} · {task.pr.state.toLowerCase()}</dd><dt>{task.stage === 'done' ? 'Historical CI' : 'CI checks'}</dt><dd>{task.pr.checks} · {task.pr.checkCount} reported checks</dd><dt>PR review</dt><dd>{task.pr.reviewDecision.toLowerCase().replaceAll('_', ' ')}</dd></>}
+    {task.pr && <><dt>PR snapshot</dt><dd>{date(task.pr.checkedAt)} · {task.pr.state.toLowerCase()}</dd><dt>{task.stage === 'done' ? 'Historical observed CI' : 'Observed CI'}</dt><dd>{task.pr.checks} · {task.pr.checkCount} reported checks</dd><dt>Required CI</dt><dd>{task.pr.requiredCi?.status === 'none' ? 'No requirements' : task.pr.requiredCi?.status || 'unknown'}{task.pr.requiredCi?.reason && ` · ${task.pr.requiredCi.reason}`}</dd><dt>Mergeability</dt><dd>{task.pr.mergeable?.toLowerCase() || 'unknown'}</dd><dt>Human review</dt><dd>{task.pr.reviewDecision.toLowerCase().replaceAll('_', ' ')}</dd></>}
     {task.archivedAt && <><dt>Archived</dt><dd>{date(task.archivedAt)}</dd></>}
   </dl></section>;
 }
@@ -256,12 +257,15 @@ function TaskDetail({ vm, selected }) {
     <div className="detail-actions">
       {task.stage !== 'done' && <Button disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>{taskLaunch(task).action}<Icon name="arrow"/></Button>}
       {task.stage === 'done' && <Button disabled={vm.busy} loading={vm.busy} onClick={() => vm.action(() => vm.archive([task], !task.archivedAt), task.archivedAt ? 'Restoring task…' : 'Archiving task…')}>{task.archivedAt ? 'Restore to Done' : 'Archive task'}</Button>}
+      {task.threadId && task.requirements && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.refreshEvidence(), 'Checking evidence freshness…')}>Recheck evidence</Secondary>}
       {task.prUrl && <><Secondary disabled={vm.busy} loading={vm.busy && vm.busyLabel === 'Checking pull request…'} onClick={() => vm.action(() => vm.refreshPr(), 'Checking pull request…')}>Check PR now</Secondary><TextLink href={task.prUrl} onClick={link(task.prUrl)}>Open pull request</TextLink></>}
     </div>
     <BusyStatus vm={vm}/>
     {task.stage === 'done' ? <p className="merge-confirmed">Merged {date(task.pr?.mergedAt)}. Checks below are a historical snapshot.</p> : next && next !== task.summary && <section className="next-action"><h4>Next action</h4><p>{next}</p></section>}
     {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color="warning" variant="soft" key={launch.id} title={launchStatus[launch.state]} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review pending request</Quiet> : undefined}/>)}
     <TaskEvidence task={task}/>
+    <PublicationDetails vm={vm} task={task}/>
+    <RemoteRunDetails key={task.id} vm={vm} task={task}/>
     <section className="task-note"><header><h4>Task note</h4>{noteIsLegacy && note && <Badge>Original · read-only</Badge>}</header>
       {note ? <Markdown includeMath={false} skipHtml components={{ a: ({ href, children }) => /^https?:\/\//.test(href || '') ? <TextLink href={href} onClick={link(href)}>{children}</TextLink> : <span>{children}</span>, img: ({ alt }) => <span>{alt || 'Image reference'}</span> }}>{note}</Markdown> : <p className="dialog-copy">No saved note yet. Scope and evidence will appear here when work starts.</p>}
     </section><TechnicalDetails task={task} repository={repository}/><ActionError vm={vm}/>

@@ -26,3 +26,5 @@ For an implementation request, proceed after resolving material ambiguity; do no
 Finish with the **Next-step handoff** defined in the shared contract, choosing the recommendation from the actual result of this stage.
 
 Record the current preview board checkpoint before handing back control, following **Preview board checkpoints** in the shared contract.
+
+Follow [delivery evidence and recovery](../../references/delivery-recovery.md) to freeze accepted requirements before implementation.

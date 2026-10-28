@@ -54,3 +54,5 @@ Monitoring is a separate, explicit request governed by [read-only monitoring](..
 Finish each handoff with PR/revision, completed stages, checks, independent-review status and remaining decisions. Follow the shared **Next-step handoff**: for pending results suggest a later read-only greenlight check; for confirmed findings offer “Address findings” with a prompt naming the PR, findings and requested actions. A click authorizes only that round, not future scheduled work. When green, leave readiness/merge to the user. Do not recommend publishing again after publication is complete.
 
 Record the current preview board checkpoint before handing back control, following **Preview board checkpoints** in the shared contract.
+
+For authorized publication, use the controller in [delivery evidence and recovery](../../references/delivery-recovery.md). It owns commits, pushes and draft-PR updates. Reconcile uncertainty before retrying; saved attempts and remote run observations never grant new authority.
