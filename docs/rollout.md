@@ -47,3 +47,18 @@ After approval, recheck remote drift, apply the approved preparation/remediation
 ## Ongoing releases
 
 Passing `main` changes publish the unbound `releases` marketplace and versioned GitHub ZIPs/checksums. Existing installations pull that channel as described in [updates](updates.md). Keep original workspace identities out of the public catalog. Restore previous behavior through a compatible newer release; do not reset public version numbers or erase newer user state.
+
+## Prepare an existing release
+
+Maintainers can prepare verified downloads without publishing or changing an installation:
+
+```sh
+pnpm update:prepare
+pnpm update:prepare --tag release-SOURCE_SHA --published /absolute/path/to/current/plugins
+```
+
+The comparison directory contains `shelob/`, `sauron/` and `workbench/` from the current packages. Preparation requires GitHub CLI access, Python 3 and the repository's pinned dependencies. It selects a stable GitHub Release, requires successful main-push CI for its source commit, verifies ZIP checksums and package fingerprints, checks package metadata/public content, and starts the packages with disposable data. The plan, downloaded archives and extracted packages are retained under ignored `dist/updates/`. Repeated preparation preserves earlier plans.
+
+The plan reports unchanged packages or lists changed files and versions. Missing current sources remain unverified. Preparation does not establish saved-state compatibility: follow [compatibility](compatibility.md) with disposable copies before replacing a build. This tooling changes no plugin state format or data location and requires no migration itself.
+
+For an explicitly requested manual account upload, use `$ai-tools-release` from a chat in this repository. The maintainer skill compares the exact current listing, preserves its identity and audience, verifies compatibility and reads back the uploaded result. Pass a separate private mapping with `--workspace-ids /absolute/path/to/private/listing-ids.json` when needed; IDs appear only in the ignored plan, never in the public marketplace. See [optional workspace distribution](workspace-setup.md). Account publication and native desktop activation require their own evidence.
