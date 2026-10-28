@@ -89,4 +89,6 @@ Synthetic data in the browser preview; this image does not establish native-host
 
 Verification and independent review can bind results to server-generated fingerprints of the actual checkout, tested content, base and accepted requirements. Legacy evidence remains readable as historical or unbound. The board displays the last explicit freshness observation; it does not watch the filesystem.
 
+PR checks distinguish observed outcomes from required CI, human review and mergeability.
+
 See [delivery evidence and recovery](references/delivery-recovery.md) for tool inputs and capability gaps. Installation starts none of these actions.

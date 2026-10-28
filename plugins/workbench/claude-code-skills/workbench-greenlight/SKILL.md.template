@@ -29,3 +29,5 @@ Only use this when the user explicitly asked to be watched/notified.
 - When findings appear, report them and offer one explicit next step ("want me to fix these?") rather than fixing anything automatically — a monitoring check never carries authorization to push or reply.
 
 **Next:** `workbench-publish` if fixes are ready to push; otherwise name the remaining pending checks/approvals/decisions. If truly nothing remains, say there's no further Workbench step and leave merge/ready-for-review to the user.
+
+Use Workbench PR refresh to distinguish observed checks from required CI. Treat missing checks as pending and unresolved policy as unknown; neither establishes green status.

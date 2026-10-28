@@ -25,3 +25,5 @@ Return a compact summary: PR/revision, addressed items, remaining decisions, che
 Finish with the **Next-step handoff** defined in the shared contract, choosing the recommendation from the actual result of this stage.
 
 Record the current preview board checkpoint before handing back control, following **Preview board checkpoints** in the shared contract.
+
+Use Workbench PR refresh to distinguish observed checks from required CI. Treat missing checks as pending and unresolved policy as unknown; neither establishes green status.

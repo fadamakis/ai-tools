@@ -236,7 +236,7 @@ function LaunchRecovery({ vm, launch }) {
 function TaskEvidence({ task }) {
   return <section className="task-evidence" aria-label="Verification and review"><h4>Evidence</h4><dl className="task-facts"><dt>Updated</dt><dd>{date(task.updatedAt)}</dd><dt>Verification</dt><dd>{evidenceLabel(task, 'verify')}</dd><dt>Code review</dt><dd>{evidenceLabel(task, 'review')}</dd>
     {['verify', 'review'].map(kind => task.evidenceChecks?.[kind]?.checkedAt && <React.Fragment key={kind}><dt>{kind === 'verify' ? 'Verification checked' : 'Review checked'}</dt><dd>{date(task.evidenceChecks[kind].checkedAt)}</dd></React.Fragment>)}
-    {task.pr && <><dt>PR snapshot</dt><dd>{date(task.pr.checkedAt)} · {task.pr.state.toLowerCase()}</dd><dt>{task.stage === 'done' ? 'Historical CI' : 'CI checks'}</dt><dd>{task.pr.checks} · {task.pr.checkCount} reported checks</dd><dt>PR review</dt><dd>{task.pr.reviewDecision.toLowerCase().replaceAll('_', ' ')}</dd></>}
+    {task.pr && <><dt>PR snapshot</dt><dd>{date(task.pr.checkedAt)} · {task.pr.state.toLowerCase()}</dd><dt>{task.stage === 'done' ? 'Historical observed CI' : 'Observed CI'}</dt><dd>{task.pr.checks} · {task.pr.checkCount} reported checks</dd><dt>Required CI</dt><dd>{task.pr.requiredCi?.status === 'none' ? 'No requirements' : task.pr.requiredCi?.status || 'unknown'}{task.pr.requiredCi?.reason && ` · ${task.pr.requiredCi.reason}`}</dd><dt>Mergeability</dt><dd>{task.pr.mergeable?.toLowerCase() || 'unknown'}</dd><dt>Human review</dt><dd>{task.pr.reviewDecision.toLowerCase().replaceAll('_', ' ')}</dd></>}
     {task.archivedAt && <><dt>Archived</dt><dd>{date(task.archivedAt)}</dd></>}
   </dl></section>;
 }

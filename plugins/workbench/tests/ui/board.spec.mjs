@@ -284,7 +284,7 @@ test('a Done card shows merge completion separately from historical checks and c
   await expect(card).toContainText('Merged'); await expect(card).not.toContainText('pending');
   await card.click();
   const details = app.getByRole('dialog', { name: 'Task details' });
-  await expect(details).toContainText('Historical CI'); await expect(details).toContainText('pending');
+  await expect(details).toContainText('Historical observed CI'); await expect(details).toContainText('pending');
   await details.getByRole('button', { name: 'Archive task', exact: true }).click();
   await expect(app.locator('.task-card').filter({ hasText: 'WEB-101' })).toHaveCount(0);
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 task archived');
