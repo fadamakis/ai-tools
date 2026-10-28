@@ -1,0 +1,36 @@
+.agents/skills/ai-tools-release/SKILL.md
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 1-9,11-13,15-17
+  s_f84b3e31c1e6b0::t_14c5b0d4cfd349 10,14
+scripts/prepare-update.mjs
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 1-108
+docs/workspace-setup.md
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 12-17
+README.md
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 52
+docs/rollout.md
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 50-64
+CHANGELOG.md
+  s_f84b3e31c1e6b0::t_d5e88892de3a32 3-7
+tests/release/prepare-update.test.mjs
+  s_f84b3e31c1e6b0::t_32ba6185a8c900 1-57
+package.json
+  s_f84b3e31c1e6b0::t_61fee0c9ec4b21 11
+scripts/extract-release.py
+  s_f84b3e31c1e6b0::t_1ec04d71cf1e74 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5def255836c96828bea4c81afb542d3c40afc897",
+  "prompts": {},
+  "sessions": {
+    "s_f84b3e31c1e6b0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17dc6-78ed-7ea0-9a9f-7efaf77041f7",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
