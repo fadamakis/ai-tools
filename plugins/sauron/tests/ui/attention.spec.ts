@@ -331,7 +331,7 @@ test('source filter supports keyboard selection, dismissal and narrow layouts',a
 
 test.describe('local list timestamps',()=>{
   test.use({timezoneId:'Pacific/Auckland'});
-  test('live items have clean source labels and one relative update time with a local exact time',async({page})=>{
+  test('live items have clean source labels and one relative update time with a Berlin exact time',async({page})=>{
     const {SauronStore}=await import('../../src/server/store.js');
     const store=new SauronStore(dbPath,()=>new Date('2026-10-18T17:00:00Z'));
     try{
@@ -350,7 +350,7 @@ test.describe('local list timestamps',()=>{
     await expect(page.getByRole('button',{name:'Open source',exact:true})).toBeVisible();
     await expect(page.getByText(/Sample last checked|Madrid|Last checked/)).toHaveCount(0);
     await expect(page.locator('.inbox-update [role=status]')).toContainText('Last check 5 minutes ago');
-    await expect(page.locator('.inbox-update [role=status] time')).toHaveAttribute('title',/Oct 19, 2026.*6:00/);
+    await expect(page.locator('.inbox-update [role=status] time')).toHaveAttribute('title',/Oct 18, 2026.*7:00/);
     await expect(page.locator('article time')).toHaveCount(0);
     await page.getByRole('button',{name:'Switch to dark theme'}).click();
     await filterSource(page,'Slack');await expect(page.getByRole('heading',{name:'Review the release plan',exact:true})).toBeVisible();

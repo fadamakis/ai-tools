@@ -77,6 +77,21 @@ test('priority hints use real due and review dates without changing focus',t=>{
   const waiting=store.planTask({operationId:randomUUID(),id:other.id,expectedVersion:other.version,reviewDate:'2026-11-01'}).items.find(item=>item.id===other.id)!;
   assert.equal(waiting.priorityReason,'Review waiting item');assert.equal(waiting.suggestedFocus,false);
 });
+test('planning dates use Berlin midnight while sync keeps its configured time zone',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'sauron-berlin-plan-')),path=join(dir,'state.sqlite');
+  const store=new SauronStore(path,()=>new Date('2026-11-01T23:30:00Z'),'America/Los_Angeles');
+  t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const today=store.createPersonal({operationId:randomUUID(),title:'Due in Berlin'}).items[0];
+  const due=store.planTask({operationId:randomUUID(),id:today.id,expectedVersion:today.version,dueDate:'2026-11-02'}).items[0];
+  assert.equal(due.priorityReason,'Due today');assert.equal(due.suggestedFocus,true);
+  const yesterday=store.createPersonal({operationId:randomUUID(),title:'Past due in Berlin'}).items.find(task=>task.title==='Past due in Berlin')!;
+  const overdue=store.planTask({operationId:randomUUID(),id:yesterday.id,expectedVersion:yesterday.version,dueDate:'2026-11-01'}).items.find(task=>task.id===yesterday.id)!;
+  assert.equal(overdue.priorityReason,'Past due');
+  const item=store.createPersonal({operationId:randomUUID(),title:'Waiting review',sourceState:'waiting'}).items.find(task=>task.title==='Waiting review')!;
+  const waiting=store.planTask({operationId:randomUUID(),id:item.id,expectedVersion:item.version,reviewDate:'2026-11-02'}).items.find(task=>task.id===item.id)!;
+  assert.equal(waiting.priorityReason,'Review waiting item');
+  assert.equal(store.coordination().freshness.timeZone,'America/Los_Angeles');
+});
 
 test('leaving Today clears focus without losing task order or restoring focus on return',t=>{
   const f=fixture(t),store=f.store;
