@@ -20,8 +20,11 @@ test('discussion links survive observations and restart without changing tasks o
   const saved=store.saveDiscussion({...request,url:url+'?model=test#ignored'});
   assert.deepEqual(saved.items,before.items);assert.equal(saved.discussion?.url,url);
   assert.equal(store.saveDiscussion(request).receipt?.duplicate,true);
-  const otherUrl=`codex://threads/${randomUUID()}`;
+  const existingThread=randomUUID(),otherUrl=`codex://threads/${existingThread}`;
   assert.equal(store.saveDiscussion({...request,url:otherUrl}).discussions?.length,2);
+  const reused=store.trackCodexThreads({expectedStoreId:store.storeId,threads:[{threadId:existingThread,title:'Existing linked chat'}]});
+  assert.equal(reused.trackedThreads?.[0]?.status,'already_tracked');
+  assert.equal(reused.trackedThreads?.[0]?.taskId,before.items[0].id);
   store.upsert({batchId:'later',items:[syntheticObservation(2)]});
   const after=store.view();assert.equal(after.items[0].state,'done');
   store.close();store=new SauronStore(path);
@@ -50,6 +53,44 @@ test('automatic linking derives identity from per-call metadata and refuses abse
   for(const meta of [undefined,{}, {'openai/threadId':'not-a-thread'}, {'x-codex-turn-metadata':'invalid'}])assert.equal(discussionConversationUrl(meta),undefined);
 });
 
+test('selected Codex chats create linked tasks once and preserve decisions across restart',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'sauron-tracked-chats-')),path=join(dir,'fixture.sqlite');
+  let store=new SauronStore(path);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const first=randomUUID(),second=randomUUID(),request={expectedStoreId:store.storeId,threads:[
+    {threadId:first,title:'First selected chat'},
+    {threadId:second,title:'Second selected chat',nextAction:'Continue the conversation.'},
+  ]};
+  const created=store.trackCodexThreads(request);
+  assert.deepEqual(created.trackedThreads?.map(item=>item.status),['created','created']);
+  assert.equal(created.items.length,2);
+  assert.deepEqual(new Set(created.discussions?.map(link=>link.url)),new Set([`codex://threads/${first}`,`codex://threads/${second}`]));
+  const firstTask=created.items.find(item=>item.id===`personal:${first}`)!;
+  store.decide({id:firstTask.id,expectedVersion:firstTask.version,operationId:randomUUID(),action:'complete'});
+  const replay=store.trackCodexThreads({...request,threads:[{threadId:first,title:'Renamed chat'},{threadId:second,title:'Second selected chat'}]});
+  assert.deepEqual(replay.trackedThreads?.map(item=>item.status),['already_tracked','already_tracked']);
+  assert.equal(replay.items.find(item=>item.id===firstTask.id)?.state,'done');
+  assert.equal(replay.items.find(item=>item.id===firstTask.id)?.title,'First selected chat');
+  store.close();store=new SauronStore(path);
+  assert.equal(store.view().items.length,2);
+  assert.equal(store.view().discussions?.length,2);
+  assert.deepEqual(store.trackCodexThreads(request).trackedThreads?.map(item=>item.status),['already_tracked','already_tracked']);
+});
+
+test('tracking reports a colliding chat separately and never writes to the wrong store',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'sauron-tracked-chat-errors-')),store=new SauronStore(join(dir,'fixture.sqlite'));
+  t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const collision=randomUUID(),good=randomUUID();
+  store.createPersonal({operationId:collision,title:'Unrelated personal task'});
+  const request={expectedStoreId:store.storeId,threads:[{threadId:collision,title:'Collision'},{threadId:good,title:'Good chat'}]};
+  assert.throws(()=>store.trackCodexThreads({...request,expectedStoreId:randomUUID()}),/Store ID/);
+  assert.throws(()=>store.trackCodexThreads({...request,threads:[request.threads[0],request.threads[0]]}),/distinct Codex chats/);
+  const result=store.trackCodexThreads(request);
+  assert.deepEqual(result.trackedThreads?.map(item=>item.status),['failed','created']);
+  assert.equal(result.items.length,2);
+  assert.equal(result.discussions?.length,1);
+  assert.equal(result.items.find(item=>item.id===`personal:${collision}`)?.title,'Unrelated personal task');
+});
+
 test('the real MCP tool saves the host conversation idempotently and exposes pasted links only to the app',async t=>{
   const dir=mkdtempSync(join(tmpdir(),'sauron-discussion-mcp-'));
   t.after(()=>rmSync(dir,{recursive:true,force:true}));
@@ -68,5 +109,10 @@ test('the real MCP tool saves the host conversation idempotently and exposes pas
     assert.deepEqual(((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as any).items,before.items);
     const {tools}=await client.listTools();
     assert.deepEqual((tools.find(tool=>tool.name==='save_attention_discussion_link')!._meta?.ui as any).visibility,['app']);
+    const selected=randomUUID();
+    const tracked=await client.callTool({name:'track_codex_threads',arguments:{expectedStoreId:before.storeId,threads:[{threadId:selected,title:'Selected Codex chat'}]}});
+    assert.equal(tracked.isError,undefined);
+    assert.equal((tracked.structuredContent as any).trackedThreads[0].status,'created');
+    assert.equal((tracked.structuredContent as any).discussions.find((link:any)=>link.taskId===`personal:${selected}`)?.url,`codex://threads/${selected}`);
   }finally{await client.close();}
 });

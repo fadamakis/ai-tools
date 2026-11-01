@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import {localPolicyDigest} from './local-policy.js';
 import { ReplyStore } from './reply-store.js';
 import {saveDiscussionSchema,type DiscussionLink} from '../shared/contracts.js';
-import { decisionSchema, personalTaskSchema, upsertSchema, type Result, type Task, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, liveProviders, type SyncProgress } from '../shared/contracts.js';
+import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, upsertSchema, type Result, type Task, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, liveProviders, type SyncProgress } from '../shared/contracts.js';
 
 export class StoreError extends Error {
   constructor(public code: string, message: string) { super(message); }
@@ -404,6 +404,48 @@ export class SauronStore {
         decidedAt:null, snoozedUntil:null, updatedAt:time, createdAt:time, state:task.sourceState},
       'personal',task.operationId);
     });
+  }
+  trackCodexThreads(input:unknown):Result {
+    const request=trackCodexThreadsSchema.parse(input);
+    if(request.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+    const ids=request.threads.map(thread=>thread.threadId.toLowerCase());
+    if(new Set(ids).size!==ids.length)throw new StoreError('duplicate_thread','A batch must contain distinct Codex chats.');
+    const trackedThreads:TrackedCodexThread[]=[];
+    for(const thread of request.threads){
+      const threadId=thread.threadId.toLowerCase(),url=`codex://threads/${threadId}`;
+      let begun=false;
+      try{
+        this.db.exec('BEGIN IMMEDIATE');
+        begun=true;
+        const links=this.discussions().filter(link=>link.url===url);
+        const matches=new Set(links.map(link=>link.taskId));
+        if(matches.size>1)throw new StoreError('ambiguous_chat','Several Sauron items already link to this chat.');
+        const linkedId=[...matches][0];
+        let result:TrackedCodexThread;
+        if(linkedId){
+          if(!this.get(linkedId))throw new StoreError('missing_task','The linked Sauron item no longer exists.');
+          result={threadId,taskId:linkedId,url,status:'already_tracked'};
+        }else{
+          const id=`personal:${threadId}`;
+          if(this.get(id))throw new StoreError('task_collision','A personal task already uses this chat ID.');
+          const time=this.now().toISOString();
+          this.save({id,obligationKey:id,sourceVersion:1,provider:'personal',
+            title:thread.title,nextAction:thread.nextAction,sourceState:'needs_you',
+            sourceUrl:null,lastCheckedAt:null,version:1,userDecision:null,
+            decidedAt:null,snoozedUntil:null,updatedAt:time,createdAt:time,state:'needs_you'},
+          'personal',threadId);
+          this.setMetadata('discussion-link:'+hash([id,url]),{taskId:id,url,createdAt:time});
+          result={threadId,taskId:id,url,status:'created'};
+        }
+        this.db.exec('COMMIT');
+        begun=false;
+        trackedThreads.push(result);
+      }catch(error){
+        if(begun)this.db.exec('ROLLBACK');
+        trackedThreads.push({threadId,taskId:null,url,status:'failed',error:error instanceof Error?error.message:'Could not track this chat.'});
+      }
+    }
+    return {...this.view(),trackedThreads};
   }
   decide(input: unknown): Result {
     const operation = decisionSchema.parse(input);

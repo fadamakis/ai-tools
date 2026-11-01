@@ -146,6 +146,16 @@ export const personalTaskSchema = z.strictObject({
   sourceState: z.enum(['needs_you', 'waiting']).default('needs_you'),
 });
 
+export const trackCodexThreadsSchema = z.strictObject({
+  expectedStoreId: z.string().uuid(),
+  threads: z.array(z.strictObject({
+    threadId: z.string().uuid(),
+    title: z.string().trim().min(1).max(160),
+    nextAction: z.string().trim().max(400).default(''),
+  })).min(1).max(20),
+});
+export type TrackedCodexThread = {threadId:string;taskId:string|null;url:string;status:'created'|'already_tracked'|'failed';error?:string};
+
 export type Observation = z.infer<typeof observationSchema>;
 export type DecisionInput = z.infer<typeof decisionSchema>;
 export type PersonalTaskInput = z.infer<typeof personalTaskSchema>;
@@ -177,7 +187,7 @@ export const saveDiscussionSchema=linkDiscussionSchema.extend({url:z.string().ma
 })});
 export type DiscussionLink={taskId:string;url:string;createdAt:string};
 export type View = { items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
-export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink };
+export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[] };
 
 export const syntheticObservation = (version = 1): Observation => ({
   obligationKey: 'synthetic:review-proof', sourceVersion: version, provider: 'manual',
