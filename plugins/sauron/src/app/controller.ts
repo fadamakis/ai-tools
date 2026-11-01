@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { connect, type Client } from './client.js';
-import { syntheticObservation, type SourceKind, type Task, type TaskState, type Result, type DecisionInput, type PersonalTaskInput } from '../shared/contracts.js';
+import { syntheticObservation, type SourceKind, type WorkArea, type Task, type TaskState, type Result, type DecisionInput, type PersonalTaskInput } from '../shared/contracts.js';
 import { sourceOf } from './icons.js';
 import { operationId } from './operation.js';
 import { mergeSavedView } from './presentation.js';
@@ -15,16 +15,19 @@ const remember=(pending:Pending|null)=>{storage.write(pendingKey,pending);storag
 const readPending=():Pending|null=>storage.read(pendingKey)??(storage.read('attention:pending:v1')?{kind:'decision',input:storage.read('attention:pending:v1')}:null);
 export type Draft={title:string;nextAction:string;sourceState:'needs_you'|'waiting'};
 const emptyDraft:Draft={title:'',nextAction:'',sourceState:'needs_you'};
+type Filter='today'|'inbox'|'waiting'|'snoozed'|'done'|'dismissed';
 
 export function useSauronController(){
   const [view,setView]=useState<Result|null>(null);
   const [client,setClient]=useState<Client|null>(null);
-  const [filter,setFilter]=useState<TaskState>('needs_you');
+  const [filter,setFilter]=useState<Filter>('today');
   const [source,setSource]=useState<SourceKind|'all'>('all');
+  const [area,setArea]=useState<WorkArea|'all'>('all');
+  const [weeklyReview,setWeeklyReview]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
-  const currentView=useRef({filter:'needs_you' as TaskState,source:'all' as SourceKind|'all',query:''});
+  const currentView=useRef({filter:'today' as Filter,source:'all' as SourceKind|'all',area:'all' as WorkArea|'all',query:''});
   const [pending,setPending]=useState<Pending|null>(readPending);
   const [recovering,setRecovering]=useState(()=>!!readPending());
   const [adding,setAdding]=useState(()=>!!storage.read(draftKey)&&!readPending());
@@ -97,9 +100,9 @@ export function useSauronController(){
       remember(null);setPending(null);setRecovering(false);setNotice(pending.kind==='create'?'Task saved.':'Saved decision confirmed.');
       if(pending.kind==='decision'){
         setReopenId(pending.input.action==='reopen'?null:task!.id);
-        if(pending.input.action==='reopen'){setFilter(task!.sourceState);setSource('all');setQuery('');}
+        if(pending.input.action==='reopen'){setFilter(task!.sourceState==='waiting'?'waiting':'today');setSource('all');setQuery('');}
       }
-      if(pending.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(pending.input.sourceState);}
+      if(pending.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(pending.input.sourceState==='waiting'?'waiting':'today');}
     }
   },[view,pending]);
   function save(operation:Pending){
@@ -112,14 +115,27 @@ export function useSauronController(){
       setReopenId(operation.kind==='decision'&&operation.input.action!=='reopen'?operation.input.id:null);
       if(operation.kind==='decision'&&operation.input.action==='reopen'){
         const reopened=view?.items.find(task=>task.id===operation.input.id);
-        if(reopened)selectState(reopened.sourceState);
+        if(reopened)selectState(reopened.sourceState==='waiting'?'waiting':'today');
       }
-      if(operation.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(operation.input.sourceState);setSource('all');setQuery('');}
+      if(operation.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(operation.input.sourceState==='waiting'?'waiting':'today');setSource('all');setQuery('');}
     },()=>setRecovering(true));
   }
   function decide(task:Task,action:DecisionInput['action']){
     save({kind:'decision',input:{id:task.id,action,expectedVersion:task.version,operationId:operationId(),
       ...(action==='snooze'?{snoozedUntil:new Date(Date.now()+3_600_000).toISOString()}:{}),}});
+  }
+  function plan(task:Task,patch:Record<string,unknown>){
+    if(!client)return;
+    void run(()=>client.call('plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:operationId(),...patch}),()=>{
+      setNotice('Task plan saved.');
+      if('workflowState' in patch)setFilter(patch.workflowState==='waiting'?'waiting':patch.workflowState==='inbox'?'inbox':'today');
+    });
+  }
+  function order(orderedIds:string[],focusIds:string[]){
+    if(!client||!view)return;
+    const actionable=view.items.filter(task=>task.state==='ready'||task.state==='in_progress');
+    void run(()=>client.call('order_attention_tasks',{operationId:operationId(),expectedStoreId:view.storeId,orderedIds,focusIds,
+      expectedVersions:actionable.map(task=>({id:task.id,version:task.version}))}),()=>setNotice('Order saved.'));
   }
   function seed(){
     if(!client)return;
@@ -134,36 +150,40 @@ export function useSauronController(){
       ()=>setNotice('Incoming observation replayed. User decisions preserved.'));
   }
   const allTasks = view?.items ?? [];
-  const count = (state: TaskState) => allTasks.filter(task => task.state === state).length;
+  const count = (state: TaskState|'today') => allTasks.filter(task => state==='today'?(task.state==='ready'||task.state==='in_progress'):task.state === state).length;
   const history = filter === 'done' || filter === 'dismissed';
-  const stateItems = allTasks.filter(task => task.state === filter);
-  const hasFilters = !!query.trim() || source !== 'all';
+  const stateItems = allTasks.filter(task => filter==='today'?(task.state==='ready'||task.state==='in_progress'):task.state===filter);
+  const hasFilters = !!query.trim() || source !== 'all'||area!=='all';
   const items = stateItems.filter(task => (source === 'all' || sourceOf(task) === source)
-    && `${task.title} ${task.nextAction}`.toLowerCase().includes(query.trim().toLowerCase()));
+    && (area==='all'||(task.area??(task.provider==='personal'?'personal':'unassigned'))===area)
+    && `${task.title} ${task.nextAction}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a,b)=>filter==='today'?(a.focusOrder??99)-(b.focusOrder??99)||
+      (a.state==='in_progress'?0:1)-(b.state==='in_progress'?0:1)||(a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id):
+      (a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id));
   const showTools = !!view && (stateItems.length > 0 || hasFilters);
   const reopenTask = allTasks.find(task => task.id === reopenId && task.userDecision !== null
     && (task.state === 'done' || task.state === 'dismissed' || task.state === 'snoozed'));
-  function selectState(state: TaskState) {
-    if(!history&&(state==='done'||state==='dismissed'))currentView.current={filter,source,query};
-    setFilter(state);setSource('all');setQuery('');
+  function selectState(state: Filter) {
+    if(!history&&(state==='done'||state==='dismissed'))currentView.current={filter,source,area,query};
+    setFilter(state);setSource('all');setArea('all');setQuery('');
   }
   function returnToTasks(){
-    setFilter(currentView.current.filter);setSource(currentView.current.source);setQuery(currentView.current.query);
+    setFilter(currentView.current.filter);setSource(currentView.current.source);setArea(currentView.current.area);setQuery(currentView.current.query);
   }
-  const emptyTitles: Record<TaskState, string> = {
-    needs_you: allTasks.length ? 'Nothing needs you right now' : 'Start with one task',
-    waiting: 'Nothing you’re waiting on', done: 'No completed tasks yet',
-    snoozed: 'Nothing snoozed', dismissed: 'No dismissed tasks',
+  const emptyTitles: Record<Filter, string> = {
+    today: allTasks.length ? 'Nothing ready right now' : 'Start with one task',inbox:'Inbox is clear',
+    waiting: 'Nothing you’re waiting on', done: 'No completed tasks yet',snoozed: 'Nothing snoozed', dismissed: 'No dismissed tasks',
   };
-  const emptyDescriptions: Record<TaskState, string> = {
-    needs_you: allTasks.length ? 'Your saved list has no tasks in Needs you.' : 'Refresh to check Slack and Granola, or add a personal task.',
-    waiting: 'Tasks you’re waiting on will appear here.',
+  const emptyDescriptions: Record<Filter, string> = {
+    today: allTasks.length ? 'Review your Inbox or add a task.' : 'Refresh to check sources, or add a personal task.',
+    inbox:'New source obligations and chat follow-ups will appear here for review.',
+    waiting: 'Tasks you’re waiting on will appear here. Set a review date to know when to check again.',
     done: 'Tasks you complete will appear here.',
     snoozed: 'Snoozed tasks return at the time you chose.',
     dismissed: 'Tasks you dismiss will appear here.',
   };
   function dismissNotice(){setNotice('');setReopenId(null);}
   function cancelPending(){remember(null);setPending(null);setRecovering(false);if(pending?.kind==='create')cancelDraft();}
-  return {view,client,filter,source,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
+  return {view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;

@@ -20,6 +20,8 @@ export function seedDevStore(path:string){
   try{
     store.upsert({batchId:'sauron-dev-fixture-v1',items:[syntheticObservation()]});
     refreshFixtures(store);
+    const replyTask=store.view().items.find(item=>item.sourceUrl===sample.sourceUrl)!;
+    store.planTask({id:replyTask.id,expectedVersion:replyTask.version,operationId:'1a35e5ae-7ed7-48b7-b8bd-f6dc40a99df1',workflowState:'ready'});
     store.createPersonal({operationId:'9c21488a-e52b-4b60-aae7-3d10691fb2dd',title:'Fixture: try a personal task',nextAction:'Complete, snooze, or dismiss this task.',sourceState:'needs_you'});
     const result=store.createPersonal({operationId:'5216c96b-c501-4b3a-b767-132a8cb979e7',title:'Fixture: a completed task',nextAction:'Find this in History.',sourceState:'waiting'});
     const completed=result.items.find(item=>item.id==='personal:5216c96b-c501-4b3a-b767-132a8cb979e7')!;
@@ -51,7 +53,7 @@ export const invokeFixture:typeof invoke=(store,name,args,context)=>{
       return {...store.view(),reply:store.replies.byId(reply.id)};
     }
     default: {
-      if(!['open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
+      if(!['open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
       return invoke(store,name,args,context);
     }
   }

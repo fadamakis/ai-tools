@@ -81,7 +81,8 @@ test('strict synthetic boundary rejects live URLs, unsupported providers, extra 
 test('Waiting, last checked, and database update time are independent',t=>{
   const fixture=setup(t);const {store}=fixture;
   store.upsert({batchId:'a',items:[{...item(),sourceState:'waiting',lastCheckedAt:'2026-10-17T12:00:00Z'}]});
-  assert.equal(store.view().items[0].state,'waiting');
+  assert.equal(store.view().items[0].state,'inbox');
+  assert.equal(store.view().items[0].sourceState,'waiting');
   assert.equal(store.view().items[0].lastCheckedAt,'2026-10-17T12:00:00.000Z');
   assert.equal(store.view().items[0].updatedAt,instant);
 });
@@ -91,7 +92,7 @@ test('snooze uses an absolute instant across Madrid DST; repeated operation does
   const op={id:item().obligationKey,operationId:'snooze',expectedVersion:1,action:'snooze',snoozedUntil:'2026-10-25T01:30:00Z'};
   store.decide(op);fixture.setTime('2026-10-25T01:00:00Z');store.decide(op);
   assert.equal(store.view().items[0].state,'snoozed');
-  fixture.setTime('2026-10-25T01:30:00Z');assert.equal(store.view().items[0].state,'needs_you');
+  fixture.setTime('2026-10-25T01:30:00Z');assert.equal(store.view().items[0].state,'inbox');
 });
 test('killing a process with an uncommitted write leaves the previous committed task intact',async t=>{
   const {store,path}=setup(t);store.upsert({batchId:'a',items:[item()]});
@@ -143,11 +144,11 @@ for(const action of ['complete','dismiss','snooze'] as const)test(`explicit reop
   store.upsert({batchId:'new-context',items:[{...item(2),sourceState:'waiting'}]});
   const operation={id:item().obligationKey,operationId:'reopen',expectedVersion:3,action:'reopen'};
   const task=store.decide(operation).items[0];
-  assert.equal(task.state,'waiting');assert.equal(task.userDecision,null);
+  assert.equal(task.state,'inbox');assert.equal(task.sourceState,'waiting');assert.equal(task.userDecision,null);
   assert.equal(task.decidedAt,null);assert.equal(task.snoozedUntil,null);
   assert.equal(store.decide(operation).receipt?.duplicate,true);
   store.upsert({batchId:'replay',items:[{...item(2),sourceState:'waiting'}]});
-  assert.equal(fixture.restart().view().items[0].state,'waiting');
+  assert.equal(fixture.restart().view().items[0].state,'inbox');
 });
 test('stale reopen cannot overwrite a newer decision',t=>{
   const {store}=setup(t);store.upsert({batchId:'a',items:[item()]});

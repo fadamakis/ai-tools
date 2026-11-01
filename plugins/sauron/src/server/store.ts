@@ -5,13 +5,14 @@ import { dirname } from 'node:path';
 import {localPolicyDigest} from './local-policy.js';
 import { ReplyStore } from './reply-store.js';
 import {saveDiscussionSchema,type DiscussionLink} from '../shared/contracts.js';
-import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, upsertSchema, type Result, type Task, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, liveProviders, type SyncProgress } from '../shared/contracts.js';
+import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
 
 export class StoreError extends Error {
   constructor(public code: string, message: string) { super(message); }
 }
 const hash = (v: unknown): string => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const facts = ({lastCheckedAt: _, ...rest}: Record<string, unknown>) => rest;
+type TaskPlan={workflowState:WorkflowState;area:WorkArea;userTitle:string|null;plannedAction:string|null;dueDate:string|null;reviewDate:string|null;order:number|null;focusOrder:number|null;acceptedAt:string|null};
 
 export class SauronStore {
   private db: DatabaseSync;
@@ -37,6 +38,27 @@ export class SauronStore {
     this.replies = new ReplyStore(this.db,this.now);
     // Retire the presentation preference without changing tasks or decisions.
     this.db.prepare("DELETE FROM metadata WHERE key='ui_layout'").run();
+    if(!this.metadata('planning_initialized_v1',false)){
+      this.db.exec('BEGIN IMMEDIATE');
+      try{
+        for(const task of this.all())this.setMetadata('task-plan:'+task.id,this.defaultPlan(task,true));
+        this.setMetadata('planning_initialized_v1',true);
+        this.db.exec('COMMIT');
+      }catch(error){this.db.exec('ROLLBACK');throw error;}
+    }
+    const staleFocus=this.all().filter(task=>{const plan=this.plan(task);return plan.focusOrder!==null&&!this.actionable(task,plan);});
+    if(staleFocus.length){
+      this.db.exec('BEGIN IMMEDIATE');
+      try{
+        for(const stale of staleFocus){
+          const task=this.get(stale.id);
+          if(!task)continue;
+          const plan=this.plan(task);
+          if(plan.focusOrder!==null&&!this.actionable(task,plan))this.savePlan(task,{...plan,focusOrder:null});
+        }
+        this.db.exec('COMMIT');
+      }catch(error){this.db.exec('ROLLBACK');throw error;}
+    }
   }
   close() { this.db.close(); }
   private all(): Task[] {
@@ -64,13 +86,38 @@ export class SauronStore {
     this.db.prepare('INSERT INTO history(task_id,kind,operation_id,at) VALUES (?,?,?,?)')
       .run(task.id, kind, operation, this.now().toISOString());
   }
+  private defaultPlan(task:Task,accepted:boolean):TaskPlan {
+    return {workflowState:accepted?(task.sourceState==='waiting'?'waiting':'ready'):'inbox',area:task.provider==='personal'?'personal':'unassigned',
+      userTitle:null,plannedAction:null,dueDate:null,reviewDate:null,order:accepted?this.nextOrder():null,focusOrder:null,acceptedAt:accepted?(task.createdAt??task.updatedAt):null};
+  }
+  private plan(task:Task):TaskPlan {
+    const row=this.db.prepare('SELECT value FROM metadata WHERE key=?').get('task-plan:'+task.id);
+    return row?JSON.parse(row.value as string) as TaskPlan:this.defaultPlan(task,true);
+  }
+  private savePlan(task:Task,plan:TaskPlan){this.setMetadata('task-plan:'+task.id,plan);}
+  private nextOrder():number {
+    const plans=this.db.prepare("SELECT value FROM metadata WHERE key LIKE 'task-plan:%'").all().map(row=>JSON.parse(row.value as string) as TaskPlan);
+    return Math.max(0,...plans.map(plan=>plan.order??0))+1;
+  }
+  private taskState(task:Task,plan:TaskPlan,now=this.now()):TaskState {
+    return task.userDecision==='complete'?'done':task.userDecision==='dismiss'?'dismissed':
+      task.userDecision==='snooze'&&task.snoozedUntil!>now.toISOString()?'snoozed':
+      'resolved' in task&&task.resolved?'done':plan.workflowState;
+  }
+  private actionable(task:Task,plan:TaskPlan):boolean {
+    const state=this.taskState(task,plan);
+    return state==='ready'||state==='in_progress';
+  }
   view(): View {
     const now = this.now();
     const tasks=this.all();
-    return {items: tasks.map(task => ({...task, state:
-      task.userDecision === 'complete' ? 'done' : task.userDecision === 'dismiss' ? 'dismissed' :
-      task.userDecision === 'snooze' && task.snoozedUntil! > now.toISOString() ? 'snoozed' : ('resolved' in task && task.resolved) ? 'done' : task.sourceState
-    })), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
+    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:this.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+    return {items: tasks.map(task => {const plan=this.plan(task),state=this.taskState(task,plan,now);
+      const priorityReason=['done','dismissed','snoozed'].includes(state)?null:plan.dueDate&&plan.dueDate<=today?(plan.dueDate<today?'Past due':'Due today'):
+        plan.workflowState==='waiting'&&plan.reviewDate&&plan.reviewDate<=today?'Review waiting item':
+        task.provider!=='personal'&&task.sourceState==='needs_you'?'Source asks for action':null;
+      return {...task,...plan,sourceTitle:task.title,sourceNextAction:task.nextAction,title:plan.userTitle??task.title,nextAction:plan.plannedAction??task.nextAction,
+        priorityReason,suggestedFocus:!!plan.dueDate&&plan.dueDate<=today&&(state==='ready'||state==='in_progress'),state};}), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
   }
   private discussions():DiscussionLink[] {
     return this.db.prepare("SELECT value FROM metadata WHERE key LIKE 'discussion-link:%'").all()
@@ -129,6 +176,7 @@ export class SauronStore {
           throw new StoreError('future_check', 'Last checked time cannot be in the future.');
         const old = this.get(observation.obligationKey);
         if(old?.provider==='personal')throw new StoreError('personal_task', 'Source observations cannot overwrite personal tasks.');
+        if(old&&!this.db.prepare('SELECT 1 FROM metadata WHERE key=?').get('task-plan:'+old.id))this.savePlan(old,this.defaultPlan(old,true));
         if (old && observation.sourceVersion < old.sourceVersion) continue;
         if (old && observation.sourceVersion === old.sourceVersion) {
           const oldObservation = upsertSchema.shape.items.element.parse({
@@ -150,6 +198,8 @@ export class SauronStore {
           decidedAt:old?.decidedAt ?? null, snoozedUntil:old?.snoozedUntil ?? null,
           updatedAt:time, state:old?.state ?? observation.sourceState};
         this.save(task, 'observation', batchId);
+        if(!old)this.savePlan(task,this.defaultPlan(task,false));
+        else{const plan=this.plan(task);if(plan.focusOrder!==null&&!this.actionable(task,plan))this.savePlan(task,{...plan,focusOrder:null});}
       }
   }
   coordination():SyncCoordination {
@@ -403,6 +453,7 @@ export class SauronStore {
         sourceUrl:null, lastCheckedAt:null, version:1, userDecision:null,
         decidedAt:null, snoozedUntil:null, updatedAt:time, createdAt:time, state:task.sourceState},
       'personal',task.operationId);
+      this.savePlan(this.get(id)!,this.defaultPlan(this.get(id)!,true));
     });
   }
   trackCodexThreads(input:unknown):Result {
@@ -418,7 +469,7 @@ export class SauronStore {
         this.db.exec('BEGIN IMMEDIATE');
         begun=true;
         const links=this.discussions().filter(link=>link.url===url);
-        const matches=new Set(links.map(link=>link.taskId));
+        const matches=new Set(links.filter(link=>!this.db.prepare("SELECT 1 FROM history WHERE task_id=? AND kind='proposal' LIMIT 1").get(link.taskId)).map(link=>link.taskId));
         if(matches.size>1)throw new StoreError('ambiguous_chat','Several Sauron items already link to this chat.');
         const linkedId=[...matches][0];
         let result:TrackedCodexThread;
@@ -434,6 +485,7 @@ export class SauronStore {
             sourceUrl:null,lastCheckedAt:null,version:1,userDecision:null,
             decidedAt:null,snoozedUntil:null,updatedAt:time,createdAt:time,state:'needs_you'},
           'personal',threadId);
+          this.savePlan(this.get(id)!,this.defaultPlan(this.get(id)!,true));
           this.setMetadata('discussion-link:'+hash([id,url]),{taskId:id,url,createdAt:time});
           result={threadId,taskId:id,url,status:'created'};
         }
@@ -447,6 +499,75 @@ export class SauronStore {
     }
     return {...this.view(),trackedThreads};
   }
+  proposeCodexFollowups(input:unknown):Result {
+    const request=proposeCodexFollowupsSchema.parse(input);
+    if(request.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+    if(new Set(request.proposals.map(item=>item.actionKey)).size!==request.proposals.length)throw new StoreError('duplicate_action','Use a distinct action key for each follow-up.');
+    const threadId=request.threadId.toLowerCase(),url=`codex://threads/${threadId}`;
+    const proposedFollowups:{id:string;status:'created'|'already_proposed'}[]=[];
+    this.db.exec('BEGIN IMMEDIATE');
+    try{
+      for(const proposal of request.proposals){
+        const digest=hash([threadId,proposal.actionKey]);
+        const uuid=`${digest.slice(0,8)}-${digest.slice(8,12)}-5${digest.slice(13,16)}-8${digest.slice(17,20)}-${digest.slice(20,32)}`;
+        const id=`personal:${uuid}`;
+        if(this.get(id)){proposedFollowups.push({id,status:'already_proposed'});continue;}
+        const time=this.now().toISOString();
+        this.save({id,obligationKey:id,sourceVersion:1,provider:'personal',title:proposal.title,nextAction:proposal.nextAction,
+          sourceState:'needs_you',sourceUrl:null,lastCheckedAt:null,version:1,userDecision:null,decidedAt:null,snoozedUntil:null,
+          updatedAt:time,createdAt:time,state:'inbox'},'proposal',proposal.actionKey);
+        this.savePlan(this.get(id)!,this.defaultPlan(this.get(id)!,false));
+        this.setMetadata('discussion-link:'+hash([id,url]),{taskId:id,url,createdAt:time});
+        proposedFollowups.push({id,status:'created'});
+      }
+      const view=this.view();this.db.exec('COMMIT');return {...view,proposedFollowups};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  planTask(input:unknown):Result {
+    const request=planTaskSchema.parse(input);
+    return this.transaction('plan:'+request.operationId,request,()=>{
+      const task=this.get(request.id);
+      if(!task)throw new StoreError('not_found','Task no longer exists. Refresh the list.');
+      if(task.version!==request.expectedVersion)throw new StoreError('conflict','Task changed in another view. Refresh before saving.');
+      if(task.userDecision==='complete'||task.userDecision==='dismiss')throw new StoreError('terminal','Reopen this task before editing its plan.');
+      const current=this.plan(task),next={...current};
+      if(request.workflowState){
+        next.workflowState=request.workflowState;
+        if(current.workflowState==='inbox'&&request.workflowState!=='inbox'){
+          next.acceptedAt??=this.now().toISOString();next.order??=this.nextOrder();
+        }
+        if(request.workflowState==='inbox'){next.acceptedAt=null;next.focusOrder=null;}
+      }
+      if(!this.actionable(task,next))next.focusOrder=null;
+      if(request.area)next.area=request.area;
+      if(request.title!==undefined)next.userTitle=request.title;
+      if(request.nextAction!==undefined)next.plannedAction=request.nextAction;
+      if(request.dueDate!==undefined)next.dueDate=request.dueDate;
+      if(request.reviewDate!==undefined)next.reviewDate=request.reviewDate;
+      this.savePlan(task,next);
+      this.save({...task,version:task.version+1,updatedAt:this.now().toISOString()},'plan',request.operationId);
+    });
+  }
+  orderTasks(input:unknown):Result {
+    const request=orderTasksSchema.parse(input);
+    if(request.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+    if(new Set(request.orderedIds).size!==request.orderedIds.length||new Set(request.focusIds).size!==request.focusIds.length||
+      request.focusIds.some(id=>!request.orderedIds.includes(id)))throw new StoreError('invalid_order','Order and focus must contain distinct actionable tasks.');
+    return this.transaction('order:'+request.operationId,request,()=>{
+      const actionable=this.view().items.filter(task=>task.state==='ready'||task.state==='in_progress');
+      const actual=actionable.map(task=>task.id).sort(),expected=[...request.orderedIds].sort();
+      if(JSON.stringify(actual)!==JSON.stringify(expected))throw new StoreError('conflict','The task list changed. Refresh before reordering.');
+      const versions=new Map(request.expectedVersions.map(item=>[item.id,item.version]));
+      if(versions.size!==actual.length||actual.some(id=>this.get(id)?.version!==versions.get(id)))throw new StoreError('conflict','Tasks changed in another view. Refresh before reordering.');
+      for(const [index,id] of request.orderedIds.entries()){
+        const task=this.get(id)!,plan=this.plan(task);
+        const next={...plan,order:index+1,focusOrder:request.focusIds.includes(id)?request.focusIds.indexOf(id)+1:null};
+        if(plan.order===next.order&&plan.focusOrder===next.focusOrder)continue;
+        this.savePlan(task,next);
+        this.save({...task,version:task.version+1,updatedAt:this.now().toISOString()},'order',request.operationId);
+      }
+    });
+  }
   decide(input: unknown): Result {
     const operation = decisionSchema.parse(input);
     return this.transaction('decision:'+operation.operationId, operation, () => {
@@ -458,10 +579,13 @@ export class SauronStore {
         throw new StoreError('invalid_snooze', 'Choose a future snooze time.');
       if (operation.action !== 'reopen' && (old.userDecision === 'complete' || old.userDecision === 'dismiss'))
         throw new StoreError('terminal', 'This task already has a final decision.');
-      this.save({...old, userDecision:operation.action === 'reopen' ? null : operation.action,
+      const updated={...old, userDecision:operation.action === 'reopen' ? null : operation.action,
         decidedAt:operation.action === 'reopen' ? null : this.now().toISOString(),
         snoozedUntil:operation.snoozedUntil ?? null, updatedAt:this.now().toISOString(),
-        version:old.version+1}, operation.action, operation.operationId);
+        version:old.version+1};
+      this.save(updated, operation.action, operation.operationId);
+      const plan=this.plan(updated);
+      if(plan.focusOrder!==null&&!this.actionable(updated,plan))this.savePlan(updated,{...plan,focusOrder:null});
     });
   }
 }

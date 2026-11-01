@@ -46,17 +46,63 @@ test('Inbox opens directly after reopening and has no layout selector',async({pa
 });
 test('Inbox supports source links, completion, snooze, dismissal and reopening',async({page,request})=>{
   await call(request,'upsert_attention_items',{batchId:'inbox-source',items:[syntheticObservation()]});await add(request);await open(page);
+  await page.getByRole('radio',{name:/^Inbox /}).click();
   await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();await expect(page.getByRole('button',{name:'Open sample source'})).toBeVisible();
+  await page.getByRole('button',{name:'Accept task'}).click();
   await actions(page,'Review launch notes','Snooze 1 hour');await page.getByRole('button',{name:/^Snoozed/}).click();await expect(page.getByRole('heading',{name:'Review launch notes',exact:true})).toBeVisible();
-  await actions(page,'Review launch notes','Bring back now');await page.getByRole('radio',{name:/^Needs you/}).click();
+  await actions(page,'Review launch notes','Bring back now');await page.getByRole('radio',{name:/^Today/}).click();
   await actions(page,'Review launch notes','Dismiss');await page.getByRole('button',{name:'Confirm dismiss'}).click();await page.getByRole('button',{name:/^History/}).click();await page.getByRole('radio',{name:/^Dismissed/}).click();
   await page.getByRole('button',{name:/^Review launch notes/}).click();await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task'}).click();
   await page.getByRole('button',{name:'Complete Review launch notes',exact:true}).click();await page.getByRole('button',{name:/^History/}).click();await expect(page.getByRole('heading',{name:'Review launch notes',exact:true})).toBeVisible();
 });
+test('new source work is reviewed before entering Today, with area and distinct dates',async({page,request})=>{
+  await call(request,'upsert_attention_items',{batchId:'review-source',items:[syntheticObservation()]});
+  await open(page);
+  await expect(page.getByRole('radio',{name:/^Today 0/})).toBeVisible();
+  await page.getByRole('radio',{name:/^Inbox 1/}).click();
+  await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
+  await expect(page.getByRole('button',{name:/^Complete /})).toHaveCount(0);
+  const editor=page.getByRole('form',{name:'Plan Review the synthetic launch note'});
+  await editor.getByRole('combobox',{name:'Area'}).selectOption('blex');
+  await editor.getByRole('textbox',{name:'Real due date'}).fill('2026-11-05');
+  await editor.getByRole('textbox',{name:'Review date'}).fill('2026-11-04');
+  await editor.getByRole('textbox',{name:'Next action'}).fill('Ask Ayhan about learner impact.');
+  await editor.getByRole('button',{name:'Accept task'}).click();
+  await expect(page.getByRole('radio',{name:/^Today 1/})).toBeVisible();
+  await call(request,'upsert_attention_items',{batchId:'review-source-newer',items:[syntheticObservation(2)]});
+  await page.reload();
+  await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
+  await expect(page.getByText('A repeated check still asks for review.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Your next action: Ask Ayhan about learner impact.',{exact:true})).toBeVisible();
+  const saved=(await call(request,'list_attention')).items[0];
+  expect(saved.area).toBe('blex');expect(saved.dueDate).toBe('2026-11-05');expect(saved.reviewDate).toBe('2026-11-04');
+  await page.getByRole('button',{name:/^Filter by area:/}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'PEX',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'No matching tasks'})).toBeVisible();
+});
+test('Top 3 and task order are user-confirmed and keyboard reorder persists',async({page,request})=>{
+  for(const title of ['Review BLEX','Check PEX','Write feedback','Plan week'])await add(request,title);
+  await open(page);
+  for(const title of ['Review BLEX','Check PEX','Write feedback'])await actions(page,title,'Add to Top 3');
+  const chosen=(await call(request,'list_attention')).items.filter(task=>task.focusOrder);
+  expect(chosen).toHaveLength(3);
+  const fourth=page.getByRole('button',{name:'Actions for Plan week'});await fourth.click();
+  await expect(page.getByRole('menuitem',{name:'Add to Top 3'})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const reorder=page.getByRole('button',{name:'Actions for Check PEX'});await reorder.focus();await page.keyboard.press('Enter');
+  const up=page.getByRole('menuitem',{name:'Move up'});await up.focus();await page.keyboard.press('Enter');
+  await expect(page.getByText('Order saved.',{exact:true})).toBeVisible();
+  await page.reload();
+  const saved=(await call(request,'list_attention')).items;
+  const ordered=saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title);
+  expect(ordered).toEqual(['Check PEX','Review BLEX','Write feedback']);
+  const rest=saved.filter(task=>task.state==='ready').sort((a,b)=>(a.order??0)-(b.order??0)).map(task=>task.title);
+  expect(rest.indexOf('Check PEX')).toBeLessThan(rest.indexOf('Review BLEX'));
+});
 test('Inbox fits long titles, mobile, dark mode, empty filters and keyboard menus',async({page,request})=>{
   mkdirSync(evidence,{recursive:true});
   const title='Review '+('a very long meeting topic '.repeat(5));await add(request,title);await open(page);
-  const menu=page.getByRole('button',{name:`Actions for ${title}`});await menu.focus();await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Snooze 1 hour'})).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toBeFocused();
+  const menu=page.getByRole('button',{name:`Actions for ${title}`});await menu.focus();await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Add to Top 3'})).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toBeFocused();
   for(const width of [320,375,768,1440]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   await page.setViewportSize({width:375,height:900});await page.screenshot({path:evidence+'/inbox-mobile.png',fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Switch to dark theme'}).click();await page.screenshot({path:evidence+'/inbox-mobile-dark.png',fullPage:true,animations:'disabled'});
