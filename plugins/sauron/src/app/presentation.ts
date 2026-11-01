@@ -16,10 +16,12 @@ export function mergeSavedView(previous:Result|null,next:Result):Result {
 }
 
 export const labels: Record<TaskState, string> = {
-  needs_you: 'Needs you', waiting: 'Waiting', done: 'Done',
+  needs_you: 'Ready', inbox:'Inbox', ready:'Ready', in_progress:'In progress', waiting: 'Waiting', done: 'Done',
   snoozed: 'Snoozed', dismissed: 'Dismissed',
 };
+export const areaLabels={blex:'BLEX',pex:'PEX',personal:'Personal',unassigned:'Unassigned'} as const;
+export const plannedDate=(value:string)=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',dateStyle:'medium'}).format(new Date(value+'T12:00:00Z'));
 const dateFormat = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium', timeStyle: 'short',
+  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin',
 });
 export const date = (value: string) => dateFormat.format(new Date(value));

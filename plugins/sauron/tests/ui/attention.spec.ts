@@ -34,7 +34,13 @@ async function filterSource(page:Page,label:string){
   await page.getByRole('option',{name:label,exact:true}).click();
 }
 async function action(page:Page,name:string){await page.getByRole('button',{name:/^Actions for /}).click();await page.getByRole('menuitem',{name,exact:true}).click();}
-async function seed(page:Page){await diagnostics(page,'Create synthetic task');await expect(page.getByRole('button',{name:/^Complete /})).toBeVisible();}
+async function seed(page:Page){
+  await diagnostics(page,'Create synthetic task');
+  await page.getByRole('radio',{name:/^Inbox /}).click();
+  await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
+  await page.getByRole('button',{name:'Accept task'}).click();
+  await expect(page.getByRole('button',{name:/^Complete /})).toBeVisible();
+}
 async function history(page:Page, state='done'){
   await page.getByRole('button',{name:/^History /}).click();
   if(state==='dismissed')await page.getByRole('radio',{name:/^Dismissed /}).click();
@@ -88,7 +94,7 @@ test('save lost before delivery remains retryable after reload',async({page,requ
     if(route.request().postDataJSON().name==='decide_attention_item')await route.abort();else await route.continue();
   });
   await page.getByRole('button',{name:/^Complete /}).click();await expect(page.getByRole('alert')).toBeVisible();
-  expect((await call(request,'list_attention')).items[0].state).toBe('needs_you');
+  expect((await call(request,'list_attention')).items[0].state).toBe('ready');
   await page.unroute('**/api/tool');await page.reload();await expect(page.getByText('Check an interrupted save')).toBeVisible();
   await page.getByRole('button',{name:'Retry decision'}).click();
   await expect(page.getByRole('button',{name:/^History 1/})).toBeVisible();
@@ -109,6 +115,8 @@ test('snooze survives replay; Waiting and source links render; layouts fit narro
   await diagnostics(page,'Replay incoming update');await page.getByRole('button',{name:/^Snoozed /}).click();
   await expect(page.getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
   await call(request,'upsert_attention_items',{batchId:'waiting',items:[{...syntheticObservation(),obligationKey:'synthetic:waiting',sourceState:'waiting',title:'Wait for the synthetic reviewer'}]});
+  const waiting=(await call(request,'list_attention')).items.find(task=>task.id==='synthetic:waiting')!;
+  await call(request,'plan_attention_task',{id:waiting.id,expectedVersion:waiting.version,operationId:randomUUID(),workflowState:'waiting'});
   await page.getByRole('button',{name:'Refresh'}).click();await page.getByRole('radio',{name:/^Waiting /}).click();
   await expect(page.getByRole('heading',{name:'Wait for the synthetic reviewer',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/^Wait for the synthetic reviewer/}).click();
@@ -172,7 +180,11 @@ for(const committed of [false,true])test(`interrupted personal creation ${commit
 test('source icons and filtering distinguish personal tasks and sample sources; light/dark themes and responsive layouts',async({page,request})=>{
   await call(request,'create_personal_task',{operationId:'0bf3e519-8323-4bcf-ac1f-5f40cbce3c6e',title:'Plan my week',nextAction:'Choose the three things I want to focus on.'});
   const samples=[['slack','Reply to the sample design thread'],['jira','Review the sample project plan'],['github','Check the sample pull request'],['calendar','Prepare for the sample meeting'],['meeting','Follow up on the sample discussion']] as const;
-  for(const [sourceKind,title] of samples)await call(request,'upsert_attention_items',{batchId:sourceKind,items:[{...syntheticObservation(),obligationKey:'synthetic:'+sourceKind,sourceKind,title,nextAction:'Synthetic example for source identification.'}]});
+  for(const [sourceKind,title] of samples){
+    const result=await call(request,'upsert_attention_items',{batchId:sourceKind,items:[{...syntheticObservation(),obligationKey:'synthetic:'+sourceKind,sourceKind,title,nextAction:'Synthetic example for source identification.'}]});
+    const task=result.items.find(item=>item.id==='synthetic:'+sourceKind)!;
+    await call(request,'plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:randomUUID(),workflowState:'ready'});
+  }
   await open(page);await expect(page.locator('article')).toHaveCount(6);
   for(const [sourceKind] of samples)await expect(page.locator(`.source-icon.${sourceKind} svg`)).toBeVisible();
   await expect(page.locator('.inbox-brand img')).toHaveJSProperty('naturalWidth',1254);
@@ -197,7 +209,7 @@ test('empty states hide unused tools; filters stay available for recovery; histo
   await page.getByRole('radio',{name:/^Waiting /}).click();
   await expect(page.getByRole('heading',{name:'Nothing you’re waiting on',exact:true})).toBeVisible();
   await expect(page.getByLabel('Filter by source')).toHaveCount(0);
-  await page.getByRole('radio',{name:/^Needs you /}).click();
+  await page.getByRole('radio',{name:/^Today /}).click();
   await seed(page);
   await page.getByLabel('Search tasks',{exact:true}).fill('no matching title');
   await expect(page.getByRole('heading',{name:'No matching tasks',exact:true})).toBeVisible();
@@ -219,12 +231,12 @@ test('empty states hide unused tools; filters stay available for recovery; histo
   expect((await call(request,'list_attention')).items[0].state).toBe('done');
   await page.setViewportSize({width:1184,height:850});
   await page.locator('.inbox-task-open').click();
-  await page.getByRole('heading',{name:'Your attention list',exact:true}).click();
+  await page.getByRole('heading',{name:'Your working day',exact:true}).click();
   await page.screenshot({path:'docs/evidence/inbox-0.5.0/sauron-history-0.5.0.png',fullPage:true,animations:'disabled'});
   await page.getByRole('radio',{name:/^Waiting /}).click();
   await expect(page.getByRole('heading',{name:'Nothing you’re waiting on',exact:true})).toBeVisible();
   await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
-  await page.getByRole('heading',{name:'Your attention list',exact:true}).click();
+  await page.getByRole('heading',{name:'Your working day',exact:true}).click();
   await page.screenshot({path:'docs/evidence/inbox-0.5.0/sauron-waiting-0.5.0.png',fullPage:true,animations:'disabled'});
 });
 test('completion can be reopened deliberately, and snoozed tasks can be brought back',async({page,request})=>{
@@ -232,11 +244,11 @@ test('completion can be reopened deliberately, and snoozed tasks can be brought 
   await page.getByRole('button',{name:/^Complete /}).click();
   await page.getByRole('button',{name:'Reopen task',exact:true}).click();
   await expect(page.getByRole('button',{name:/^Complete /})).toBeVisible();
-  let task=(await call(request,'list_attention')).items[0];expect(task.state).toBe('needs_you');
+  let task=(await call(request,'list_attention')).items[0];expect(task.state).toBe('ready');
   await action(page,'Snooze 1 hour');
   await page.getByRole('button',{name:/^Snoozed /}).click();
   await action(page,'Bring back now');
-  await page.getByRole('radio',{name:/^Needs you /}).click();
+  await page.getByRole('radio',{name:/^Today /}).click();
   await expect(page.getByRole('button',{name:/^Complete /})).toBeVisible();
   task=(await call(request,'list_attention')).items[0];expect(task.snoozedUntil).toBeNull();
   await action(page,'Dismiss');
@@ -244,7 +256,7 @@ test('completion can be reopened deliberately, and snoozed tasks can be brought 
   await history(page,'dismissed');
   await page.locator('.inbox-task-open').click();
   await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
-  expect((await call(request,'list_attention')).items[0].state).toBe('needs_you');
+  expect((await call(request,'list_attention')).items[0].state).toBe('ready');
 });
 test('failed load has an actionable retry and never claims an empty list',async({page})=>{
   await page.route('**/api/tool',route=>route.abort());
@@ -314,7 +326,7 @@ test('source filter supports keyboard selection, dismissal and narrow layouts',a
   const menu=page.getByRole('dialog');const bounds=(await menu.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(375);
   await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(trigger).toBeFocused();
-  await trigger.click();await page.getByRole('heading',{name:'Your attention list',exact:true}).click();await expect(menu).toHaveCount(0);
+  await trigger.click();await page.getByRole('heading',{name:'Your working day',exact:true}).click();await expect(menu).toHaveCount(0);
 });
 
 test.describe('local list timestamps',()=>{
@@ -333,6 +345,7 @@ test.describe('local list timestamps',()=>{
     await expect(page.locator('header')).toHaveText(/Sauron/);
     await expect(page.locator('.nav-separator,.nav-context,.sample-tag')).toHaveCount(0);
     await expect(page.getByText('Sample',{exact:true})).toHaveCount(0);
+    await page.getByRole('radio',{name:/^Inbox /}).click();
     await page.getByRole('button',{name:/^Review the release plan/}).click();
     await expect(page.getByRole('button',{name:'Open source',exact:true})).toBeVisible();
     await expect(page.getByText(/Sample last checked|Madrid|Last checked/)).toHaveCount(0);
@@ -356,6 +369,7 @@ test('dot sync has distinct partial/error and last-success state, real provider 
     nextAction:'Review the synthetic issue.',sourceState:'needs_you',resolved:false,provenance:{reader:'dot',evidence:'Isolated synthetic source evidence'},
   }]}});
   await open(page);await expect(page.locator('.inbox-update [role=status]')).toContainText('Last full update');
+  await page.getByRole('radio',{name:/^Inbox /}).click();
   await expect(page.getByLabel('Jira task',{exact:true})).toBeVisible();
   await page.locator('.inbox-task-open').click();await page.getByText('Source evidence',{exact:true}).click();
   await expect(page.getByText('Isolated synthetic source evidence',{exact:true})).toBeVisible();
@@ -366,6 +380,7 @@ test('dot sync has distinct partial/error and last-success state, real provider 
   await expect(page.locator('.inbox-update [role=status]')).toContainText('Last full update');
   await page.getByText('Update details',{exact:true}).click();
   await expect(page.getByText('Calendar (failed): Calendar unavailable',{exact:true})).toBeVisible();
+  await page.getByRole('radio',{name:/^Inbox /}).click();
   await expect(page.locator('article')).toHaveCount(1);
   await page.screenshot({path:'test-results/dot-sync-partial-0.6.0.png',fullPage:true});
 });

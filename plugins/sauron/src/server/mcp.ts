@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { upsertSchema, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
+import { upsertSchema, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, proposeCodexFollowupsSchema, planTaskSchema, orderTasksSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
 import { SauronStore } from './store.js';
 import { invoke } from './service.js';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +56,12 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:personalTaskSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app']}}},
     {name:'track_codex_threads', title:'Track selected Codex chats', description:'Create one personal task per explicitly selected Codex chat and save its chat link atomically. First use Codex app tools to verify each selected chat ID and title; never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Report created, already_tracked and failed entries.',
       inputSchema:trackCodexThreadsSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app','model']}}},
+    {name:'propose_codex_followups',title:'Propose Codex chat follow-ups',description:'After the user selects a verified Codex chat, propose distinct concrete follow-ups for review in Sauron Inbox. Use an exact stable actionKey from each chat action; reuse it on retries. Never infer a chat ID or auto-accept a proposal. The user must accept or dismiss each proposal in Sauron.',
+      inputSchema:proposeCodexFollowupsSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'plan_attention_task',title:'Edit Sauron task plan',description:'Accept an Inbox item or edit its user-owned workflow state, area, next action, and real due or review dates. Source facts remain unchanged. Requires a displayed task version and stable operation ID.',
+      inputSchema:planTaskSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'order_attention_tasks',title:'Set Sauron task order',description:'Save the user-confirmed order of all actionable tasks and up to three focus tasks. Refresh and retry after a version conflict; source refresh never chooses the order.',
+      inputSchema:orderTasksSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app']}}},
     {name:'get_slack_reply',title:'Read reply draft',description:'Read a saved local Slack reply and preparation or delivery status.',
       inputSchema:replyTaskSchema,annotations:readOnly,_meta:{ui:{visibility:['app']}}},
     {name:'prepare_slack_reply',title:'Prepare Slack reply',description:'Read the original Slack discussion and prepare an editable local draft. Does not send or create an external Slack draft. Poll get_slack_reply while preparing.',
