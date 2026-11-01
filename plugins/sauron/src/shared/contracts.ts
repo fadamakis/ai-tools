@@ -148,6 +148,7 @@ export const personalTaskSchema = z.strictObject({
 
 export const workAreas = ['blex', 'pex', 'personal', 'unassigned'] as const;
 export const workflowStates = ['inbox', 'ready', 'in_progress', 'waiting'] as const;
+export const planningTimeZone = 'Europe/Berlin';
 const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => !Number.isNaN(Date.parse(value)) && new Date(value+'T00:00:00Z').toISOString().startsWith(value), 'Use a valid calendar date.');
 export const planTaskSchema = z.strictObject({
   operationId:z.string().uuid(), id:taskIdSchema, expectedVersion:z.number().int().nonnegative(),

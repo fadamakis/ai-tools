@@ -10,17 +10,28 @@ import { ReplyComposer } from './ReplyComposer.js';
 
 function TaskActions({task,vm,label=`Actions for ${task.title}`}:{task:Task;vm:SauronController;label?:string}){
   const actionable=(vm.view?.items??[]).filter(item=>item.state==='ready'||item.state==='in_progress')
-    .sort((a,b)=>(a.focusOrder??99)-(b.focusOrder??99)||(a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id));
+    .sort((a,b)=>(a.focusOrder??99)-(b.focusOrder??99)||
+      (a.state==='in_progress'?0:1)-(b.state==='in_progress'?0:1)||(a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id));
   const ids=actionable.map(item=>item.id),focus=actionable.filter(item=>item.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(item=>item.id);
   const position=ids.indexOf(task.id);
-  const move=(delta:number)=>{const next=[...ids];[next[position],next[position+delta]]=[next[position+delta],next[position]];vm.order(next,next.filter(id=>focus.includes(id)));};
+  const canMove=(delta:number)=>{
+    const neighbor=actionable[position+delta];
+    return !vm.hasFilters&&!!neighbor&&(!!task.focusOrder!==!!neighbor.focusOrder||task.state===neighbor.state);
+  };
+  const move=(delta:number)=>{
+    const neighbor=actionable[position+delta],next=[...ids];
+    [next[position],next[position+delta]]=[next[position+delta],next[position]];
+    const focusIds=!!task.focusOrder===!!neighbor.focusOrder?focus:
+      focus.map(id=>id===(task.focusOrder?task.id:neighbor.id)?(task.focusOrder?neighbor.id:task.id):id);
+    vm.order(next,next.filter(id=>focusIds.includes(id)));
+  };
   const toggleFocus=()=>vm.order(ids,focus.includes(task.id)?focus.filter(id=>id!==task.id):[...focus,task.id]);
   return <Menu><Menu.Trigger><Button color="secondary" variant="ghost" size="sm" uniform aria-label={label} disabled={vm.busy||!!vm.pending}><span aria-hidden="true" className="inbox-ellipsis">⋯</span></Button></Menu.Trigger>
     <Menu.Content align="end" minWidth={180}>
       {(task.state==='ready'||task.state==='in_progress')&&<>
         {focus.includes(task.id)?<Menu.Item onSelect={toggleFocus}>Remove from Top 3</Menu.Item>:focus.length<3&&<Menu.Item onSelect={toggleFocus}>Add to Top 3</Menu.Item>}
-        {position>0&&<Menu.Item onSelect={()=>move(-1)}>Move up</Menu.Item>}
-        {position>=0&&position<ids.length-1&&<Menu.Item onSelect={()=>move(1)}>Move down</Menu.Item>}
+        {canMove(-1)&&<Menu.Item onSelect={()=>move(-1)}>Move up</Menu.Item>}
+        {canMove(1)&&<Menu.Item onSelect={()=>move(1)}>Move down</Menu.Item>}
         <Menu.Item onSelect={()=>vm.plan(task,{workflowState:task.state==='ready'?'in_progress':'ready'})}>{task.state==='ready'?'Start work':'Move to Ready'}</Menu.Item>
         <Menu.Item onSelect={()=>vm.plan(task,{workflowState:'waiting'})}>Move to Waiting</Menu.Item>
       </>}

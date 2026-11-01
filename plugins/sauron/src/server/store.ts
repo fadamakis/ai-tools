@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import {localPolicyDigest} from './local-policy.js';
 import { ReplyStore } from './reply-store.js';
 import {saveDiscussionSchema,type DiscussionLink} from '../shared/contracts.js';
-import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
+import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, planningTimeZone, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
 
 export class StoreError extends Error {
   constructor(public code: string, message: string) { super(message); }
@@ -111,7 +111,7 @@ export class SauronStore {
   view(): View {
     const now = this.now();
     const tasks=this.all();
-    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:this.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:planningTimeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
     return {items: tasks.map(task => {const plan=this.plan(task),state=this.taskState(task,plan,now);
       const priorityReason=['done','dismissed','snoozed'].includes(state)?null:plan.dueDate&&plan.dueDate<=today?(plan.dueDate<today?'Past due':'Due today'):
         plan.workflowState==='waiting'&&plan.reviewDate&&plan.reviewDate<=today?'Review waiting item':

@@ -20,6 +20,10 @@ async function call(request:APIRequestContext,name:string,args:unknown={}):Promi
 async function open(page:Page){await page.goto(origin);await expect(page.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();}
 async function add(request:APIRequestContext,title='Review launch notes'){return call(request,'create_personal_task',{title,nextAction:'Decide the next step after reviewing the meeting notes.',sourceState:'needs_you',operationId:crypto.randomUUID()});}
 async function actions(page:Page,title:string,action:string){await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).click();await page.getByRole('menuitem',{name:action,exact:true}).click();}
+async function keyboardAction(page:Page,title:string,action:string){
+  await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).focus();await page.keyboard.press('Enter');
+  await page.getByRole('menuitem',{name:action,exact:true}).focus();await page.keyboard.press('Enter');
+}
 
 for(const theme of ['light','dark'] as const){
   test(`preview starts with the system ${theme} theme and readable field hints`,async({page})=>{
@@ -98,6 +102,30 @@ test('Top 3 and task order are user-confirmed and keyboard reorder persists',asy
   expect(ordered).toEqual(['Check PEX','Review BLEX','Write feedback']);
   const rest=saved.filter(task=>task.state==='ready').sort((a,b)=>(a.order??0)-(b.order??0)).map(task=>task.title);
   expect(rest.indexOf('Check PEX')).toBeLessThan(rest.indexOf('Review BLEX'));
+});
+test('keyboard moves swap Top 3 membership but stop at the In progress and Ready boundary',async({page,request})=>{
+  for(const title of ['Review BLEX','Check PEX','Write feedback','Plan week'])await add(request,title);
+  await open(page);
+  for(const title of ['Review BLEX','Check PEX','Write feedback'])await actions(page,title,'Add to Top 3');
+  await actions(page,'Plan week','Start work');
+  await expect(page.getByRole('heading',{name:'In progress',exact:true})).toBeVisible();
+  await keyboardAction(page,'Write feedback','Move down');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Review BLEX','Check PEX','Plan week','Write feedback']);
+  await page.reload();
+  let saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Review BLEX','Check PEX','Plan week']);
+  expect(saved.find(task=>task.title==='Plan week')?.state).toBe('in_progress');
+  expect(saved.find(task=>task.title==='Write feedback')?.state).toBe('ready');
+  await keyboardAction(page,'Write feedback','Move up');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Review BLEX','Check PEX','Write feedback','Plan week']);
+  await add(request,'Next ready');await page.reload();
+  saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Review BLEX','Check PEX','Write feedback']);
+  await page.getByRole('button',{name:'Actions for Plan week'}).click();
+  await expect(page.getByRole('menuitem',{name:'Move down'})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Actions for Next ready'}).click();
+  await expect(page.getByRole('menuitem',{name:'Move up'})).toHaveCount(0);
 });
 test('Inbox fits long titles, mobile, dark mode, empty filters and keyboard menus',async({page,request})=>{
   mkdirSync(evidence,{recursive:true});
