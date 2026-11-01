@@ -8,15 +8,17 @@ import { invoke } from './service.js';
 import { fileURLToPath } from 'node:url';
 import { replyTaskSchema,prepareReplySchema,saveReplySchema,sendReplySchema } from '../shared/replies.js';
 import {discussionConversationUrl} from './discussion-context.js';
+import {resolve} from 'node:path';
 
 // Keep the entrypoint address readable by already-running pre-update servers.
 export const UI_URI = 'ui://attention/list-v1';
-export function createServer(store: SauronStore, htmlPath: string) {
-  const icon={src:'data:image/svg+xml;base64,'+readFileSync(fileURLToPath(new URL('../../assets/sidebar-icon.svg',import.meta.url))).toString('base64'), mimeType:'image/svg+xml',sizes:['any']};
-  const server = new McpServer({name:'sauron-local-prototype', version:JSON.parse(readFileSync(new URL('../../plugin.json',import.meta.url),'utf8')).version, icons:[icon]});
+export function createServer(store: SauronStore, htmlPath: string, options:{invoke?:typeof invoke;buildId?:string;runtimeRoot?:string}={}) {
+  const runtimeFile=(name:string)=>options.runtimeRoot?resolve(options.runtimeRoot,name):fileURLToPath(new URL('../../'+name,import.meta.url));
+  const icon={src:'data:image/svg+xml;base64,'+readFileSync(runtimeFile('assets/sidebar-icon.svg')).toString('base64'), mimeType:'image/svg+xml',sizes:['any']};
+  const server = new McpServer({name:options.buildId?'sauron-dev':'sauron-local-prototype', version:JSON.parse(readFileSync(runtimeFile('plugin.json'),'utf8')).version, icons:[icon]});
   new OpenAIExtensions(server);
   for(const uri of [UI_URI,'ui://attention/list-v0.6.6','ui://attention/list-v0.6.5','ui://attention/list-v0.6.4','ui://attention/list-v0.6.3','ui://attention/list-v0.6.2','ui://attention/list-v0.6.1','ui://attention/list-v0.6.0','ui://attention/list-v0.5.0','ui://attention/list-v0.4.2','ui://attention/list-v0.4.1','ui://attention/list-v0.4.0','ui://attention/list-v0.3.1'])server.registerResource('attention-view-'+uri, uri,
-    {title:'Sauron', mimeType:'text/html;profile=mcp-app'}, async () => ({contents:[{
+    {title:options.buildId?'Sauron Dev':'Sauron', mimeType:'text/html;profile=mcp-app'}, async () => ({contents:[{
       uri, mimeType:'text/html;profile=mcp-app', text:readFileSync(htmlPath, 'utf8'),
       _meta:{ui:{csp:{connectDomains:[], resourceDomains:[]}}, 'openai/ui':{
         preferredDisplayMode:'fullscreen', availableDisplayModes:['fullscreen'],
@@ -24,7 +26,7 @@ export function createServer(store: SauronStore, htmlPath: string) {
     }]}));
   const readOnly = {readOnlyHint:true, destructiveHint:false, openWorldHint:false};
   const definitions = [
-    {name:'open_attention', title:'Sauron', description:'Open your saved tasks, latest five-source Dot sync and independent manual check status.',
+    {name:'open_attention', title:options.buildId?'Sauron Dev':'Sauron', description:'Open your saved tasks, latest five-source Dot sync and independent manual check status.',
       icons:[icon],
       inputSchema:z.strictObject({}), annotations:readOnly,
       _meta:{ui:{resourceUri:UI_URI, visibility:['app']}, 'openai/ui':{entrypoints:[{type:'global'}]}}},
@@ -65,11 +67,12 @@ export function createServer(store: SauronStore, htmlPath: string) {
     const {name, ...config} = definition;
     server.registerTool(name, config, async (args: unknown,context) => {
       try {
-        const data=invoke(store,name,args,name==='link_attention_discussion'?{conversationUrl:discussionConversationUrl(context.mcpReq._meta)}:undefined);
+        const data=(options.invoke??invoke)(store,name,args,name==='link_attention_discussion'?{conversationUrl:discussionConversationUrl(context.mcpReq._meta)}:undefined);
         // Linking a chat does not need to disclose the rest of the user's list
         // to that conversation. App-only saves retain the normal full UI view.
         const response=name==='link_attention_discussion'?{storeId:data.storeId,discussion:data.discussion,receipt:data.receipt}:data;
-        return {content:[{type:'text' as const,text:JSON.stringify(response)}], structuredContent:{...response}};
+        const result={...response,...(options.buildId?{dev:{buildId:options.buildId,fixtures:true}}:{})};
+        return {content:[{type:'text' as const,text:JSON.stringify(result)}], structuredContent:result};
       } catch(error) {
         return {isError:true, content:[{type:'text' as const,text:error instanceof Error ? error.message : 'Save failed'}]};
       }

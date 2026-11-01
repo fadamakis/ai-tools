@@ -6,6 +6,7 @@ import type { ReplyDraft } from '../shared/replies.js';
 import type { Client } from './client.js';
 import { Icon } from './icons.js';
 import { operationId } from './operation.js';
+import {devBuildId} from '../shared/build-info.js';
 
 function cached(reply:ReplyDraft){
   try{const value=JSON.parse(sessionStorage.getItem('sauron:reply:'+reply.id)??'null');
@@ -82,17 +83,17 @@ export function ReplyComposer({task,client,disabled}:{task:Task;client:Client|nu
   }
   if(!expanded)return <Button size="sm" pill={false} color="secondary" variant="ghost" ref={button} className="prepare-reply" disabled={disabled||!client} onClick={open}>Prepare reply</Button>;
   return <section className="reply-composer" aria-label={`Reply to ${task.title}`}>
-    <div className="reply-heading"><h3>Reply in Slack</h3><Button size="sm" pill={false} color="secondary" variant="ghost" uniform aria-label="Close reply" disabled={busy} onClick={close}><Icon name="close"/></Button></div>
+    <div className="reply-heading"><h3>{devBuildId?'Simulated Slack reply':'Reply in Slack'}</h3><Button size="sm" pill={false} color="secondary" variant="ghost" uniform aria-label="Close reply" disabled={busy} onClick={close}><Icon name="close"/></Button></div>
     <p className="reply-destination">{reply?.destination?<>To <strong>{reply.destination}</strong> · original thread</>:'Reading the original discussion…'}</p>
     {reply?.status==='preparing'&&<p role="status" className="reply-progress">Preparing a reply from the latest discussion…</p>}
     {!!reply?.text&&<><Textarea aria-label="Reply draft" ref={editor} rows={5} maxLength={4000} value={text} readOnly={reply.status!=='ready'||busy}
         onChange={event=>{latestText.current=event.target.value;setText(event.target.value);cache(reply.id,event.target.value,reply.revision);setNotice('');}}/>
       <div className="reply-actions"><Button size="sm" pill={false} color="secondary" variant="outline" disabled={busy||!text.trim()} onClick={copy}>Copy reply</Button>
-        {reply.status==='ready'&&<Button size="sm" pill={false} color="primary" disabled={disabled||busy||!text.trim()} onClick={send}>Send to Slack</Button>}
+        {reply.status==='ready'&&<Button size="sm" pill={false} color="primary" disabled={disabled||busy||!text.trim()} onClick={send}>{devBuildId?'Simulate send':'Send to Slack'}</Button>}
         {reply.status==='sending'&&<Button size="sm" pill={false} color="primary" disabled aria-busy="true">Sending…</Button>}
-        {reply.status==='sent'&&<span className="reply-sent" role="status"><Icon name="check" width="14"/> Sent to Slack</span>}
+        {reply.status==='sent'&&<span className="reply-sent" role="status"><Icon name="check" width="14"/> {devBuildId?'Simulated send complete':'Sent to Slack'}</span>}
       </div></>}
-    {reply?.status==='sent'&&<Button size="sm" pill={false} color="secondary" variant="ghost" onClick={()=>void client?.open(reply.messageUrl!)}>Open sent reply <Icon name="arrow" width="12"/></Button>}
+    {reply?.status==='sent'&&<Button size="sm" pill={false} color="secondary" variant="ghost" onClick={()=>void client?.open(reply.messageUrl!)}>{devBuildId?'Open sample source':'Open sent reply'} <Icon name="arrow" width="12"/></Button>}
     {reply?.status==='sent'&&<Button size="sm" pill={false} color="secondary" variant="ghost" className="another-reply" disabled={busy} onClick={prepare}>Prepare another reply</Button>}
     {(error||reply?.error)&&<p className="reply-error" role="alert">{error||reply?.error}</p>}
     {(reply?.status==='uncertain'||error)&&<Button size="sm" pill={false} color="secondary" variant="ghost" onClick={()=>void client?.open(task.sourceUrl!)}>Check Slack discussion <Icon name="arrow" width="12"/></Button>}

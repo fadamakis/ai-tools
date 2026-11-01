@@ -2,6 +2,12 @@ import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextp
 import { OpenAIExtensions } from '@openai/mcp-extensions/app';
 import { discussionMessage } from './discussion.js';
 import type { Result, Task } from '../shared/contracts.js';
+import {devBuildId} from '../shared/build-info.js';
+
+function checkedResult(data:Result&{dev?:{buildId:string}}):Result {
+  if(devBuildId&&data.dev?.buildId!==devBuildId)throw Error('Sauron Dev loaded a different server build. Restart the desktop app and reopen Sauron Dev.');
+  return data;
+}
 
 export type Client = {call:(name:string,args?:unknown)=>Promise<Result>; open:(url:string)=>Promise<void>; mode:string; discuss?:(task:Task,storeId:string)=>Promise<void>};
 export async function connect(onView:(view:Result)=>void):Promise<Client> {
@@ -14,7 +20,7 @@ export async function connect(onView:(view:Result)=>void):Promise<Client> {
           body:JSON.stringify({name,arguments:args})});
         const data=await response.json();
         if(!response.ok || data.error)throw Error(data.error ?? 'Request failed');
-        return data;
+        return checkedResult(data);
       },
       open:async url=>{window.open(url,'_blank','noopener,noreferrer');},
     };
@@ -23,7 +29,7 @@ export async function connect(onView:(view:Result)=>void):Promise<Client> {
   const extensions=new OpenAIExtensions(app);
   app.ontoolresult=result=>{
     if(result.structuredContent && 'items' in result.structuredContent)
-      onView(result.structuredContent as Result);
+      onView(checkedResult(result.structuredContent as Result));
   };
   const style=(context:ReturnType<App['getHostContext']>)=>{
     if(context?.theme)applyDocumentTheme(context.theme);
@@ -49,6 +55,6 @@ export async function connect(onView:(view:Result)=>void):Promise<Client> {
     const result=await app.callServerTool({name,arguments:args as Record<string,unknown>});
     if(result.isError)throw Error(result.content?.find(v=>v.type==='text')?.text ?? 'Save failed');
     if(!result.structuredContent || !('items' in result.structuredContent))throw Error('Invalid server response');
-    return result.structuredContent as Result;
+    return checkedResult(result.structuredContent as Result);
   },open:async url=>{await app.openLink({url});}};
 }

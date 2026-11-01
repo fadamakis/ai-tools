@@ -8,6 +8,11 @@ export async function prepareLocalPlugin({
   projectRoot = fileURLToPath(new URL('..', import.meta.url)),
   outputDir = resolve(projectRoot, 'local-plugin'),
   databasePath = resolve(projectRoot, '.data/sidebar-verification.sqlite'),
+  pluginName,
+  displayName,
+  serverName = 'sauron',
+  runtimePath = resolve(projectRoot, 'dist/server/index.js'),
+  environment = {},
 } = {}) {
   const adapterRoot = resolve(outputDir);
   if (adapterRoot === resolve(projectRoot)) throw new Error('Adapter must be separate from the portable project.');
@@ -18,17 +23,17 @@ export async function prepareLocalPlugin({
   await writeFile(resolve(adapterRoot, 'assets/sauron.png'), await readFile(resolve(projectRoot, 'assets/sauron.png')));
   await writeFile(resolve(adapterRoot, 'assets/sidebar-icon.svg'), await readFile(resolve(projectRoot, 'assets/sidebar-icon.svg')));
   await writeFile(resolve(adapterRoot, '.codex-plugin/plugin.json'), JSON.stringify({
-    name, version, description, author,
+    name: pluginName ?? name, version, description, author,
     skills: './skills/', mcpServers: './.mcp.json',
-    interface: manifest.extensions['com.openai'].interface,
+    interface: {...manifest.extensions['com.openai'].interface,...(displayName?{displayName}:{})},
   }, null, 2) + '\n');
   await writeFile(resolve(adapterRoot, '.mcp.json'), JSON.stringify({
     mcpServers: {
-      sauron: {
+      [serverName]: {
         type: 'stdio', command: process.execPath,
-        args: [resolve(projectRoot, 'dist/server/index.js')],
+        args: [resolve(runtimePath)],
         cwd: projectRoot,
-        env: { ATTENTION_DB: resolve(databasePath) },
+        env: { ...environment, ATTENTION_DB: resolve(databasePath) },
       },
     },
   }, null, 2) + '\n');
