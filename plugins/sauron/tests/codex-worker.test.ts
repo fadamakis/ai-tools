@@ -56,3 +56,12 @@ test('worker failures reject without leaving private task files', async t => {
     cleaned();
   });
 });
+
+test('manual scanner worker disables every connector outside its enabled providers',async t=>{
+ const {request,cleaned}=fixture(t,`const fs=require('node:fs');process.stdin.resume();process.stdin.on('end',()=>fs.writeFileSync(process.argv[process.argv.indexOf('--output-last-message')+1],JSON.stringify(process.argv.slice(2))));`);
+ const args=await runCodexWorker({...request,providers:['granola'],maxOutputLength:32_000}) as string[];
+ assert.ok(args.includes('--ignore-user-config'));assert.ok(args.includes('--strict-config'));
+ const {localReaders}=await import('../src/server/local-policy.js');
+ for(const [provider,reader] of Object.entries(localReaders))assert.ok(args.includes(`apps.${reader.id}.enabled=${provider==='granola'}`));
+ cleaned();
+});

@@ -19,6 +19,7 @@ export function invoke(store: SauronStore, name: string, args: unknown,context?:
     case 'refresh_attention': z.strictObject({}).parse(args); return refreshAttention(store);
     case 'check_scheduled_attention': z.strictObject({}).parse(args); return refreshAttention(store,true);
     case 'check_local_attention': return checkLocalAttention(store,args);
+    case 'configure_attention_sources': return store.configureSources(args);
     case 'configure_attention_sync': return store.configureSync(args);
     case 'get_attention_sync_receipt': {
       const request=z.strictObject({expectedStoreId:z.string().uuid(),runId:z.string().uuid()}).parse(args);

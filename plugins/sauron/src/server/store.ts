@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import {localPolicyDigest} from './local-policy.js';
 import { ReplyStore } from './reply-store.js';
 import {saveDiscussionSchema,type DiscussionLink} from '../shared/contracts.js';
-import { decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, planningTimeZone, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
+import { configureSourcesSchema,defaultSourcePreferences,enabledSources,type SourcePreferences,type LiveProvider, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, planningTimeZone, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
 
 export class StoreError extends Error {
   constructor(public code: string, message: string) { super(message); }
@@ -117,7 +117,7 @@ export class SauronStore {
         plan.workflowState==='waiting'&&plan.reviewDate&&plan.reviewDate<=today?'Review waiting item':
         task.provider!=='personal'&&task.sourceState==='needs_you'?'Source asks for action':null;
       return {...task,...plan,sourceTitle:task.title,sourceNextAction:task.nextAction,title:plan.userTitle??task.title,nextAction:plan.plannedAction??task.nextAction,
-        priorityReason,suggestedFocus:!!plan.dueDate&&plan.dueDate<=today&&(state==='ready'||state==='in_progress'),state};}), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
+        priorityReason,suggestedFocus:!!plan.dueDate&&plan.dueDate<=today&&(state==='ready'||state==='in_progress'),state};}), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, sourcePreferences:this.sourcePreferences(),pendingSourceSync:!!this.pendingLocalSync(),scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
   }
   private discussions():DiscussionLink[] {
     return this.db.prepare("SELECT value FROM metadata WHERE key LIKE 'discussion-link:%'").all()
@@ -165,6 +165,7 @@ export class SauronStore {
     if (new Set(batch.items.map(v => v.obligationKey)).size !== batch.items.length)
       throw new StoreError('duplicate_key', 'A batch must contain distinct obligation keys.');
     return this.transaction('batch:'+batch.batchId, batch, () => {
+      this.assertEnabled(batch.items);
       const items=batch.items.map(item=>item.provider==='manual'||this.get(item.obligationKey)?item:{...item,obligationKey:this.sourceKey(item)});
       if(new Set(items.map(item=>item.obligationKey)).size!==items.length)throw new StoreError('duplicate_key','A batch must contain distinct obligation keys.');
       this.observe(items,batch.batchId);
@@ -202,6 +203,32 @@ export class SauronStore {
         else{const plan=this.plan(task);if(plan.focusOrder!==null&&!this.actionable(task,plan))this.savePlan(task,{...plan,focusOrder:null});}
       }
   }
+  sourcePreferences():SourcePreferences {return this.metadata('source_preferences',defaultSourcePreferences());}
+  configureSources(input:unknown):Result {
+    const request=configureSourcesSchema.parse(input);
+    if(request.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match. No setting was written.');
+    return this.transaction('sources:'+request.operationId,request,()=>{
+      const current=this.sourcePreferences();
+      if(current.revision!==request.expectedRevision)throw new StoreError('sources_changed','Source settings changed. Reload settings before retrying.');
+      if(this.scan()?.status==='running'||this.sync()?.status==='running'||this.pendingLocalSync())
+        throw new StoreError('sources_busy','Wait for the current update or pending reconciliation before changing sources.');
+      if(current.enabled[request.provider]===request.enabled)return;
+      this.setMetadata('source_preferences',{revision:current.revision+1,enabled:{...current.enabled,[request.provider]:request.enabled}});
+      const local=this.localState();
+      this.setMetadata('local_state',{...local,failures:0,blocked:undefined,reason:undefined,nextAttemptAt:undefined});
+    });
+  }
+  private assertEnabled(items:{provider:string}[],providers=enabledSources(this.sourcePreferences())) {
+    if(items.some(item=>liveProviders.includes(item.provider as LiveProvider)&&!providers.includes(item.provider as LiveProvider)))
+      throw new StoreError('source_disabled','This batch contains observations from a disabled source. Reload source settings before retrying.');
+  }
+  private validateSyncSources(request:Extract<ReturnType<typeof syncSchema.parse>['request'],{phase:'finish'}>,run:SyncRun) {
+    const providers=run.enabledProviders??[...liveProviders];
+    this.assertEnabled(request.items,providers);
+    this.assertEnabled(request.items);
+    if(liveProviders.some(provider=>!providers.includes(provider)&&request.sources[provider].status!=='skipped'))
+      throw new StoreError('source_disabled','Disabled sources must be reported as skipped.');
+  }
   coordination():SyncCoordination {
     const row=this.db.prepare("SELECT value FROM metadata WHERE key='sync_coordination'").get();
     const setting=row?JSON.parse(row.value as string):{mode:'independent',changedAt:null};
@@ -211,7 +238,9 @@ export class SauronStore {
     const value=(type:string)=>parts.find(part=>part.type===type)?.value??'';
     const minute=Number(value('hour'))*60+Number(value('minute'));
     const businessHoursActive=['Mon','Tue','Wed','Thu','Fri'].includes(value('weekday'))&&minute>=9*60&&minute<=18*60;
-    const status=sync?.status==='running'?'running':sync?.status==='partial'?'partial':sync?.status==='failed'?'failed':
+    const preferences=this.sourcePreferences();
+    const selectionCurrent=(sync?.sourceRevision??0)===preferences.revision;
+    const status=!enabledSources(preferences).length||!selectionCurrent?'never':sync?.status==='running'?'running':sync?.status==='partial'?'partial':sync?.status==='failed'?'failed':
       ageMinutes===null?'never':ageMinutes>90?'stale':'fresh';
     return {...setting,epoch:setting.epoch??0,freshness:{status,lastAttemptAt:sync?.finishedAt??sync?.startedAt??null,lastSuccessAt:sync?.lastSuccessAt??null,
       ageMinutes,staleAfterMinutes:90,businessHoursActive,timeZone:this.timeZone}};
@@ -257,9 +286,11 @@ export class SauronStore {
         this.assertSyncOwner(request);
         if(request.writer==='local'&&this.scan()?.status==='running')throw new StoreError('scan_running','A manual source scan is already running.');
         if(this.pendingLocalSync())throw new StoreError('pending_sync','Reconcile the pending source sync before starting another.');
+        const providers=enabledSources(this.sourcePreferences());
+        if(!providers.length)return;
         const old=this.sync();
         if(old?.status==='running')throw new StoreError('sync_busy','A dot sync is already running. Read its status before retrying.');
-        this.saveSync({id:request.runId,status:'running',startedAt:this.now().toISOString(),finishedAt:null,
+        this.saveSync({enabledProviders:providers,sourceRevision:this.sourcePreferences().revision,id:request.runId,status:'running',startedAt:this.now().toISOString(),finishedAt:null,
           lastSuccessAt:old?.lastSuccessAt??null,sources:null,error:null,itemCount:0,
           ...(request.writer==='local'?{writer:'local' as const,epoch:request.epoch,targetThrough:request.targetThrough,
             sourceVersions:Object.fromEntries(this.all().map(task=>[task.id,task.sourceVersion]))}:{})});
@@ -275,6 +306,7 @@ export class SauronStore {
       }
       if(Date.parse(request.checkedAt)>this.now().getTime()+60_000||Date.parse(request.checkedAt)<Date.parse(run.startedAt)-60_000)
         throw new StoreError('invalid_check_time','Use the actual check time from this sync, without a future timestamp.');
+      this.validateSyncSources(request,run);
       if(request.items.some(item=>request.sources[item.provider].status!=='checked'))
         throw new StoreError('unverified_source','Unchecked or failed sources cannot produce observations.');
       const items=request.items.map(item=>{
@@ -290,15 +322,16 @@ export class SauronStore {
         return !old||(run.writer==='local'?run.sourceVersions?.[item.obligationKey]===old.sourceVersion:Date.parse(old.lastCheckedAt!)<=Date.parse(item.lastCheckedAt));
       });
       this.observe(accepted,request.runId);
-      const checked=Object.values(request.sources).filter(source=>source.status==='checked').length;
-      const caughtUp=run.writer!=='local'||liveProviders.every(provider=>request.progress?.[provider].complete&&request.progress[provider].through===run.targetThrough);
-      const status=checked===5&&caughtUp?'completed':checked>0?'partial':'failed';
+      const providers=run.enabledProviders??[...liveProviders];
+      const checked=providers.filter(provider=>request.sources[provider].status==='checked').length;
+      const caughtUp=run.writer!=='local'||providers.every(provider=>request.progress?.[provider]?.complete&&request.progress[provider]?.through===run.targetThrough);
+      const status=checked===providers.length&&caughtUp?'completed':checked>0?'partial':'failed';
       this.saveSync({...run,status,finishedAt,sources:request.sources,itemCount:accepted.length,...(request.progress?{progress:request.progress}:{}),
         lastSuccessAt:status==='completed'?finishedAt:run.lastSuccessAt,
         error:status==='completed'?null:status==='partial'?(run.writer==='local'?'Source coverage is incomplete or catching up. Earlier tasks are still saved.':'Some sources were not checked. Earlier tasks are still saved.'):'No sources were checked. Earlier tasks are still saved.'});
       if(run.writer==='local'&&request.progress){
         const state=this.localState();const checkpoints={...state.checkpoints};
-        for(const provider of liveProviders)if(request.sources[provider].status==='checked')checkpoints[provider]=request.progress[provider];
+        for(const provider of providers)if(request.sources[provider].status==='checked')checkpoints[provider]=request.progress[provider];
         this.setMetadata('local_state',{...state,checkpoints});
       }
       this.saveSyncReceipt(request,this.sync()!,Object.fromEntries(accepted.map(item=>[item.obligationKey,this.get(item.obligationKey)!.version])));
@@ -335,8 +368,10 @@ export class SauronStore {
   private validateLocalProgress(request:any,run:SyncRun) {
     if(!request.progress||request.items.some((item:any)=>item.provenance.reader!=='local_agent'))throw new StoreError('local_evidence','Local sync requires local evidence and provider checkpoints.');
     const prior=this.localState().checkpoints??{};
-    for(const provider of liveProviders){
-      const progress=request.progress[provider];const old=prior[provider];
+    for(const provider of run.enabledProviders??liveProviders){
+      const progress=request.progress[provider];
+      if(!progress)throw new StoreError('missing_checkpoint','Enabled providers require progress.');
+      const old=prior[provider];
       if(progress.target!==run.targetThrough||Date.parse(progress.from)>Date.parse(progress.through)||Date.parse(progress.through)>Date.parse(progress.target)||
         !old&&progress.from!==new Date(Date.parse(run.targetThrough!)-7*24*60*60_000).toISOString()||
         old&&(progress.scopeKey!==old.scopeKey||progress.identity!==old.identity||progress.from!==old.through||Date.parse(progress.through)<Date.parse(old.through)))
@@ -360,6 +395,7 @@ export class SauronStore {
       if(!run||run.id!==request.runId||run.status!=='running')throw new StoreError('expired_sync','This local sync is no longer active.');
       this.assertSyncOwner(request,run);
       if(request.phase==='finish'){
+        this.validateSyncSources(request,run);
         if(Date.parse(request.checkedAt)>this.now().getTime()+60_000||Date.parse(request.checkedAt)<Date.parse(run.startedAt)-60_000)
           throw new StoreError('invalid_check_time','Use the actual check time from this sync.');
         if(request.items.some(item=>request.sources[item.provider].status!=='checked'))throw new StoreError('unverified_source','Unchecked sources cannot produce observations.');
@@ -402,7 +438,9 @@ export class SauronStore {
       const existing=this.scan();
       if(existing?.status==='running'){this.db.exec('COMMIT');return {run:existing,started:false};}
       const sourceVersions=Object.fromEntries(this.all().filter(task=>task.provider==='slack'||task.provider==='granola').map(task=>[task.id,task.sourceVersion]));
-      const run:ScanRun={id:randomUUID(),status:'running',startedAt:this.now().toISOString(),finishedAt:null,sources:null,error:null,itemCount:0,sourceVersions};
+      const providers=enabledSources(this.sourcePreferences()).filter(provider=>provider==='slack'||provider==='granola');
+      if(!providers.length)throw new StoreError('sources_paused','Manual source checks are paused. Enable Slack or Meetings to refresh.');
+      const run:ScanRun={enabledProviders:providers,sourceRevision:this.sourcePreferences().revision,id:randomUUID(),status:'running',startedAt:this.now().toISOString(),finishedAt:null,sources:null,error:null,itemCount:0,sourceVersions};
       this.saveScan(run);this.db.exec('COMMIT');return {run,started:true};
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
@@ -413,6 +451,9 @@ export class SauronStore {
     return this.transaction('scan:'+id,output,()=>{
       const run=this.scan();
       if(!run||run.id!==id||run.status!=='running')throw new StoreError('expired_scan','This scan is no longer active.');
+      this.assertEnabled(output.items,run.enabledProviders??['slack','granola']);
+      this.assertEnabled(output.items);
+      for(const provider of ['slack','granola'] as const)if(run.enabledProviders&&!run.enabledProviders.includes(provider)&&output.sources[provider].status!=='skipped')throw new StoreError('source_disabled','Disabled sources must be reported as skipped.');
       // Derive versions under the write lock, shared with dot sync and explicit
       // observations. A scan can take minutes; retain facts checked by another
       // writer after it began instead of applying its potentially older snapshot.
@@ -429,10 +470,11 @@ export class SauronStore {
         return !old||(run.sourceVersions?run.sourceVersions[item.obligationKey]===old.sourceVersion:
           Date.parse(old.lastCheckedAt!)<=Date.parse(run.startedAt));
       }),id);
-      const checked=Object.values(output.sources).filter(source=>source.status==='checked').length;
-      this.saveScan({...run,status:checked===2?'completed':checked===1?'partial':'failed',
+      const providers=run.enabledProviders??['slack','granola'];
+      const checked=providers.filter(provider=>output.sources[provider as 'slack'|'granola'].status==='checked').length;
+      this.saveScan({...run,status:checked===providers.length?'completed':checked>0?'partial':'failed',
         finishedAt:this.now().toISOString(),sources:output.sources,itemCount:items.length,
-        error:checked===2?null:checked===1?'One source could not be checked. Earlier tasks are still saved.':'Slack and Granola could not be checked. Earlier tasks are still saved.'});
+        error:checked===providers.length?null:checked>0?'One source could not be checked. Earlier tasks are still saved.':'Slack and Granola could not be checked. Earlier tasks are still saved.'});
     });
   }
   failScan(id:string,message:string):void {

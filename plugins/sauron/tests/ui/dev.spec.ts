@@ -56,9 +56,15 @@ test('Sauron Dev shows its build, simulates refresh and replies, and routes disc
     const text=await page.evaluate(()=>(window as any).devMessages[0].content[0].text);
     expect(text).toContain('plugin://sauron-dev@sauron-dev');
     expect(text).not.toContain('plugin://sauron@ai-tools');
-    const beforeRefresh=(await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result;
+    const beforeSources=await client.callTool({name:'list_attention',arguments:{}});
     await app.getByRole('button',{name:'Refresh',exact:true}).click();
-    await expect.poll(async()=>((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result).scan?.id).not.toBe(beforeRefresh.scan?.id);
+    await app.getByRole('menuitemcheckbox',{name:'GitHub',exact:true}).click();
+    await expect(app.getByRole('menuitemcheckbox',{name:'GitHub',exact:true})).not.toBeChecked();
+    const afterSources=await client.callTool({name:'list_attention',arguments:{}});
+    expect((afterSources.structuredContent as any).items).toEqual((beforeSources.structuredContent as any).items);
+    expect((afterSources.structuredContent as any).sourcePreferences.enabled.github).toBe(false);
+    await app.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
+    await expect.poll(async()=>((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result).scan?.id).not.toBe((beforeSources.structuredContent as Result).scan?.id);
     await expect(app.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   }finally{await client.close();rmSync(dir,{recursive:true,force:true});}
 });

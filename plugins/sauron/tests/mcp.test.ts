@@ -63,7 +63,7 @@ test('legacy MCP SDK 1 client can discover and open the SDK 2 service',async t=>
   const dir=mkdtempSync(join(tmpdir(),'attention-legacy-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const client=new LegacyClient({name:'legacy-test',version:'1.0.0'});
   try{await client.connect(new LegacyTransport({command:process.execPath,args:[resolve('dist/server/index.js')],env:{ATTENTION_DB:join(dir,'legacy.sqlite')},stderr:'pipe'}));
-    assert.equal((await client.listTools()).tools.length,21);
+    assert.equal((await client.listTools()).tools.length,22);
     assert.equal((await client.callTool({name:'open_attention',arguments:{}})).isError,undefined);
   }finally{await client.close();}
 });

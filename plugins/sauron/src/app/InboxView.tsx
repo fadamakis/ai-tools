@@ -1,3 +1,4 @@
+import {SourceControls} from './SourceControls.js';
 import React, { useEffect, useId, useRef } from 'react';
 import { Button } from '@ai-tools/ui';
 import { Input } from '@ai-tools/ui';
@@ -35,7 +36,7 @@ export function InboxView({vm}:{vm:SauronController}){
   return <div className="inbox-app">
     <header className="inbox-bar"><div className="inbox-bar-inner"><div className="inbox-brand"><img src={logo} alt=""/><span>{devBuildId?'Sauron Dev':'Sauron'}</span></div>
       <div className="inbox-header-actions">{vm.client?.mode==='Local preview'&&<Button uniform variant="ghost" color="secondary" aria-label={`Switch to ${vm.theme==='light'?'dark':'light'} theme`} onClick={()=>{const next=vm.theme==='light'?'dark':'light';document.documentElement.dataset.theme=next;vm.setTheme(next);}}><Icon name={vm.theme==='light'?'moon':'sun'}/></Button>}
-        <Button variant="outline" color="secondary" size="md" disabled={!vm.client||vm.busy||vm.scanning} aria-busy={vm.scanning} onClick={vm.refresh}><Icon name="refresh" className={vm.scanning?'spinning':undefined}/>{vm.scanning?'Refreshing…':'Refresh'}</Button>
+        <SourceControls vm={vm}/>
       </div></div></header>
     <main className="inbox-main"><section className="inbox-heading"><div><h1>Your working day</h1><p className="inbox-muted">Choose what matters, then keep it moving.</p></div>
       <Button color="primary" disabled={!vm.client||disabled||vm.adding} onClick={()=>vm.setAdding(true)}><Icon name="plus"/> Add task</Button></section>
