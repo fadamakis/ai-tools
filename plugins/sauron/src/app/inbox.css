@@ -112,3 +112,6 @@
 .inbox-discussion-form{display:grid;gap:8px;margin-top:12px}.inbox-discussion-form label{font-size:12px}.inbox-discussion-form input{font:inherit;font-size:13px;width:100%;padding:8px 10px;color:inherit;background:transparent;border:1px solid var(--color-border-primary,#d1d5db);border-radius:8px}.inbox-discussion-form button{justify-self:start}
 
 .inbox-plan-conflict{margin-bottom:12px;color:var(--ink);font-size:13px}.inbox-plan-conflict p{margin:0 0 8px}.inbox-plan-conflict>div{display:flex;flex-wrap:wrap;gap:8px}
+.inbox-source-help{font-size:12px;line-height:1.5;color:var(--muted);padding:4px 8px;white-space:normal;max-width:264px}
+.inbox-source-heading{font-size:12px;font-weight:600;color:var(--ink);padding:8px 8px 4px}
+.inbox-source-error{font-size:12px;line-height:1.5;color:var(--color-text-danger);padding:4px 8px;max-width:264px;overflow-wrap:anywhere}

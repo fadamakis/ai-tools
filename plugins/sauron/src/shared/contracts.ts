@@ -24,6 +24,13 @@ const syntheticSchema = z.strictObject({
 
 export const liveProviders = ['slack', 'granola', 'jira', 'github', 'calendar'] as const;
 export type LiveProvider = typeof liveProviders[number];
+export type SourcePreferences = {revision:number;enabled:Record<LiveProvider,boolean>};
+export const defaultSourcePreferences = ():SourcePreferences => ({revision:0,enabled:{slack:true,granola:true,jira:true,github:true,calendar:true}});
+export const configureSourcesSchema=z.strictObject({expectedStoreId:z.string().uuid(),operationId:z.string().uuid(),expectedRevision:z.number().int().nonnegative(),provider:z.enum(liveProviders),enabled:z.boolean()});
+export const enabledSources=(preferences:SourcePreferences=defaultSourcePreferences())=>liveProviders.filter(provider=>preferences.enabled[provider]);
+export const selectionMatches=(run:{enabledProviders?:LiveProvider[];sourceRevision?:number}|null|undefined,preferences:SourcePreferences)=>
+  !!run&&(run.sourceRevision??0)===preferences.revision;
+
 export const providerKind = {slack:'slack',granola:'meeting',jira:'jira',github:'github',calendar:'calendar'} as const;
 const provenanceSchema = z.strictObject({reader:z.enum(['dot','local_agent']), evidence:z.string().trim().min(1).max(1000)});
 export const liveSourceSchema = z.strictObject({
@@ -76,7 +83,7 @@ const liveObservationSchema = z.strictObject({
     ctx.addIssue({code:'custom',message:'Source identity and direct link must match the provider.'});
 });
 export const observationSchema = z.union([syntheticSchema,liveObservationSchema]);
-const coverageSchema=z.strictObject({status:z.enum(['checked','failed']),detail:z.string().max(400)});
+const coverageSchema=z.strictObject({status:z.enum(['checked','failed','skipped']),detail:z.string().max(400)});
 export const scanOutputSchema=z.strictObject({
   sources:z.strictObject({slack:coverageSchema,granola:coverageSchema}),
   items:z.array(liveSourceSchema.safeExtend({provider:z.enum(['slack','granola'])})).max(100),
@@ -87,7 +94,7 @@ export const scanOutputJsonSchema=()=>z.toJSONSchema(scanOutputSchema,{override:
   if(ctx.jsonSchema.format==='uri')delete ctx.jsonSchema.format;
 }});
 export type ScanOutput=z.infer<typeof scanOutputSchema>;
-export type ScanRun={id:string;status:'running'|'completed'|'partial'|'failed';startedAt:string;finishedAt:string|null;
+export type ScanRun={enabledProviders?:LiveProvider[];sourceRevision?:number;id:string;status:'running'|'completed'|'partial'|'failed';startedAt:string;finishedAt:string|null;
   sources:ScanOutput['sources']|null;error:string|null;itemCount:number;sourceVersions?:Record<string,number>};
 
 const syncCoverageSchema=z.strictObject({status:z.enum(['checked','failed','skipped']),detail:z.string().trim().min(1).max(400)});
@@ -103,7 +110,7 @@ const syncIdentity={expectedStoreId:z.string().uuid(),runId:z.string().uuid(),wr
 const syncRequestSchema=z.discriminatedUnion('phase',[
   z.strictObject({...syncIdentity,phase:z.literal('start'),targetThrough:z.string().datetime().optional()}),
   z.strictObject({...syncIdentity,phase:z.literal('finish'),checkedAt:z.string().datetime().transform(v=>new Date(v).toISOString()),
-    progress:syncProgressSchema.optional(),sources:syncSourcesSchema,items:z.array(liveSourceSchema.safeExtend({provenance:provenanceSchema})).max(100)}),
+    progress:syncProgressSchema.partial().optional(),sources:syncSourcesSchema,items:z.array(liveSourceSchema.safeExtend({provenance:provenanceSchema})).max(100)}),
   z.strictObject({...syncIdentity,phase:z.literal('fail'),error:z.string().trim().min(1).max(400)}),
 ]);
 export const syncSchema=z.strictObject({request:syncRequestSchema});
@@ -112,17 +119,17 @@ export const configureSyncSchema=z.strictObject({expectedStoreId:z.string().uuid
 export type SyncMode=typeof syncModes[number];
 export type SyncCoordination={mode:SyncMode;changedAt:string|null;epoch?:number;freshness:{status:'never'|'running'|'fresh'|'stale'|'partial'|'failed';
   lastAttemptAt:string|null;lastSuccessAt:string|null;ageMinutes:number|null;staleAfterMinutes:number;businessHoursActive:boolean;timeZone:string}};
-export type SyncRun={writer?:'dot'|'local';epoch?:number;targetThrough?:string;sourceVersions?:Record<string,number>;progress?:SyncProgress;id:string;status:'running'|'completed'|'partial'|'failed';startedAt:string;finishedAt:string|null;
+export type SyncRun={enabledProviders?:LiveProvider[];sourceRevision?:number;writer?:'dot'|'local';epoch?:number;targetThrough?:string;sourceVersions?:Record<string,number>;progress?:Partial<SyncProgress>;id:string;status:'running'|'completed'|'partial'|'failed';startedAt:string;finishedAt:string|null;
   lastSuccessAt:string|null;sources:z.infer<typeof syncSourcesSchema>|null;error:string|null;itemCount:number};
 
 export const localOutputSchema=z.strictObject({
-  sources:syncSourcesSchema,progress:syncProgressSchema,
+  sources:syncSourcesSchema,progress:syncProgressSchema.partial(),
   items:z.array(liveSourceSchema.safeExtend({provenance:z.strictObject({reader:z.literal('local_agent'),evidence:z.string().trim().min(1).max(1000)})})).max(100),
 });
-export const localOutputJsonSchema=()=>z.toJSONSchema(localOutputSchema,{override:ctx=>{if(ctx.jsonSchema.format==='uri')delete ctx.jsonSchema.format;}});
+export const localOutputJsonSchema=(providers:LiveProvider[]=[...liveProviders])=>z.toJSONSchema(localOutputSchema.extend({progress:z.strictObject(Object.fromEntries(providers.map(provider=>[provider,sourceProgressSchema])))}),{override:ctx=>{if(ctx.jsonSchema.format==='uri')delete ctx.jsonSchema.format;}});
 export const localTriggerSchema=z.strictObject({expectedStoreId:z.string().uuid(),reason:z.enum(['timer','connect','reconnect','manual']).default('timer')});
 export type LocalState={runtime?:{policyDigest:string;verifiedAt:string;cliVersion:string};lastTickAt?:string;lastAttemptAt?:string;nextAttemptAt?:string;lastAvailableAt?:string;failures?:number;reason?:string;blocked?:string;checkpoints?:Partial<Record<LiveProvider,SourceProgress>>};
-export type SyncReceipt={runId:string;digest:string;status:SyncRun['status'];finishedAt:string|null;itemVersions:Record<string,number>;progress?:SyncProgress};
+export type SyncReceipt={runId:string;digest:string;status:SyncRun['status'];finishedAt:string|null;itemVersions:Record<string,number>;progress?:Partial<SyncProgress>};
 
 export const upsertSchema = z.strictObject({
   batchId: z.string().min(1).max(120),
@@ -221,7 +228,7 @@ export const saveDiscussionSchema=linkDiscussionSchema.extend({url:z.string().ma
   try{return canonicalDiscussionUrl(value.trim());}catch{ctx.addIssue({code:'custom',message:'Paste a ChatGPT or Codex conversation link.'});return z.NEVER;}
 })});
 export type DiscussionLink={taskId:string;url:string;createdAt:string};
-export type View = { items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
+export type View = { items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; sourcePreferences?:SourcePreferences; pendingSourceSync?:boolean;scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
 export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[];proposedFollowups?:{id:string;status:'created'|'already_proposed'}[] };
 
 export const syntheticObservation = (version = 1): Observation => ({

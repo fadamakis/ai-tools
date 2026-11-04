@@ -54,8 +54,8 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     await expect(app.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();
     await expect(app.locator('html')).toHaveAttribute('data-theme','light');
     await expect(app.getByRole('heading',{name:'Start with one task',exact:true})).toBeVisible();
-    await app.getByRole('button',{name:'Refresh',exact:true}).click();
-    await expect(app.getByRole('button',{name:'Refreshing…',exact:true})).toBeDisabled();
+    await app.getByRole('button',{name:'Refresh',exact:true}).click();await app.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
+    await expect(app.getByRole('button',{name:'Refreshing…',exact:true})).toBeEnabled();
     await expect(app.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled({timeout:10000});
     await app.getByRole('button',{name:'Diagnostics',exact:true}).click();
     await expect(app.getByText('MCP app · Local store')).toBeVisible();

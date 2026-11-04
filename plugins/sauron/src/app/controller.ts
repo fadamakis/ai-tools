@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { connect, type Client } from './client.js';
-import { syntheticObservation, type SourceKind, type WorkArea, type Task, type TaskState, type Result, type DecisionInput, type PersonalTaskInput } from '../shared/contracts.js';
+import { syntheticObservation, defaultSourcePreferences, type LiveProvider, type SourceKind, type WorkArea, type Task, type TaskState, type Result, type DecisionInput, type PersonalTaskInput } from '../shared/contracts.js';
 import { sourceOf } from './icons.js';
 import { operationId } from './operation.js';
 import { mergeSavedView } from './presentation.js';
@@ -26,6 +26,9 @@ export function useSauronController(){
   const [weeklyReview,setWeeklyReview]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [sourceSaving,setSourceSaving]=useState(false);
+  const [sourceError,setSourceError]=useState('');
+  const failedSource=useRef<{provider:LiveProvider;enabled:boolean;request:Record<string,unknown>}|null>(null);
   const [query,setQuery]=useState('');
   const currentView=useRef({filter:'today' as Filter,source:'all' as SourceKind|'all',area:'all' as WorkArea|'all',query:''});
   const [pending,setPending]=useState<Pending|null>(readPending);
@@ -52,6 +55,21 @@ export function useSauronController(){
   }
   const readSaved=()=>{if(c.current)void run(()=>c.current!.call('list_attention'));};
   const refresh=()=>{if(c.current)void run(()=>c.current!.call('refresh_attention'));};
+  async function saveSource(provider:LiveProvider,enabled:boolean,retry=false){
+    if(!client||!view||gate.current)return;
+    const preferences=view.sourcePreferences??defaultSourcePreferences();
+    const previous=failedSource.current;
+    const request=retry&&previous?.request.expectedRevision===preferences.revision?previous.request:
+      {expectedStoreId:view.storeId,operationId:operationId(),expectedRevision:preferences.revision,provider,enabled};
+    gate.current=true;setBusy(true);setSourceSaving(true);setSourceError('');
+    try{apply(await client.call('configure_attention_sources',request));failedSource.current=null;}
+    catch(error){
+      failedSource.current={provider,enabled,request};
+      setSourceError(error instanceof Error?error.message:'Could not save source settings. Retry to check the saved value.');
+      try{apply(await client.call('list_attention'));}catch{}
+    }finally{gate.current=false;setBusy(false);setSourceSaving(false);}
+  }
+  const retrySource=()=>{const failed=failedSource.current;if(failed)void saveSource(failed.provider,failed.enabled,true);};
   useEffect(()=>{
     let active=true;
     let lastActiveAt=Date.now();
@@ -196,6 +214,6 @@ export function useSauronController(){
   };
   function dismissNotice(){setNotice('');setReopenId(null);}
   function cancelPending(){remember(null);setPending(null);setRecovering(false);if(pending?.kind==='create')cancelDraft();}
-  return {view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
+  return {sourceSaving,sourceError,saveSource,retrySource,view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;

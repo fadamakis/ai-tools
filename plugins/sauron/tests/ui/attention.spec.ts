@@ -117,7 +117,7 @@ test('snooze survives replay; Waiting and source links render; layouts fit narro
   await call(request,'upsert_attention_items',{batchId:'waiting',items:[{...syntheticObservation(),obligationKey:'synthetic:waiting',sourceState:'waiting',title:'Wait for the synthetic reviewer'}]});
   const waiting=(await call(request,'list_attention')).items.find(task=>task.id==='synthetic:waiting')!;
   await call(request,'plan_attention_task',{id:waiting.id,expectedVersion:waiting.version,operationId:randomUUID(),workflowState:'waiting'});
-  await page.getByRole('button',{name:'Refresh'}).click();await page.getByRole('radio',{name:/^Waiting /}).click();
+  await page.getByRole('button',{name:'Refresh'}).click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();await page.getByRole('radio',{name:/^Waiting /}).click();
   await expect(page.getByRole('heading',{name:'Wait for the synthetic reviewer',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/^Wait for the synthetic reviewer/}).click();
   await expect(page.getByRole('button',{name:'Open sample source'})).toBeVisible();
@@ -288,24 +288,24 @@ test('Refresh starts a source scan, stays disabled across reopening, and reenabl
   await open(page);
   await expect(page.getByText('Waiting for the first automatic update.',{exact:true})).toBeVisible();
   const refresh=page.getByRole('button',{name:'Refresh',exact:true});
-  await refresh.click();
-  await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeDisabled();
+  await refresh.click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeEnabled();
   await expect(page.getByText('Checking Slack and Granola…',{exact:true})).toBeVisible();
   const run=(await call(request,'list_attention')).scan!;
   expect(run.status).toBe('running');
   const joined=await call(request,'refresh_attention');expect(joined.scan?.id).toBe(run.id);
   await page.reload();
-  await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeEnabled();
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled({timeout:10000});
   await page.getByText('Update details',{exact:true}).click();
-  await expect(page.getByText('Slack and Granola checked.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Enabled manual sources checked.',{exact:true})).toBeVisible();
   expect((await call(request,'list_attention')).scan?.status).toBe('completed');
 });
 
 test('a runtime failure reenables Refresh and preserves the saved list',async({page,request})=>{
   await open(page);await seed(page);
   writeFileSync(join(dir,'runtime.cjs'),'#!/usr/bin/env node\nprocess.exit(1);',{mode:0o700});
-  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('The source check did not finish');
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   await expect(page.getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
