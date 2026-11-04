@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { mkdtempSync,rmSync,writeFileSync,mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { syntheticObservation, type Result } from '../../src/shared/contracts.js';
 import { contrastRatio } from '../../../../tests/ui/contrast.mjs';
 let child:ChildProcess,dir:string,origin:string;let port=4610;
@@ -254,7 +255,7 @@ test('History returns to the previous task state and filters from either exit',a
   await page.getByRole('button',{name:'Back to current tasks',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Waiting for launch review',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/^History/}).click();
-  const needsYou=page.getByRole('radio',{name:/^Needs you/});
+  const needsYou=page.getByRole('radio',{name:/^Today/});
   await needsYou.focus();await page.keyboard.press('Space');
   await expect(needsYou).toBeFocused();
   await expect(page.getByRole('heading',{name:'Current launch review',exact:true})).toBeVisible();
@@ -337,7 +338,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
     expect((await reader.boundingBox())!.y).toBeCloseTo(before.y,1);
     await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
     await expect(notice).toHaveCount(0);
-    const saved=await call(request,'list_attention');expect(saved.items.find(task=>task.title==='Complete without flashing')?.state).toBe('needs_you');
+    const saved=await call(request,'list_attention');expect(saved.items.find(task=>task.title==='Complete without flashing')?.state).toBe('ready');
   }finally{release();}
 });
 
@@ -374,4 +375,78 @@ test('completion notification remains in view on a long narrow task list',async(
   expect((await page.locator('.inbox-footer').boundingBox())!.y).toBeGreaterThan(900);
   await notice.getByRole('button',{name:'Dismiss notification',exact:true}).click();
   await expect(notice).toHaveCount(0);
+});
+
+for(const scenario of [
+  {sourceState:'needs_you',workflowState:'waiting',tab:'Waiting'},
+  {sourceState:'waiting',workflowState:'in_progress',tab:'Today'},
+] as const)test(`reopening restores ${scenario.workflowState} and clears task filters`,async({page,request})=>{
+  const title='Restore saved workflow';
+  const created=await call(request,'create_personal_task',{operationId:crypto.randomUUID(),title,sourceState:scenario.sourceState});
+  const task=created.items.find(item=>item.title===title)!;
+  await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,workflowState:scenario.workflowState});
+  await open(page);await page.getByRole('radio',{name:new RegExp(`^${scenario.tab} `)}).click();
+  await page.getByRole('button',{name:`Complete ${title}`,exact:true}).click();
+  await page.getByRole('button',{name:/^History /}).click();
+  await page.getByRole('button',{name:'Filter by source: All sources'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Personal',exact:true}).click();
+  await page.getByRole('button',{name:'Filter by area: All areas'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Personal',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search tasks'}).fill(title);
+  await page.locator('.inbox-task-open').filter({hasText:title}).click();
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:new RegExp(`^${scenario.tab} `)})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'Search tasks'})).toHaveValue('');
+  await expect(page.getByRole('button',{name:'Filter by source: All sources'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Filter by area: All areas'})).toBeVisible();
+  expect((await call(request,'list_attention')).items.find(item=>item.id===task.id)?.state).toBe(scenario.workflowState);
+});
+
+test('reopening a dismissed Inbox task returns to Inbox',async({page,request})=>{
+  await call(request,'upsert_attention_items',{batchId:'reopen-inbox',items:[syntheticObservation()]});
+  await open(page);await page.getByRole('radio',{name:/^Inbox /}).click();
+  await actions(page,'Review the synthetic launch note','Dismiss');await page.getByRole('button',{name:'Confirm dismiss'}).click();
+  await page.getByRole('button',{name:/^History /}).click();await page.getByRole('radio',{name:/^Dismissed /}).click();
+  await page.locator('.inbox-task-open').click();await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:/^Inbox /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
+});
+
+test('an interrupted committed reopen recovers into Waiting without another decision',async({page,request})=>{
+  const created=await add(request,'Recover reopened workflow');const task=created.items[0];
+  const planned=await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,workflowState:'waiting'});
+  await call(request,'decide_attention_item',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:planned.items[0].version,action:'complete'});
+  await open(page);await page.getByRole('button',{name:/^History /}).click();await page.locator('.inbox-task-open').click();
+  let reopens=0;
+  await page.route('**/api/tool',async route=>{
+    const body=route.request().postDataJSON();
+    if(body.name==='decide_attention_item'&&body.arguments.action==='reopen'){
+      reopens++;await route.fetch();await route.abort('failed');
+    }else await route.continue();
+  });
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Recover reopened workflow',exact:true})).toBeVisible();
+  await expect(page.getByText('Check an interrupted save',{exact:true})).toHaveCount(0);expect(reopens).toBe(1);
+  const db=new DatabaseSync(join(dir,'test.sqlite'));try{expect(db.prepare("SELECT count(*) AS count FROM history WHERE task_id=? AND kind='reopen'").get(task.id)?.count).toBe(1);}finally{db.close();}
+});
+
+test('reopen navigation uses the authoritative response rather than the previous view',async({page,request})=>{
+  const created=await add(request,'Latest reopened workflow');const task=created.items[0];
+  await call(request,'decide_attention_item',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,action:'complete'});
+  await open(page);await page.getByRole('button',{name:/^History /}).click();await page.locator('.inbox-task-open').click();
+  await page.route('**/api/tool',async route=>{
+    const body=route.request().postDataJSON();
+    if(body.name==='decide_attention_item'&&body.arguments.action==='reopen'){
+      const result=await route.fetch();const reopened=await result.json() as Result;
+      const saved=await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:reopened.items[0].version,workflowState:'waiting'});
+      await route.fulfill({response:result,json:saved});
+    }else await route.continue();
+  });
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Latest reopened workflow',exact:true})).toBeVisible();
 });

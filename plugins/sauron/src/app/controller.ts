@@ -43,10 +43,10 @@ export function useSauronController(){
   const gate=useRef(false);
   const c=useRef<Client|null>(null);
   const apply=(next:Result)=>setView(old=>mergeSavedView(old,next));
-  async function run(work:()=>Promise<Result>, success?:()=>void, failure?:()=>void){
+  async function run(work:()=>Promise<Result>, success?:(saved:Result)=>void, failure?:()=>void){
     if(gate.current)return;
     gate.current=true;setBusy(true);setError('');
-    try{apply(await work());success?.();}
+    try{const saved=await work();apply(saved);success?.(saved);}
     catch(e){setError(e instanceof Error?e.message:'Request failed. Refresh to check saved state.');failure?.();}
     finally{gate.current=false;setBusy(false);}
   }
@@ -100,7 +100,7 @@ export function useSauronController(){
       remember(null);setPending(null);setRecovering(false);setNotice(pending.kind==='create'?'Task saved.':'Saved decision confirmed.');
       if(pending.kind==='decision'){
         setReopenId(pending.input.action==='reopen'?null:task!.id);
-        if(pending.input.action==='reopen'){setFilter(task!.sourceState==='waiting'?'waiting':'today');setSource('all');setQuery('');}
+        if(pending.input.action==='reopen')selectReopened(task!);
       }
       if(pending.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(pending.input.sourceState==='waiting'?'waiting':'today');}
     }
@@ -110,12 +110,12 @@ export function useSauronController(){
     if(!pending)setRecovering(false);
     setNotice('');setReopenId(null);
     remember(operation);setPending(operation);
-    void run(()=>client.call(operation.kind==='create'?'create_personal_task':'decide_attention_item',operation.input),()=>{
+    void run(()=>client.call(operation.kind==='create'?'create_personal_task':'decide_attention_item',operation.input),saved=>{
       remember(null);setPending(null);setRecovering(false);setNotice(operation.kind==='create'?'Task added.':operation.input.action==='complete'?'Task completed.':operation.input.action==='dismiss'?'Task dismissed.':operation.input.action==='reopen'?'Task reopened.':'Task snoozed for one hour.');
       setReopenId(operation.kind==='decision'&&operation.input.action!=='reopen'?operation.input.id:null);
       if(operation.kind==='decision'&&operation.input.action==='reopen'){
-        const reopened=view?.items.find(task=>task.id===operation.input.id);
-        if(reopened)selectState(reopened.sourceState==='waiting'?'waiting':'today');
+        const reopened=saved.items.find(task=>task.id===operation.input.id);
+        if(reopened)selectReopened(reopened);
       }
       if(operation.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(operation.input.sourceState==='waiting'?'waiting':'today');setSource('all');setQuery('');}
     },()=>setRecovering(true));
@@ -163,6 +163,10 @@ export function useSauronController(){
   const showTools = !!view && (stateItems.length > 0 || hasFilters);
   const reopenTask = allTasks.find(task => task.id === reopenId && task.userDecision !== null
     && (task.state === 'done' || task.state === 'dismissed' || task.state === 'snoozed'));
+  function selectReopened(task:Task){
+    const workflow=task.workflowState??(task.sourceState==='waiting'?'waiting':'ready');
+    selectState(workflow==='waiting'?'waiting':workflow==='inbox'?'inbox':'today');
+  }
   function selectState(state: Filter) {
     if(!history&&(state==='done'||state==='dismissed'))currentView.current={filter,source,area,query};
     setFilter(state);setSource('all');setArea('all');setQuery('');
