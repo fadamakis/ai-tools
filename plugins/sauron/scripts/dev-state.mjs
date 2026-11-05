@@ -50,7 +50,7 @@ export function acquireDevRuntimeLock(projectRoot){
   const release=()=>{unlinkSync(join(path,'owner.json'));rmdirSync(path);};
   try{
     const owner=lockStatus(lock);
-    if(owner?.alive&&owner.purpose!=='native runtime')throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Retry when it finishes.`);
+    if(owner?.alive&&owner.purpose!=='native runtime'&&owner.purpose!=='build')throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Retry when it finishes.`);
   }catch(error){release();throw error;}
   return release;
 }
@@ -69,13 +69,13 @@ export function acquireDevLock(projectRoot,purpose){
         if(owner.token!==token)throw Error('Dev lock ownership changed.');
         unlinkSync(join(lock,'owner.json'));rmdirSync(lock);
       };
-      const runtimes=runtimeStatuses(projectRoot).filter(owner=>owner.alive);
-      if(runtimes.length){release();throw Error(`Sauron Dev is busy (${runtimes.length} native runtime${runtimes.length===1?'':'s'}). Disconnect Sauron Dev or restart Codex, then retry.`);}
+      const runtimes=purpose==='build'?[]:runtimeStatuses(projectRoot).filter(owner=>owner.alive);
+      if(runtimes.length){release();throw Error(`Sauron Dev is busy (${runtimes.length} native runtime${runtimes.length===1?'':'s'}). Quit Codex to stop its Sauron Dev runtimes, then retry.`);}
       return release;
     }catch(error){
       if(error.code!=='EEXIST')throw error;
       const owner=lockStatus(lock);
-      if(owner.alive)throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Disconnect Sauron Dev or restart Codex, then retry.`);
+      if(owner.alive)throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Retry when that command finishes.`);
       unlinkSync(join(lock,'owner.json'));rmdirSync(lock);
     }
   }

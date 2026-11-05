@@ -9,6 +9,7 @@ import {devPaths,assertLocalPath,acquireDevLock,currentBuild,lockStatus,runtimeS
 
 export const projectRoot=fileURLToPath(new URL('..',import.meta.url));
 const readJson=path=>JSON.parse(readFileSync(path,'utf8'));
+const marketplaceFiles=['.agents/plugins/marketplace.json','plugins/sauron-dev/.codex-plugin/plugin.json','plugins/sauron-dev/.mcp.json','plugins/sauron-dev/assets/sauron.png','plugins/sauron-dev/assets/sidebar-icon.svg','plugins/sauron-dev/skills/update-sauron/SKILL.md'];
 
 export function preflight(root=projectRoot){
   const [major,minor]=process.versions.node.split('.').map(Number);
@@ -29,7 +30,7 @@ export function preflight(root=projectRoot){
 export async function prepareMarketplace(root=projectRoot){
   const paths=devPaths(root);
   assertLocalPath(root,paths.marketplace);
-  for(const file of ['.agents/plugins/marketplace.json','plugins/sauron-dev/.codex-plugin/plugin.json','plugins/sauron-dev/.mcp.json','plugins/sauron-dev/assets/sauron.png','plugins/sauron-dev/assets/sidebar-icon.svg','plugins/sauron-dev/skills/update-sauron/SKILL.md'])assertLocalPath(root,join(paths.marketplace,file));
+  for(const file of marketplaceFiles)assertLocalPath(root,join(paths.marketplace,file));
   const adapter=await prepareLocalPlugin({projectRoot:root,outputDir:join(paths.marketplace,'plugins/sauron-dev'),
     databasePath:paths.database,pluginName:'sauron-dev',displayName:'Sauron Dev',serverName:'sauron-dev',
     runtimePath:join(root,'scripts/dev-launch.mjs')});
@@ -45,6 +46,12 @@ export async function buildDevelopment({root=projectRoot,setup=false,build=runBu
   const release=acquireDevLock(root,setup?'setup':'build');
   try{
     if(!setup&&!existsSync(paths.database))throw Error('Dev database is missing. Run pnpm sauron:dev:setup first.');
+    if(!setup){
+      for(const path of [paths.current,...marketplaceFiles.map(file=>join(paths.marketplace,file))]){
+        assertLocalPath(root,path);
+        if(!existsSync(path)||!lstatSync(path).isFile())throw Error('Dev setup files are missing. Run pnpm sauron:dev:setup first.');
+      }
+    }
     const buildId=new Date().toISOString().replace(/[-:.TZ]/g,'')+'-'+randomUUID().slice(0,8);
     const output=join(paths.root,'builds',buildId);
     assertLocalPath(root,output);
@@ -58,7 +65,7 @@ export async function buildDevelopment({root=projectRoot,setup=false,build=runBu
       seedDevStore(staging);
       renameSync(staging,paths.database);
     }
-    await prepareMarketplace(root);
+    if(setup)await prepareMarketplace(root);
     const current={buildId};
     const temporary=join(paths.root,`current-${randomUUID()}.tmp`);
     writeFileSync(temporary,JSON.stringify(current,null,2)+'\n',{mode:0o600});
@@ -155,7 +162,7 @@ async function main(){
   const result=await buildDevelopment({setup:command==='setup'});
   console.log(`Sauron Dev fixtures · build ${result.buildId}\nDatabase: ${result.database}\nMarketplace: ${result.marketplace}`);
   if(command==='setup')console.log(`Register once:\ncodex plugin marketplace add '${result.marketplace.replaceAll("'","'\\''")}'\nThen restart the desktop app and install Sauron Dev from the Sauron Dev marketplace in Plugins.`);
-  console.log('Reopen Sauron Dev and compare its build ID. If the old build remains, restart the desktop app.');
+  console.log('Running Sauron Dev processes keep their current build. Restart Codex and reopen Sauron Dev to load the selected build. No uninstall is needed.');
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(error.message);process.exitCode=1;});

@@ -48,16 +48,17 @@ to install, refresh, or remove the plugin.
 
 ## Daily loop
 
-If Sauron Dev is connected, first disable it with the supported UI or restart
-the desktop app. Then edit Sauron source and run:
+Edit Sauron source and build while the plugin stays connected:
 
 ```sh
 pnpm sauron:dev:build
 ```
 
-Re-enable and reopen Sauron Dev afterwards. If the panel still shows the old
-build, restart the desktop app. The footer and Diagnostics show the loaded
-fixture build ID. Compare it with the expected ID from:
+After the build succeeds, restart Codex and reopen Sauron Dev to load it.
+There is no need to disable or uninstall the plugin. Existing processes and
+panels keep their current build until their connection restarts. The footer
+and Diagnostics show the loaded fixture build ID. Compare it with the expected
+ID from:
 
 ```sh
 pnpm sauron:dev:doctor
@@ -68,11 +69,20 @@ generated marketplace, adapter paths, and runtime lock. It does not check
 fixture database content or prove that the desktop app has loaded the selected
 build.
 
-Sauron Dev holds a lock while its native runtime is connected. A rebuild or
-reset refuses to run while that lock is active. Closing the panel might not end
-the runtime immediately. Disable or restart Sauron Dev with the supported UI,
-then rerun the command. File watching and automatic desktop reload are not part
-of this first workflow.
+Each successful build is published in a new directory. Running clients keep
+using their existing build; new connections load the last successfully
+published build, even while another build is in progress. A failed or incomplete
+build leaves the selected build unchanged. Old build directories are retained.
+
+Ordinary builds preserve the fixture database and reuse the marketplace and
+adapter files created by setup. They do not regenerate plugin metadata. If setup
+files are missing, the command asks you to run `pnpm sauron:dev:setup`.
+
+Build, setup and reset commands cannot run concurrently with each other. Setup
+and reset also refuse to run while any native runtime is connected. Quit Codex
+completely, run setup or reset from an external terminal, then reopen Codex.
+Closing only the panel may leave its runtime alive. File watching and automatic
+reload are not provided.
 
 ## Fixtures and reset
 
@@ -89,7 +99,8 @@ pnpm sauron:dev:reset
 
 Type `reset` when prompted. The command moves the database and any SQLite WAL
 sidecars to `plugins/sauron/.data/sauron-dev/archives/<id>/`, then creates a
-fresh fixture database. It refuses when a native dev runtime holds the lock.
+fresh fixture database. Quit Codex before running it from an external terminal;
+it refuses while any native runtime is connected.
 
 ## Compatibility
 
