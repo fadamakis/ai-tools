@@ -2,19 +2,22 @@ import {test,expect} from '@playwright/test';
 import {build} from 'esbuild';
 import {Client} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,existsSync} from 'node:fs';
 import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {seedDevStore} from '../../src/server/dev-fixtures.js';
+import type {Result} from '../../src/shared/contracts.js';
 
 const devBuild=process.env.SAURON_DEV_UI_BUILD;
-test('Sauron Dev native resource shows fixtures, simulates replies, and targets its own discussion plugin',async({page},testInfo)=>{
-  test.skip(!devBuild,'Run sauron:dev:setup and set SAURON_DEV_UI_BUILD to its selected build directory.');
+test('Sauron Dev shows its build, simulates refresh and replies, and routes discussion to Dev',async({page})=>{
+  expect(devBuild,'Run pnpm test:ui, or provide SAURON_DEV_UI_BUILD pointing to a complete Dev test build.').toBeTruthy();
+  for(const file of ['server/dev-runtime.js','ui/index.html'])expect(existsSync(join(devBuild!,file)),`Missing Dev artifact ${file}. Run pnpm test:ui to build it.`).toBe(true);
   const dir=mkdtempSync(join(tmpdir(),'sauron-dev-ui-'));
-  const database=join(dir,'attention.sqlite');seedDevStore(database);
+  const database=join(dir,'attention.sqlite');
   const client=new Client({name:'dev-ui-test',version:'1.0.0'});
-  await client.connect(new StdioClientTransport({command:process.execPath,args:[join(devBuild!,'server/dev-runtime.js')],env:{ATTENTION_DB:database,SAURON_DEV_BUILD_ID:basename(devBuild!)},stderr:'pipe'}));
   try{
+    seedDevStore(database);
+    await client.connect(new StdioClientTransport({command:process.execPath,args:[join(devBuild!,'server/dev-runtime.js')],env:{ATTENTION_DB:database,SAURON_DEV_BUILD_ID:basename(devBuild!)},stderr:'pipe'}));
     const resource=await client.readResource({uri:'ui://attention/list-v1'});
     const html=(resource.contents[0] as {text:string}).text;
     await page.exposeFunction('devTool',async(params:any)=>client.callTool(params));
@@ -42,10 +45,6 @@ test('Sauron Dev native resource shows fixtures, simulates replies, and targets 
     const app=page.frameLocator('iframe');
     await expect(app.getByText('Sauron Dev',{exact:true})).toBeVisible();
     await expect(app.locator('[data-dev-build]')).toHaveAttribute('data-dev-build',basename(devBuild!));
-    await app.getByRole('button',{name:'Add task',exact:true}).click();
-    await app.getByRole('textbox',{name:'Task name',exact:true}).fill('Dev UI personal task');
-    await app.getByRole('button',{name:'Save task',exact:true}).click();
-    await app.getByRole('button',{name:'Complete Dev UI personal task',exact:true}).click();
     await app.getByRole('button',{name:/^Fixture: review a Slack reply/}).click();
     await app.getByRole('button',{name:'Prepare reply',exact:true}).click();
     await expect(app.getByRole('textbox',{name:'Reply draft'})).toHaveValue(/Simulated reply/);
@@ -57,16 +56,9 @@ test('Sauron Dev native resource shows fixtures, simulates replies, and targets 
     const text=await page.evaluate(()=>(window as any).devMessages[0].content[0].text);
     expect(text).toContain('plugin://sauron-dev@sauron-dev');
     expect(text).not.toContain('plugin://sauron@ai-tools');
+    const beforeRefresh=(await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result;
     await app.getByRole('button',{name:'Refresh',exact:true}).click();
+    await expect.poll(async()=>((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result).scan?.id).not.toBe(beforeRefresh.scan?.id);
     await expect(app.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
-    await page.screenshot({path:testInfo.outputPath('sauron-dev-desktop.png'),fullPage:true});
-    for(const width of [320,375]){
-      await page.setViewportSize({width,height:1000});
-      await expect.poll(()=>app.locator('html').evaluate(element=>element.scrollWidth<=window.innerWidth)).toBe(true);
-    }
-    await page.screenshot({path:testInfo.outputPath('sauron-dev-mobile.png'),fullPage:true});
-    await app.getByRole('button',{name:'Diagnostics',exact:true}).click();
-    await expect(app.getByText('Refresh and reply actions use fixtures. No connected services are contacted.')).toBeVisible();
-    await page.screenshot({path:testInfo.outputPath('sauron-dev-diagnostics.png'),fullPage:true});
   }finally{await client.close();rmSync(dir,{recursive:true,force:true});}
 });

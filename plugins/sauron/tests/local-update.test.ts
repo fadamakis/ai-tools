@@ -83,7 +83,7 @@ test('scheduler coalesces bursts and sleep, respects Madrid periodic hours, no m
  assert.equal(localCheckDue(weekend,{},'connect',new Date('2026-10-24T10:00:00Z')),true);
 });
 test('tool policy is deny by default and drops source/desktop credentials from child environment',()=>{
- const args=localPolicyArgs().join('\n');assert.match(args,/apps\._default.enabled=false/);assert.match(args,/mcp_servers.sauron.enabled=false/);assert.match(args,/features.shell_tool=false/);
+ const args=localPolicyArgs().join('\n');assert.match(args,/apps\._default.enabled=false/);assert.match(args,/mcp_servers.sauron.enabled=false/);assert.ok(localPolicyArgs().includes('mcp_servers.sauron-dev.enabled=false'));assert.match(args,/features.shell_tool=false/);
  for(const reader of Object.values(localReaders)){assert.match(args,new RegExp(reader.id));assert.equal(reader.tools.some(tool=>/send|write|create|update|delete|reaction|review$/.test(tool)),false);}
  assert.deepEqual(minimalAgentEnv({HOME:'/home/test',PATH:'/bin',SLACK_TOKEN:'secret',CODEX_APP_TOOLS_PIPE_PATH:'pipe',ATTENTION_DB:'live'}),{HOME:'/home/test',PATH:'/bin'});
 });
