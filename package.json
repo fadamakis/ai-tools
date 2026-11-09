@@ -13,6 +13,10 @@
     "shelob:preview": "node scripts/preview.mjs",
     "workbench:preview": "node scripts/workbench-preview.mjs",
     "sauron:migrate": "node plugins/sauron/scripts/migrate-data.mjs",
+    "sauron:dev:setup": "node plugins/sauron/scripts/dev.mjs setup",
+    "sauron:dev:build": "node plugins/sauron/scripts/dev.mjs build",
+    "sauron:dev:doctor": "node plugins/sauron/scripts/dev.mjs doctor",
+    "sauron:dev:reset": "node plugins/sauron/scripts/dev.mjs reset",
     "check:public": "node scripts/check-public.mjs",
     "audit:secrets": "node scripts/scan-secrets.mjs --history"
   },

@@ -16,7 +16,7 @@ export function localPolicyArgs() {
   };
   // Keep the app/plugin gateway available, but deny every installed local MCP
   // server. A transport is supplied because config validation precedes plugin merge.
-  for(const server of ['code-review','codex_app','computer-use','cua_repl','event-stream','node_repl','sauron','shelob','workbench']){
+  for(const server of ['code-review','codex_app','computer-use','cua_repl','event-stream','node_repl','sauron','sauron-dev','shelob','workbench']){
     values[`mcp_servers.${server}.command`]='/usr/bin/false';
     values[`mcp_servers.${server}.enabled`]=false;
   }

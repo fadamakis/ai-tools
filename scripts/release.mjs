@@ -50,7 +50,7 @@ export function release({source=process.cwd(), output=path.join(source,'dist/rel
  try {
   for(const name of products) {
    const sourceRoot=path.join(source,'plugins',name);
-   const parts=name==='sauron'?['plugin.json','.codex-plugin','mcp.json','README.md','THIRD_PARTY_NOTICES.md','assets','skills','dist','scripts/migrate-data.mjs','scripts/probe-local-runtime.mjs','scripts/prepare-local-scheduler.mjs','docs/local-updates.md','src/server/data-path.mjs']:['plugin.json','.codex-plugin','mcp.json','README.md','THIRD_PARTY_NOTICES.md','assets','skills','references','rules','schemas','scripts','server','app','shared'];
+   const parts=name==='sauron'?['plugin.json','.codex-plugin','mcp.json','README.md','THIRD_PARTY_NOTICES.md','assets','skills','dist','scripts/migrate-data.mjs','scripts/probe-local-runtime.mjs','scripts/prepare-local-scheduler.mjs','docs/local-updates.md','docs/development.md','src/server/data-path.mjs']:['plugin.json','.codex-plugin','mcp.json','README.md','THIRD_PARTY_NOTICES.md','assets','skills','references','rules','schemas','scripts','server','app','shared'];
    const hash=createHash('sha256');
    const inputs=[...sourceFiles(sourceRoot),...sourceFiles(path.join(source,'packages/ui')),...files(path.join(source,'scripts')),path.join(source,'pnpm-lock.yaml'),path.join(source,'LICENSE')];
    for(const file of inputs.sort()) hash.update(path.relative(source,file)).update('\0').update(fs.readFileSync(file)).update('\0');
