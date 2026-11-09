@@ -41,7 +41,7 @@ setup:
 codex plugin marketplace add /absolute/path/to/ai-tools/plugins/sauron/.data/sauron-dev-marketplace
 ```
 
-Restart the ChatGPT desktop app. In the Plugins directory, choose the **Sauron
+Restart Codex. In the Plugins directory, choose the **Sauron
 Dev** marketplace and install **Sauron Dev**. Use the supported Plugins UI or
 Codex CLI to remove it later. Do not edit Codex caches or configuration files
 to install, refresh, or remove the plugin.
