@@ -49,7 +49,7 @@ function localPolicyArgs() {
     "mcp_servers": {},
     "apps._default.enabled": false
   };
-  for (const server2 of ["code-review", "codex_app", "computer-use", "cua_repl", "event-stream", "node_repl", "sauron", "shelob", "workbench"]) {
+  for (const server2 of ["code-review", "codex_app", "computer-use", "cua_repl", "event-stream", "node_repl", "sauron", "sauron-dev", "shelob", "workbench"]) {
     values[`mcp_servers.${server2}.command`] = "/usr/bin/false";
     values[`mcp_servers.${server2}.enabled`] = false;
   }

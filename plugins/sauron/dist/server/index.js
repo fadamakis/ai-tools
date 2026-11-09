@@ -5137,7 +5137,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve) {
+function isRecursive(inst, stack, resolve2) {
   const cached2 = recursive.get(inst);
   if (cached2 !== void 0)
     return cached2 ? PROVEN : NONE;
@@ -5147,7 +5147,7 @@ function isRecursive(inst, stack, resolve) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve);
+      const answer = isRecursive(child, stack, resolve2);
       if (answer > result)
         result = answer;
     }
@@ -5158,7 +5158,7 @@ function isRecursive(inst, stack, resolve) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -5222,7 +5222,7 @@ function isRecursive(inst, stack, resolve) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -24153,14 +24153,14 @@ function inputRequiredRoundsExceededMessage(method, maxRounds) {
   return `Multi-round-trip request '${method}' still required input after ${maxRounds} rounds (inputRequired.maxRounds)`;
 }
 function sleep(ms, signal) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve2, reject) => {
     if (signal?.aborted) {
       reject(signal.reason instanceof SdkError ? signal.reason : new SdkError(SdkErrorCode.RequestTimeout, String(signal.reason)));
       return;
     }
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
-      resolve();
+      resolve2();
     }, ms);
     const onAbort = () => {
       clearTimeout(timer);
@@ -24959,7 +24959,7 @@ var Protocol = class {
     const flowStartedAt = Date.now();
     let onAbort;
     let cleanupMessageId;
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       const earlyReject = (error62) => {
         reject(error62);
       };
@@ -25028,7 +25028,7 @@ var Protocol = class {
         }
         if (decoded.kind === "invalid") return reject(decoded.error);
         if (decoded.kind === "input_required") {
-          if (options?.allowInputRequired === true) return resolve(manualInputRequiredValue(decoded));
+          if (options?.allowInputRequired === true) return resolve2(manualInputRequiredValue(decoded));
           const flow = {
             codec: codec2,
             request,
@@ -25040,11 +25040,11 @@ var Protocol = class {
               params
             }, resultSchema, legOptions)
           };
-          return resolve(this._resolveNonCompleteResult(decoded, flow));
+          return resolve2(this._resolveNonCompleteResult(decoded, flow));
         }
         const result = decoded.result;
         validateStandardSchema(resultSchema, result).then((parseResult) => {
-          if (parseResult.success) resolve(parseResult.data);
+          if (parseResult.success) resolve2(parseResult.data);
           else reject(new SdkError(SdkErrorCode.InvalidResult, `Invalid result for ${request.method}: ${parseResult.error}`));
         }, reject);
       });
@@ -27960,7 +27960,7 @@ var require_compile = /* @__PURE__ */ __commonJSMin(((exports) => {
     ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, ref);
     const schOrFunc = root.refs[ref];
     if (schOrFunc) return schOrFunc;
-    let _sch = resolve.call(this, root, ref);
+    let _sch = resolve2.call(this, root, ref);
     if (_sch === void 0) {
       const schema = (_a3 = root.localRefs) === null || _a3 === void 0 ? void 0 : _a3[ref];
       const { schemaId } = this.opts;
@@ -27986,7 +27986,7 @@ var require_compile = /* @__PURE__ */ __commonJSMin(((exports) => {
   function sameSchemaEnv(s1, s2) {
     return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
   }
-  function resolve(root, ref) {
+  function resolve2(root, ref) {
     let sch;
     while (typeof (sch = this.refs[ref]) == "string") ref = sch;
     return sch || this.schemas[ref] || resolveSchema.call(this, root, ref);
@@ -28436,7 +28436,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
     else if (typeof uri2 === "object") uri2 = parse3(serialize(uri2, options), options);
     return uri2;
   }
-  function resolve(baseURI, relativeURI, options) {
+  function resolve2(baseURI, relativeURI, options) {
     const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
     const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
     schemelessOptions.skipEscape = true;
@@ -28610,7 +28610,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
   const fastUri = {
     SCHEMES,
     normalize,
-    resolve,
+    resolve: resolve2,
     resolveComponent,
     equal,
     serialize,
@@ -34072,7 +34072,7 @@ var StdioServerTransport = class {
   }
   send(message) {
     if (this._closed) return Promise.reject(/* @__PURE__ */ new Error("StdioServerTransport is closed"));
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve2, reject) => {
       const json2 = serializeMessage(message);
       let settled = false;
       const onError = (error62) => {
@@ -34087,14 +34087,14 @@ var StdioServerTransport = class {
         settled = true;
         this._stdout.off("error", onError);
         this._stdout.off("drain", onDrain);
-        resolve();
+        resolve2();
       };
       this._stdout.once("error", onError);
       if (this._stdout.write(json2)) {
         if (settled) return;
         settled = true;
         this._stdout.off("error", onError);
-        resolve();
+        resolve2();
       } else if (!settled) this._stdout.once("drain", onDrain);
     });
   }
@@ -34148,14 +34148,14 @@ var StdioConnectionChannel = class {
   */
   async whenRequestsAnswered(timeoutMs) {
     if (this._closed || this._pendingRequests.size === 0) return true;
-    return await new Promise((resolve) => {
+    return await new Promise((resolve2) => {
       const waiter = () => {
         clearTimeout(timer);
-        resolve(true);
+        resolve2(true);
       };
       const timer = setTimeout(() => {
         this._drainWaiters = this._drainWaiters.filter((pending) => pending !== waiter);
-        resolve(false);
+        resolve2(false);
       }, timeoutMs);
       this._drainWaiters.push(waiter);
     });
@@ -34530,7 +34530,7 @@ function localPolicyArgs() {
     "mcp_servers": {},
     "apps._default.enabled": false
   };
-  for (const server of ["code-review", "codex_app", "computer-use", "cua_repl", "event-stream", "node_repl", "sauron", "shelob", "workbench"]) {
+  for (const server of ["code-review", "codex_app", "computer-use", "cua_repl", "event-stream", "node_repl", "sauron", "sauron-dev", "shelob", "workbench"]) {
     values[`mcp_servers.${server}.command`] = "/usr/bin/false";
     values[`mcp_servers.${server}.enabled`] = false;
   }
@@ -37136,15 +37136,17 @@ function discussionConversationUrl(meta3) {
 }
 
 // src/server/mcp.ts
+import { resolve } from "node:path";
 var UI_URI = "ui://attention/list-v1";
-function createServer(store2, htmlPath) {
-  const icon = { src: "data:image/svg+xml;base64," + readFileSync(fileURLToPath4(new URL("../../assets/sidebar-icon.svg", import.meta.url))).toString("base64"), mimeType: "image/svg+xml", sizes: ["any"] };
-  const server = new McpServer({ name: "sauron-local-prototype", version: JSON.parse(readFileSync(new URL("../../plugin.json", import.meta.url), "utf8")).version, icons: [icon] });
+function createServer(store2, htmlPath, options = {}) {
+  const runtimeFile = (name) => options.runtimeRoot ? resolve(options.runtimeRoot, name) : fileURLToPath4(new URL("../../" + name, import.meta.url));
+  const icon = { src: "data:image/svg+xml;base64," + readFileSync(runtimeFile("assets/sidebar-icon.svg")).toString("base64"), mimeType: "image/svg+xml", sizes: ["any"] };
+  const server = new McpServer({ name: options.buildId ? "sauron-dev" : "sauron-local-prototype", version: JSON.parse(readFileSync(runtimeFile("plugin.json"), "utf8")).version, icons: [icon] });
   new OpenAIExtensions(server);
   for (const uri2 of [UI_URI, "ui://attention/list-v0.6.6", "ui://attention/list-v0.6.5", "ui://attention/list-v0.6.4", "ui://attention/list-v0.6.3", "ui://attention/list-v0.6.2", "ui://attention/list-v0.6.1", "ui://attention/list-v0.6.0", "ui://attention/list-v0.5.0", "ui://attention/list-v0.4.2", "ui://attention/list-v0.4.1", "ui://attention/list-v0.4.0", "ui://attention/list-v0.3.1"]) server.registerResource(
     "attention-view-" + uri2,
     uri2,
-    { title: "Sauron", mimeType: "text/html;profile=mcp-app" },
+    { title: options.buildId ? "Sauron Dev" : "Sauron", mimeType: "text/html;profile=mcp-app" },
     async () => ({ contents: [{
       uri: uri2,
       mimeType: "text/html;profile=mcp-app",
@@ -37159,7 +37161,7 @@ function createServer(store2, htmlPath) {
   const definitions = [
     {
       name: "open_attention",
-      title: "Sauron",
+      title: options.buildId ? "Sauron Dev" : "Sauron",
       description: "Open your saved tasks, latest five-source Dot sync and independent manual check status.",
       icons: [icon],
       inputSchema: external_exports.strictObject({}),
@@ -37299,9 +37301,10 @@ function createServer(store2, htmlPath) {
     const { name, ...config2 } = definition;
     server.registerTool(name, config2, async (args, context) => {
       try {
-        const data = invoke(store2, name, args, name === "link_attention_discussion" ? { conversationUrl: discussionConversationUrl(context.mcpReq._meta) } : void 0);
+        const data = (options.invoke ?? invoke)(store2, name, args, name === "link_attention_discussion" ? { conversationUrl: discussionConversationUrl(context.mcpReq._meta) } : void 0);
         const response = name === "link_attention_discussion" ? { storeId: data.storeId, discussion: data.discussion, receipt: data.receipt } : data;
-        return { content: [{ type: "text", text: JSON.stringify(response) }], structuredContent: { ...response } };
+        const result = { ...response, ...options.buildId ? { dev: { buildId: options.buildId, fixtures: true } } : {} };
+        return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
       } catch (error62) {
         return { isError: true, content: [{ type: "text", text: error62 instanceof Error ? error62.message : "Save failed" }] };
       }
