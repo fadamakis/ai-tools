@@ -24,6 +24,7 @@ export function useSauronController(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [query,setQuery]=useState('');
+  const currentView=useRef({filter:'needs_you' as TaskState,source:'all' as SourceKind|'all',query:''});
   const [pending,setPending]=useState<Pending|null>(readPending);
   const [adding,setAdding]=useState(()=>!!storage.read(draftKey)&&!readPending());
   const [draft,setDraft]=useState<Draft>(()=>storage.read(draftKey)??emptyDraft);
@@ -139,7 +140,13 @@ export function useSauronController(){
   const showTools = !!view && (stateItems.length > 0 || hasFilters);
   const reopenTask = allTasks.find(task => task.id === reopenId && task.userDecision !== null
     && (task.state === 'done' || task.state === 'dismissed' || task.state === 'snoozed'));
-  function selectState(state: TaskState) { setFilter(state); setSource('all'); setQuery(''); }
+  function selectState(state: TaskState) {
+    if(!history&&(state==='done'||state==='dismissed'))currentView.current={filter,source,query};
+    setFilter(state);setSource('all');setQuery('');
+  }
+  function returnToTasks(){
+    setFilter(currentView.current.filter);setSource(currentView.current.source);setQuery(currentView.current.query);
+  }
   const emptyTitles: Record<TaskState, string> = {
     needs_you: allTasks.length ? 'Nothing needs you right now' : 'Start with one task',
     waiting: 'Nothing you’re waiting on', done: 'No completed tasks yet',
@@ -153,6 +160,6 @@ export function useSauronController(){
     dismissed: 'Tasks you dismiss will appear here.',
   };
   function cancelPending(){remember(null);setPending(null);if(pending?.kind==='create')cancelDraft();}
-  return {view,client,filter,source,busy,error,query,pending,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,save,decide,seed,replay,c,changeDraft,cancelDraft,cancelPending,apply};
+  return {view,client,filter,source,busy,error,query,pending,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,seed,replay,c,changeDraft,cancelDraft,cancelPending,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;

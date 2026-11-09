@@ -156,3 +156,76 @@ for(const outcome of ['recovered','new-failure','partial','next-update'] as cons
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   }
 });
+
+test('History returns to the previous task state and filters from either exit',async({page,request})=>{
+  await call(request,'create_personal_task',{title:'Waiting for launch review',nextAction:'Ask for the reviewed notes.',sourceState:'waiting',operationId:crypto.randomUUID()});
+  await add(request,'Current launch review');await open(page);
+  await page.getByRole('radio',{name:/^Waiting/}).click();
+  await page.getByLabel('Search tasks').fill('launch');
+  await page.getByRole('button',{name:/^Filter by source:/}).click();
+  await page.getByRole('option',{name:'Personal',exact:true}).click();
+  for(const exit of ['Back to current tasks','History']){
+    await page.getByRole('button',{name:/^History/}).click();
+    await expect(page.getByRole('radio',{name:/^Waiting/})).toHaveAttribute('aria-checked','false');
+    await page.getByRole('radio',{name:/^Dismissed/}).click();
+    await page.getByRole('button',{name:exit==='History'?/^History/:exit,exact:exit!=='History'}).click();
+    await expect(page.getByRole('radio',{name:/^Waiting/})).toHaveAttribute('aria-checked','true');
+    await expect(page.getByLabel('Search tasks')).toHaveValue('launch');
+    await expect(page.getByRole('button',{name:/^Filter by source:/})).toContainText('Personal');
+    await expect(page.getByRole('heading',{name:'Waiting for launch review',exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Back to current tasks',exact:true})).toHaveCount(0);
+  }
+  await page.setViewportSize({width:375,height:900});
+  await page.getByRole('button',{name:/^History/}).click();
+  await page.getByRole('button',{name:'Back to current tasks',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Waiting for launch review',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:/^History/}).click();
+  const needsYou=page.getByRole('radio',{name:/^Needs you/});
+  await needsYou.focus();await page.keyboard.press('Space');
+  await expect(needsYou).toBeFocused();
+  await expect(page.getByRole('heading',{name:'Current launch review',exact:true})).toBeVisible();
+});
+
+test('task list fills the remaining desktop height as the window and update details change',async({page,request})=>{
+  for(let i=0;i<12;i++)await add(request,`Review launch task ${i}`);
+  await page.setViewportSize({width:1440,height:900});await open(page);
+  const reader=page.locator('.inbox-reader'),short=(await reader.boundingBox())!;
+  await page.setViewportSize({width:1440,height:1400});
+  await expect.poll(async()=>(await reader.boundingBox())!.height-short.height).toBeGreaterThan(450);
+  for(const height of [650,900,1400]){
+    await page.setViewportSize({width:1440,height});
+    const bounds=(await reader.boundingBox())!;
+    expect(bounds.y+bounds.height).toBeLessThan(height);
+    expect(height-bounds.y-bounds.height).toBeLessThan(80);
+    expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight)).toBeTruthy();
+  }
+  await page.setViewportSize({width:1440,height:900});
+  const closed=(await reader.boundingBox())!;
+  await page.getByText('Update details',{exact:true}).click();
+  expect((await reader.boundingBox())!.height).toBeLessThan(closed.height);
+  await page.getByText('Update details',{exact:true}).click();
+  expect((await reader.boundingBox())!.height).toBeCloseTo(closed.height,0);
+});
+
+test('reader tools stay clear of scrolling content and portaled menus',async({page,request})=>{
+  await call(request,'create_personal_task',{title:'Read the complete launch notes',nextAction:'Read the complete notes before deciding the next step. '.repeat(7),sourceState:'needs_you',operationId:crypto.randomUUID()});
+  await page.setViewportSize({width:1280,height:650});await open(page);
+  await page.locator('.inbox-task-open').click();
+  const tools=page.locator('.inbox-reader-tools'),content=page.locator('.inbox-reader-content');
+  const before=(await tools.boundingBox())!;
+  await content.evaluate(node=>{node.scrollTop=node.scrollHeight;});
+  expect(await content.evaluate(node=>node.scrollTop)).toBeGreaterThan(0);
+  expect((await tools.boundingBox())!.y).toBe(before.y);
+  await page.getByRole('button',{name:'More task actions',exact:true}).click();
+  const dismiss=page.getByRole('menuitem',{name:'Dismiss',exact:true});
+  const box=(await dismiss.boundingBox())!;
+  expect(await dismiss.evaluate((node,point)=>node.contains(document.elementFromPoint(point.x,point.y)),{x:box.x+box.width/2,y:box.y+box.height/2})).toBeTruthy();
+  await dismiss.click();
+  await expect(page.getByRole('dialog',{name:'Dismiss this task?',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.getByRole('button',{name:/Filter by source: All sources/}).click();
+  const option=page.getByRole('option',{name:'Slack',exact:true});
+  const optionBox=(await option.boundingBox())!;
+  expect(await option.evaluate((node,point)=>node.contains(document.elementFromPoint(point.x,point.y)),{x:optionBox.x+optionBox.width/2,y:optionBox.y+optionBox.height/2})).toBeTruthy();
+  await page.keyboard.press('Escape');
+});
