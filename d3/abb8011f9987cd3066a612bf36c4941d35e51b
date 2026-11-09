@@ -1,0 +1,19 @@
+plugins/sauron/docs/development.md
+  s_3cb9b6b035e287::t_fadbb3f1e70cda 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d3abb8011f9987cd3066a612bf36c4941d35e51b",
+  "prompts": {},
+  "sessions": {
+    "s_3cb9b6b035e287": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c09e-2734-7ea2-b3d4-c22cb6a8098a",
+        "model": "unknown"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
