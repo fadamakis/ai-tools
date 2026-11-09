@@ -1,0 +1,30 @@
+plugins/sauron/src/app/controller.ts
+  s_3cb9b6b035e287::t_d92bcb48f8a9e5 29,43,47,97,107-108,111,118,165-167
+plugins/sauron/tests/ui/inbox.spec.ts
+  s_3cb9b6b035e287::t_706152c3a9567a 232-290,303
+  s_3cb9b6b035e287::t_a1e7d975f187bd 291-302
+plugins/sauron/src/app/inbox.css
+  s_3cb9b6b035e287::t_d92bcb48f8a9e5 47
+  s_3cb9b6b035e287::t_dbed750af865af 10,21
+plugins/sauron/src/app/TaskReader.tsx
+  s_3cb9b6b035e287::t_706152c3a9567a 21,26,68,70
+plugins/sauron/src/app/InboxView.tsx
+  s_3cb9b6b035e287::t_d92bcb48f8a9e5 56
+  s_3cb9b6b035e287::t_100a28815d46f1 61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "16bc170de004d8c906787a8205424dfbaecdc4d3",
+  "prompts": {},
+  "sessions": {
+    "s_3cb9b6b035e287": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c09e-2734-7ea2-b3d4-c22cb6a8098a",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
