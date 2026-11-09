@@ -2,7 +2,7 @@ import { Quiet } from '@ai-tools/ui';
 export { Secondary, Quiet } from '@ai-tools/ui';
 import React, { useRef } from 'react';
 import { Button } from '@ai-tools/ui';
-import { Plus, X, ArrowRight, Reload, TableCellsFilled as Table, Search, Archive, Folder, DotsHorizontal, Filter } from '@openai/apps-sdk-ui/components/Icon';
+import { Plus, X, ArrowRight, Reload, CheckCircleDashed, TableCellsFilled as Table, Search, Archive, Folder, DotsHorizontal, Filter } from '@openai/apps-sdk-ui/components/Icon';
 export { Button };
 export { Input } from '@ai-tools/ui';
 export { Textarea } from '@ai-tools/ui';
@@ -18,7 +18,7 @@ export { EmptyMessage } from '@ai-tools/ui';
 export { LoadingIndicator } from '@openai/apps-sdk-ui/components/Indicator';
 
 export function Icon({ name, ...props }) {
-  const Component = { plus: Plus, close: X, arrow: ArrowRight, refresh: Reload, board: Table, search: Search, archive: Archive, folder: Folder, more: DotsHorizontal, filters: Filter }[name];
+  const Component = { plus: Plus, close: X, arrow: ArrowRight, refresh: Reload, status: CheckCircleDashed, board: Table, search: Search, archive: Archive, folder: Folder, more: DotsHorizontal, filters: Filter }[name];
   return <Component width="18" height="18" aria-hidden="true" {...props}/>;
 }
 export function submitForm(event, callback) {

@@ -23,7 +23,7 @@ export async function registered(sample, key = 'EX-123', id = threadId) {
   return (await sample.store.register({ repositoryId: repository.id, key, title: key, threadId: id, checkout: sample.repo }));
 }
 export async function checkpoint(store, task, values = {}) {
-  return (await store.progress({ taskId: task.id, expectedRevision: task.revision, stage: 'implement', status: 'paused', summary: 'Focused implementation complete.', nextAction: 'Verify behavior.', threadId, ...values }));
+  return (await store.progress({ taskId: task.id, expectedRevision: task.revision, stage: 'implement', status: 'paused', pauseKind: 'orchestration', summary: 'Focused implementation complete.', nextAction: 'Verify behavior.', threadId, ...values }));
 }
 export async function seedBoard(sample) {
   const { repository } = (await sample.store.addRepository(sample.repo, false));
@@ -43,7 +43,9 @@ export async function seedBoard(sample) {
   }
   (await sample.store.mutate(data => sample.store.makeTask(data, repository.id, 'WEB-121', 'Add a clearer save confirmation')));
   let merged = (await sample.store.register({ repositoryId: repository.id, key: 'WEB-101', title: 'Improve the invitation confirmation', threadId: randomUUID(), checkout: sample.repo }));
-  merged = (await checkpoint(sample.store, merged, { stage: 'greenlight', threadId: merged.threadId, prUrl: 'https://github.com/example/repository/pull/117', summary: 'Pull request merged.', nextAction: 'Complete.' }));
-  (await sample.store.refreshPr(merged.id));
+  merged = await sample.store.taskEvidence.requirements({ taskId: merged.id, expectedRevision: merged.revision, threadId: merged.threadId, content: 'Improve and verify the invitation confirmation. The task-owned PR is the complete accepted delivery scope.', baseRef: 'main' });
+  merged = (await checkpoint(sample.store, merged, { stage: 'greenlight', status: 'waiting', threadId: merged.threadId, prUrl: 'https://github.com/example/repository/pull/117', summary: 'Pull request merged.', nextAction: 'Confirm delivery evidence.' }));
+  const at = new Date().toISOString(), source = { sourceUrl: `codex://threads/${merged.threadId}`, sourceEventId: 'fixture-completed-delivery', sourceEventAt: at, observedAt: at, taskKey: merged.key, threadId: merged.threadId };
+  await sample.store.reconciliation.observe({ taskId: merged.id, expectedRevision: merged.revision, worker: { ...source, state: 'completed', pendingReview: false, summary: 'The invitation confirmation and accepted verification are complete.' }, coverage: { ...source, sourceEventId: 'fixture-accepted-delivery-scope', requirementsDigest: merged.requirements.digest, deliverables: [{ kind: 'pr', url: merged.prUrl }], remaining: [] } });
   return repository;
 }

@@ -20,6 +20,12 @@ A team delivery workflow that coordinates the skills you already use. Start with
 
 Install `workbench@ai-tools` using [getting started](https://github.com/fadamakis/ai-tools/blob/main/docs/getting-started.md), then use the explicit `/workbench:` commands or choose a stage from the native picker.
 
+From the board, choose the chat and run mode, then select **Continue in chat**.
+Workbench adds the exact launch request to the native composer. Review it and
+press **Send** to authorize that run. This uses the host's editable-draft API;
+app-generated automatic messages cannot establish human authorization. Autopilot
+is off for each new request, and a saved request alone never starts work.
+
 Reviewability shapes `implement` before coding: choose a small responsibility map, keep the main flow easy to trace, and justify every new layer. Small, cohesive components and presentational UI are encouraged, including one-use components that improve readability. Code should need no explanatory comments except for crucial non-obvious constraints. Simplification and a final reading of the actual diff are required before handoff; moving a large hook into scattered helpers does not count. `greenlight` replaces the vague “follow-up” stage. Verification and PR maintenance do not imply permission to push, post replies, resolve discussions or merge; include the desired actions in your request. Existing authorization for the same target remains valid within its scope; scheduled checks cannot inherit permission to make changes.
 
 Choose Local or Worktree, its starting state and local environment in Codex, then use `/workbench:start TICKET`. `TICKET` can be an ID, URL or task description. Workbench respects the host-selected checkout, setup and actions. Use native Handoff to move an existing task. There is no Workbench worktree option or separate worktree setup policy.
@@ -86,6 +92,10 @@ Synthetic data in the browser preview; this image does not establish native-host
 ![Workbench preview](https://raw.githubusercontent.com/fadamakis/ai-tools/main/docs/images/workbench.png)
 
 ## Delivery evidence and recovery
+
+The open board now checks linked PR status every five minutes, in serialized batches of up to five unfinished tasks. **Check status** runs a check immediately. Each task shows when it was checked and why it still needs attention. Closing the panel stops periodic checks; no automation or worker is created.
+
+Connected Jira and chat evidence can be recorded through `workbench.observation_record` during a requested status check or delivery stage. Completion must cover the accepted scope; closed Jira alone is insufficient. Non-PR work can reach Done with a task-bound artifact verification receipt and a completed worker outcome with no pending review. User pauses, ambiguous legacy pauses and uncertain external writes are preserved. Recovery updates local checkpoints and never retries delivery or publication.
 
 Verification and independent review can bind results to server-generated fingerprints of the actual checkout, tested content, base and accepted requirements. Legacy evidence remains readable as historical or unbound. The board displays the last explicit freshness observation; it does not watch the filesystem.
 

@@ -8,6 +8,12 @@ import { fixture, registered, checkpoint, threadId, otherThread } from './fixtur
 
 function setup(t, options) { const sample = fixture(options); t.after(sample.cleanup); return sample; }
 const pr = values => ({ url: 'https://github.com/example/repository/pull/123', title: 'EX-123: Imported task', headRefName: 'ex-123', state: 'OPEN', mergedAt: null, headRefOid: 'a'.repeat(40), reviewDecision: 'REVIEW_REQUIRED', mergeable: 'MERGEABLE', statusCheckRollup: [], ...values });
+async function completed(sample, task) {
+  task = await sample.store.taskEvidence.requirements({ taskId: task.id, expectedRevision: task.revision, threadId: task.threadId, content: 'The task-owned PR implements and verifies all accepted task deliverables.', baseRef: 'main' });
+  task = await checkpoint(sample.store, task, { status: 'waiting', stage: 'greenlight', threadId: task.threadId, prUrl: task.prUrl || pr().url });
+  const at = new Date().toISOString(), source = { sourceUrl: `codex://threads/${task.threadId}`, sourceEventId: 'fixture-completed-delivery', sourceEventAt: at, observedAt: at, taskKey: task.key, threadId: task.threadId };
+  return (await sample.store.reconciliation.observe({ taskId: task.id, expectedRevision: task.revision, worker: { ...source, state: 'completed', pendingReview: false, summary: 'All accepted task deliverables are complete.' }, coverage: { ...source, sourceEventId: 'fixture-accepted-delivery-scope', requirementsDigest: task.requirements.digest, deliverables: [{ kind: 'pr', url: task.prUrl }], remaining: [] } })).task;
+}
 
 test('imports old notes idempotently, keeps them unverified and never writes to them', async t => {
   const sample = setup(t), original = fs.readFileSync(sample.legacyNote);
@@ -21,15 +27,15 @@ test('imports old notes idempotently, keeps them unverified and never writes to 
   assert.equal(new BoardStore({ root: sample.root }).get(card.id).task.stage, 'build');
 });
 
-test('import reconciliation recovers merged tasks, titles and branches without changing original notes or IDs', async t => {
+test('import reconciliation recovers merge evidence, titles and branches while keeping unknown delivery scope unverified', async t => {
   const sample = setup(t, { prReader: async () => pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
   const original = fs.readFileSync(sample.legacyNote), { repository } = (await sample.store.addRepository(sample.repo));
   const imported = sample.store.list().tasks[0];
-  assert.deepEqual(await sample.store.reconcileImported(repository.id), { checked: 1, unverified: 0 });
+  assert.deepEqual(await sample.store.reconcileImported(repository.id), { checked: 1, unverified: 1 });
   const task = sample.store.get(imported.id).task;
-  assert.equal(task.stage, 'done'); assert.equal(task.status, 'complete'); assert.equal(task.title, 'EX-123: Imported task');
-  assert.equal(task.branch, 'ex-123'); assert.match(task.nextAction, /No further action/);
-  assert.deepEqual(await sample.store.reconcileImported(repository.id), { checked: 0, unverified: 0 });
+  assert.equal(task.stage, 'pr'); assert.equal(task.status, 'unverified'); assert.equal(task.title, 'EX-123: Imported task');
+  assert.equal(task.pr.state, 'MERGED'); assert.equal(task.branch, 'ex-123'); assert.match(task.reconciliation.reason, /worker|scope/);
+  assert.deepEqual(await sample.store.reconcileImported(repository.id), { checked: 0, unverified: 1 });
   assert.equal(sample.store.list().tasks.length, 1); assert.deepEqual(fs.readFileSync(sample.legacyNote), original);
 });
 
@@ -37,9 +43,9 @@ test('import reconciliation puts open and closed PRs in PR and never invents a m
   let remote = pr({ statusCheckRollup: [{ conclusion: 'SUCCESS' }] });
   const sample = setup(t, { prReader: () => remote }), { repository } = (await sample.store.addRepository(sample.repo));
   await sample.store.reconcileImported(repository.id);
-  const task = sample.store.list().tasks[0]; assert.equal(task.stage, 'pr'); assert.equal(task.status, 'waiting');
+  const task = sample.store.list().tasks[0]; assert.equal(task.stage, 'pr'); assert.equal(task.status, 'unverified');
   remote = pr({ state: 'CLOSED' });
-  assert.equal((await sample.store.refreshPr(task.id)).status, 'paused'); assert.equal(sample.store.get(task.id).task.stage, 'pr');
+  assert.equal((await sample.store.refreshPr(task.id)).status, 'unverified'); assert.equal(sample.store.get(task.id).task.stage, 'pr');
   remote = pr({ state: 'MERGED', mergedAt: null });
   assert.equal((await sample.store.refreshPr(task.id)).stage, 'pr');
 });
@@ -55,7 +61,7 @@ test('unavailable GitHub and dependency PRs stay unverified and can be retried',
   (await assert.rejects(async () => (await sample.store.refreshPr(task.id)), /does not identify/));
   remote = pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' });
   await sample.store.reconcileImported(repository.id); task = sample.store.get(task.id).task;
-  assert.equal(task.stage, 'done'); assert.equal(task.importCheck, undefined);
+  assert.equal(task.stage, 'pr'); assert.equal(task.pr.state, 'MERGED'); assert.equal(task.importCheck, undefined);
 });
 
 test('reconciliation preserves a worker checkpoint that arrives during the PR read', async t => {
@@ -101,12 +107,14 @@ test('Done cannot be fabricated by a stage update or an open PR with green check
   assert.equal(sample.store.get(task.id).task.pr.checks, 'passed');
 });
 
-test('only matching, complete GitHub merge evidence reaches Done', async t => {
+test('a matching merge reaches Done only with current worker and complete accepted scope evidence', async t => {
   const sample = setup(t, { prReader: () => pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
-  const task = (await registered(sample)), merged = (await sample.store.refreshPr(task.id));
+  const task = (await registered(sample)), observation = (await sample.store.refreshPr(task.id));
+  assert.notEqual(observation.stage, 'done');
+  const merged = await completed(sample, observation);
   assert.equal(merged.stage, 'done'); assert.equal(merged.status, 'complete');
   (await assert.rejects(async () => (await checkpoint(sample.store, merged)), /merged/));
-  (await assert.rejects(async () => (await sample.store.prepareLaunch({ taskId: task.id })), /merged/));
+  (await assert.rejects(async () => (await sample.store.prepareLaunch({ taskId: task.id })), /complete/));
 });
 
 test('missing, pending, failed and all-skipped checks remain distinct', async t => {
@@ -115,7 +123,7 @@ test('missing, pending, failed and all-skipped checks remain distinct', async t 
   assert.equal((await sample.store.refreshPr(task.id)).pr.checks, 'unverified');
   checks = [{ status: 'IN_PROGRESS', conclusion: null }]; assert.equal((await sample.store.refreshPr(task.id)).pr.checks, 'pending');
   checks = [{ conclusion: 'SKIPPED' }]; assert.equal((await sample.store.refreshPr(task.id)).pr.checks, 'unverified');
-  checks = [{ conclusion: 'FAILURE' }]; assert.equal((await sample.store.refreshPr(task.id)).status, 'blocked');
+  checks = [{ conclusion: 'FAILURE' }]; assert.equal((await sample.store.refreshPr(task.id)).pr.checks, 'failed');
 });
 
 test('failed or mismatched PR reads preserve earlier evidence', async t => {
@@ -220,7 +228,7 @@ test('concurrent worker revisions produce one winner without losing its record',
 
 test('archiving a verified Done task is reversible and preserves notes, PR evidence and chat ownership across restart', async t => {
   const sample = setup(t, { prReader: () => pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
-  const task = (await registered(sample)), merged = (await sample.store.refreshPr(task.id)), note = fs.readFileSync(sample.legacyNote);
+  const task = (await registered(sample)), merged = await completed(sample, task), note = fs.readFileSync(sample.legacyNote);
   const archived = (await sample.store.archiveTasks([{ taskId: task.id, expectedRevision: merged.revision }])).tasks[0];
   assert.ok(archived.archivedAt); assert.equal(archived.id, task.id); assert.equal(archived.threadId, threadId); assert.deepEqual(archived.pr, merged.pr);
   const restarted = new BoardStore({ root: sample.root }); assert.equal(restarted.get(task.id).task.archivedAt, archived.archivedAt);
@@ -232,7 +240,7 @@ test('archiving a verified Done task is reversible and preserves notes, PR evide
 
 test('a bulk archive is atomic when a selected task is unfinished or changed', async t => {
   const sample = setup(t, { prReader: () => pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
-  const first = (await registered(sample)), merged = (await sample.store.refreshPr(first.id)), unfinished = (await registered(sample, 'EX-124'));
+  const first = (await registered(sample)), merged = await completed(sample, first), unfinished = (await registered(sample, 'EX-124'));
   const before = fs.readFileSync(sample.store.filename);
   const selected = [{ taskId: merged.id, expectedRevision: merged.revision }, { taskId: unfinished.id, expectedRevision: unfinished.revision }];
   (await assert.rejects(async () => (await sample.store.archiveTasks(selected)), /verified merge/)); assert.deepEqual(fs.readFileSync(sample.store.filename), before);
@@ -242,13 +250,14 @@ test('a bulk archive is atomic when a selected task is unfinished or changed', a
 });
 
 test('bulk archive and restore retain every completed record and launch history', async t => {
-  const sample = setup(t, { prReader: () => pr({ state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
+  const sample = setup(t, { prReader: url => pr({ url, title: `EX-${url.split('/').at(-1)}: Complete accepted scope`, state: 'MERGED', mergedAt: '2026-10-19T12:00:00Z' }) });
   const first = (await registered(sample)), launch = (await sample.store.prepareLaunch({ taskId: first.id }));
   (await sample.store.claimLaunch(launch.launch.id)); (await sample.store.finishLaunch({ requestId: launch.launch.id, state: 'failed', error: 'No chat created.' }));
-  const second = (await registered(sample, 'EX-124')); (await checkpoint(sample.store, second, { prUrl: pr().url }));
-  const completed = (await Promise.all([first, second].map(async task => (await sample.store.refreshPr(task.id)))));
+  let second = (await registered(sample, 'EX-124')); second = await checkpoint(sample.store, second, { prUrl: 'https://github.com/example/repository/pull/124' });
+  const finished = [];
+  for (const task of [sample.store.get(first.id).task, second]) finished.push(await completed(sample, task));
   const launches = sample.store.read().launches;
-  const archived = (await sample.store.archiveTasks(completed.map(task => ({ taskId: task.id, expectedRevision: task.revision })))).tasks;
+  const archived = (await sample.store.archiveTasks(finished.map(task => ({ taskId: task.id, expectedRevision: task.revision })))).tasks;
   assert.equal(sample.store.list().tasks.filter(task => task.archivedAt).length, 2); assert.deepEqual(sample.store.read().launches, launches);
   (await sample.store.archiveTasks(archived.map(task => ({ taskId: task.id, expectedRevision: task.revision })), false));
   assert.equal(sample.store.list().tasks.length, 2); assert.equal(sample.store.list().tasks.some(task => task.archivedAt), false);

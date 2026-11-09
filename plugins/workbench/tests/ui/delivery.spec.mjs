@@ -18,7 +18,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
       }
       return route.fulfill({ json: result });
     });
-    await page.setViewportSize({ width, height: 1000 }); await page.goto(`http://127.0.0.1:4372/?theme=${theme}`);
+    await page.setViewportSize({ width, height: 1000 }); await page.goto(`/?theme=${theme}`);
     const app = page.frameLocator('iframe');
     if (width < 1404) await app.getByRole('navigation', { name: 'Jump to delivery stage' }).getByRole('button', { name: /^PR/ }).click();
     await app.getByRole('button', { name: 'Open Fix keyboard navigation in the editor' }).click();

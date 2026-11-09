@@ -9,6 +9,7 @@ import { TaskEvidence } from './task-evidence.mjs';
 import { Publication } from './publication.mjs';
 import { RemoteRuns } from './remote-runs.mjs';
 import { LaunchLifecycle } from './launches.mjs';
+import { Reconciliation, applyPrObservation, validatePrObservation, reconcileObservedPr, verifiedArtifactCompletion } from './reconciliation.mjs';
 export { taskKey } from './launches.mjs';
 import { normalizeTaskEvidence, updateEvidence } from '../shared/evidence.mjs';
 import { unresolvedLaunchStates } from '../shared/launch-states.mjs';
@@ -40,6 +41,7 @@ export class BoardStore {
     this.taskEvidence = new TaskEvidence(this);
     this.publication = new Publication(this);
     this.remoteRuns = new RemoteRuns(this);
+    this.reconciliation = new Reconciliation(this);
   }
 
   read() { const data = this.persistence.read(); return { ...data, tasks: data.tasks.map(normalizeTaskEvidence) }; }
@@ -136,7 +138,8 @@ export class BoardStore {
 
   list() {
     const data = this.read();
-    return { repositories: data.repositories, tasks: [...data.tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), launches: data.launches.filter(item => unresolvedLaunchStates.includes(item.state) || item.state === 'failed'), preview: true };
+    const { checkedAt, nextCheckAt, checked, lease } = data.reconciliation || {};
+    return { repositories: data.repositories, tasks: [...data.tasks].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), launches: data.launches.filter(item => unresolvedLaunchStates.includes(item.state) || item.state === 'failed'), reconciliation: { available: true, checkedAt, nextCheckAt, checked, checking: Date.parse(lease?.expiresAt) > Date.now() }, preview: true };
   }
 
   async archiveTasks(tasks, archived = true) {
@@ -145,7 +148,7 @@ export class BoardStore {
       const selected = tasks.map(({ taskId, expectedRevision }) => {
         const task = this.task(data, taskId);
         if (task.revision !== expectedRevision) throw new Error('A task changed. Refresh the board before archiving or restoring it.');
-        if (task.stage !== 'done' || task.pr?.state !== 'MERGED' || !task.pr.mergedAt) throw new Error('Only tasks with a verified merge can be archived or restored.');
+        if (task.stage !== 'done' || !(task.pr?.state === 'MERGED' && task.pr.mergedAt || verifiedArtifactCompletion(task))) throw new Error('Only tasks with a verified merge or accepted artifact completion can be archived or restored.');
         return task;
       });
       for (const task of selected) {
@@ -182,7 +185,8 @@ export class BoardStore {
     });
   }
 
-  async progress({ taskId, expectedRevision, stage, status, summary, nextAction, branch, head, prUrl, threadId, evidence }) {
+  async progress({ taskId, expectedRevision, stage, status, summary, nextAction, branch, head, prUrl, threadId, evidence, pauseKind, pauseCause }) {
+    if (pauseKind !== undefined && !['user', 'orchestration'].includes(pauseKind) || pauseCause !== undefined && (pauseCause !== 'merge_gate' || pauseKind !== 'orchestration')) throw new Error('A merge-gate pause cause requires an explicit orchestration pause.');
     const initial = this.get(taskId).task;
     const checkedEvidence = evidence ? await this.taskEvidence.validate(initial, evidence) : undefined;
     return this.mutate(data => {
@@ -193,6 +197,9 @@ export class BoardStore {
       if (threadId && task.threadId && threadId !== task.threadId) throw new Error('This task belongs to another chat. Use an explicit continuation launch first.');
       if (prUrl) task.prUrl = githubPr(prUrl);
       Object.assign(task, { stage: stageColumn[stage], workbenchStage: stage, status, summary, nextAction, updatedAt: now(), revision: task.revision + 1 });
+      task.checkpointAt = task.updatedAt;
+      if (status === 'paused') task.pause = { version: 1, kind: pauseKind || 'user', ...(pauseCause ? { cause: pauseCause } : {}), sourceEventId: `checkpoint:${task.revision}`, sourceEventAt: task.updatedAt, sourceUrl: `codex://threads/${threadId || task.threadId}`, reason: nextAction || summary };
+      else delete task.pause;
       for (const [key, value] of Object.entries({ branch, head, threadId })) if (value !== undefined) task[key] = value;
       if (evidence) updateEvidence(task, checkedEvidence || evidence);
       if (checkedEvidence) { task.workspace = { status: 'available', snapshot: checkedEvidence.snapshot }; task.head = checkedEvidence.head; }
@@ -209,26 +216,12 @@ export class BoardStore {
   }
 
   async savePr(task, pr) {
-    if (githubPr(pr.url) !== task.prUrl || !/^[a-f0-9]{40,64}$/.test(pr.headRefOid || '') || !['OPEN', 'CLOSED', 'MERGED'].includes(pr.state)) throw new Error('GitHub returned incomplete or mismatched PR evidence.');
-    // Notes can contain dependency PRs. An untouched imported ticket needs its
-    // own ticket identifier in live PR evidence before it can be reconciled.
-    if (task.importedAt && !task.workbenchStage && /^[A-Z][A-Z0-9]+-\d+$/.test(task.key) && !new RegExp(`\\b${task.key}\\b`, 'i').test(pr.title || '')) throw new Error('The linked PR does not identify this task. Check the task note before continuing.');
+    validatePrObservation(task, pr);
     return this.mutate(data => {
       const current = this.task(data, task.id);
       if (current.revision !== task.revision) throw new Error('Task changed during the GitHub check. Refresh again.');
-      const checks = pr.statusCheckRollup || [];
-      const outcomes = checks.map(check => check.conclusion || check.state || check.status);
-      const failed = outcomes.some(value => ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE'].includes(value));
-      const pending = outcomes.some(value => !['SUCCESS', 'NEUTRAL', 'SKIPPED', 'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE'].includes(value));
-      current.pr = { state: pr.state, mergedAt: pr.mergedAt || null, head: pr.headRefOid, ...(pr.baseRefOid ? { base: pr.baseRefOid, baseBranch: pr.baseRefName } : {}), reviewDecision: pr.reviewDecision || 'UNKNOWN', mergeable: pr.mergeable || 'UNKNOWN', checks: pr.ci?.observed || (failed ? 'failed' : pending ? 'pending' : outcomes.includes('SUCCESS') ? 'passed' : 'unverified'), requiredCi: pr.ci?.required || { version: 1, status: 'unknown', reason: 'Required-check policy was not resolved.' }, checkCount: pr.ci?.count ?? checks.length, checkedAt: now() };
-      current.stage = pr.state === 'MERGED' && pr.mergedAt ? 'done' : 'pr';
-      current.status = current.stage === 'done' ? 'complete' : pr.state === 'CLOSED' ? 'paused' : failed ? 'blocked' : 'waiting';
-      current.nextAction = current.stage === 'done' ? 'Pull request merged. No further action.' : pr.state === 'CLOSED' ? 'Review the closed pull request before resuming.' : failed ? 'Address the failed pull request checks.' : 'Check pending CI and review feedback.';
-      if (current.importedAt && current.title === current.key && pr.title) current.title = pr.title;
-      if (current.importedAt && !current.branch && pr.headRefName) current.branch = pr.headRefName;
-      delete current.importCheck;
-      current.updatedAt = now(); current.revision++;
-      return current;
+      applyPrObservation(current, pr, now());
+      return reconcileObservedPr(data, current, pr);
     });
   }
 
