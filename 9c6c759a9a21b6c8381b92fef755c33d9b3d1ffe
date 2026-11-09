@@ -1,0 +1,14 @@
+.github/workflows/ci.yml
+  h_6d9097287a2f38 14,55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c6c759a9a21b6c8381b92fef755c33d9b3d1ffe",
+  "prompts": {},
+  "humans": {
+    "h_6d9097287a2f38": {
+      "author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
