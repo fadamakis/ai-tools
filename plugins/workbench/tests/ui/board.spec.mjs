@@ -1,10 +1,18 @@
 import { test, expect } from '@playwright/test';
 import { contrastRatio } from '../../../../tests/ui/contrast.mjs';
 
+test.beforeEach(async ({ request }) => {
+  expect((await request.post('/reset')).ok()).toBe(true);
+});
+
 async function open(page, query = '') {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto(`http://127.0.0.1:4372/${query}`);
+  await page.goto(`/${query}`);
   const app = page.frameLocator('iframe'); await expect(app.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible();
+  if (!query.includes('deferBoard')) {
+    await expect.poll(() => page.evaluate(() => window.__workbenchPreview.requests.some(request => request.method === 'tools/call' && request.params.name === 'workbench.reconcile'))).toBe(true);
+    await expect(app.getByRole('button', { name: 'Check status', exact: true })).toBeEnabled();
+  }
   return { app, errors };
 }
 
@@ -49,7 +57,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
 
 test('desktop columns stay equal and stationary when a task empties a stage or search filters its contents', async ({ page }) => {
   const { app } = await open(page);
-  const board = (await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const original = board.tasks.find(task => task.key === 'WEB-104');
   const geometry = () => app.locator('.column').evaluateAll(columns => columns.map(column => {
     const { x, y, width } = column.getBoundingClientRect();
@@ -60,7 +68,7 @@ test('desktop columns stay equal and stationary when a task empties a stage or s
   expect(Math.max(...before.map(column => column.width)) - Math.min(...before.map(column => column.width))).toBeLessThan(1);
   let current;
   try {
-    const moved = await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: original.revision, stage: 'implement', status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
+    const moved = await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: original.revision, stage: 'implement', status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
     const result = await moved.json(); expect(result.isError).not.toBe(true); current = result.structuredContent.task;
     await expect(app.locator('.column[data-stage=plan] .task-card')).toHaveCount(0, { timeout: 6000 });
     await expect(app.locator('.column[data-stage=build] .task-card')).toHaveCount(2);
@@ -69,7 +77,7 @@ test('desktop columns stay equal and stationary when a task empties a stage or s
     await expect(app.locator('.task-card')).toHaveCount(1);
     expect(await geometry()).toEqual(before);
   } finally {
-    if (current) await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: current.revision, stage: original.workbenchStage, status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
+    if (current) await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: current.revision, stage: original.workbenchStage, status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
   }
 });
 
@@ -131,10 +139,18 @@ test('Autopilot is off each time and native environment plus explicit consent tr
   await app.getByLabel('Ticket or desired outcome').fill(`UI-${Date.now()} Test action`);
   await app.getByRole('radio', { name: 'Worktree', exact: true }).click();
   await app.getByRole('checkbox', { name: 'Autopilot', exact: true }).check();
-  await app.getByRole('button', { name: 'Start new chat with Autopilot', exact: true }).click();
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task' })).toHaveCount(0);
   const messages = await page.evaluate(() => window.__workbenchPreview.messages);
-  expect(messages).toHaveLength(1); expect(messages[0].content[0].text).toContain('native Codex worktree chat'); expect(messages[0].content[0].text).toContain('Autopilot is on: commits');
+  expect(messages).toHaveLength(1); expect(messages[0]._meta['openai/message']).toEqual({ target: 'active', send: false }); expect(messages[0].content[0].text).toContain('native Codex worktree chat'); expect(messages[0].content[0].text).toContain('Autopilot is on: commits');
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await app.locator('html').evaluate(root => { root.style.fontSize = '200%'; });
+  const bounds = await app.locator('body').evaluate(body => ({ scroll: body.scrollWidth, viewport: innerWidth }));
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.viewport);
+  await page.screenshot({ path: 'dist/workbench-preview-verification/composer-pending-zoom.png', fullPage: true });
+  await app.locator('html').evaluate(root => { root.style.fontSize = ''; });
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
   await expect(app.getByRole('radio', { name: 'Local', exact: true })).toBeChecked(); expect(errors).toEqual([]);
@@ -144,11 +160,11 @@ test('resume preserves the original chat and hides new-environment controls unti
   const { app } = await open(page);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104'); await app.locator('.task-card').click();
   await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
-  await expect(app.getByRole('button', { name: 'Resume original chat', exact: true })).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
   await expect(app.getByRole('radiogroup', { name: 'Native Codex environment' })).toHaveCount(0);
   await app.getByRole('checkbox', { name: 'Use a new chat instead' }).check();
   await expect(app.getByRole('radiogroup', { name: 'Native Codex environment' })).toBeVisible();
-  await expect(app.getByRole('button', { name: 'Start new chat', exact: true })).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
 });
 
 test('save errors preserve the repository draft, and Enter works without sandbox allow-forms', async ({ page }) => {
@@ -167,7 +183,7 @@ test('save errors preserve the repository draft, and Enter works without sandbox
 test('unsupported message capability disables launch and explains the fallback', async ({ page }) => {
   const { app } = await open(page, '?noMessages');
   await app.getByRole('button', { name: 'New task', exact: true }).click();
-  await expect(app.getByRole('button', { name: 'Start new chat', exact: true })).toBeDisabled();
+  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeDisabled();
   await expect(app.getByRole('dialog')).toContainText('does not support launching chats');
   expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(0);
 });
@@ -187,9 +203,9 @@ test('dark and narrow layouts keep controls reachable, trap focus and restore th
 
 test('visible board picks up a real saved checkpoint on the next local refresh', async ({ page }) => {
   const { app } = await open(page);
-  const response = await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } });
+  const response = await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } });
   const board = (await response.json()).structuredContent, task = board.tasks.find(task => task.key === 'WEB-104');
-  await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.progress', arguments: { taskId: task.id, expectedRevision: task.revision, stage: 'implement', status: 'paused', summary: 'Updated from a worker checkpoint.', nextAction: 'Verify.', threadId: task.threadId } } });
+  await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: task.id, expectedRevision: task.revision, stage: 'implement', status: 'paused', summary: 'Updated from a worker checkpoint.', nextAction: 'Verify.', threadId: task.threadId } } });
   const card = app.locator('.column[data-stage=build] .task-card').filter({ hasText: 'WEB-104' });
   await expect(card).toContainText('Verify.', { timeout: 6000 });
   await card.click(); await expect(app.getByRole('dialog', { name: 'Task details' })).toContainText('Updated from a worker checkpoint.');
@@ -197,10 +213,10 @@ test('visible board picks up a real saved checkpoint on the next local refresh',
 
 test('task details label passed evidence from an earlier revision after a new checkpoint', async ({ page }) => {
   const { app } = await open(page);
-  const response = await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } });
+  const response = await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } });
   let task = (await response.json()).structuredContent.tasks.find(task => task.key === 'WEB-115');
   for (const [head, evidence] of [['a'.repeat(40), { verify: 'passed', review: 'passed', checkedAt: new Date().toISOString(), head: 'a'.repeat(40) }], ['b'.repeat(40), undefined]]) {
-    const saved = await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.progress', arguments: { taskId: task.id, expectedRevision: task.revision, stage: 'review', status: 'paused', summary: 'Revision changed after verification.', nextAction: 'Recheck the change.', threadId: task.threadId, head, ...(evidence ? { evidence } : {}) } } });
+    const saved = await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: task.id, expectedRevision: task.revision, stage: 'review', status: 'paused', summary: 'Revision changed after verification.', nextAction: 'Recheck the change.', threadId: task.threadId, head, ...(evidence ? { evidence } : {}) } } });
     task = (await saved.json()).structuredContent.task;
   }
   await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
@@ -213,28 +229,38 @@ test('task details label passed evidence from an earlier revision after a new ch
   await page.screenshot({ path: 'repair-evidence/evidence-revision-after.png', fullPage: true });
 });
 
-test('board Start and Resume complete a bounded simulated handoff and preserve the same worker checkout', async ({ page }) => {
+test('board drafts start no work until Send and then preserve the same worker checkout on resume', async ({ page }) => {
   const { app, errors } = await open(page, '?handoff=success');
   const key = `BRIDGE-${Date.now()}`;
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   await app.getByLabel('Ticket or desired outcome').fill(`${key} Simulated handoff only`);
   await app.getByRole('radio', { name: 'Worktree', exact: true }).click();
-  await app.getByRole('button', { name: 'Start new chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task' })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
+  await expect(app.getByRole('region', { name: 'Chat handoff' })).toContainText('Awaiting Send in chat');
+  const requestId = await page.evaluate(() => window.__workbenchPreview.draft.content[0].text.match(/board-request ([a-f0-9-]{36})/)[1]);
+  const prepared = await (await page.request.post('/rpc', { data: { name: 'workbench.launch_get', arguments: { requestId } } })).json();
+  expect(prepared.structuredContent.launch.state).toBe('prepared');
+  expect(prepared.structuredContent.task.threadId).toBeUndefined();
+  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
   await app.getByRole('textbox', { name: 'Search tasks' }).fill(key);
   await expect(app.locator('.column[data-stage=plan] .task-card')).toContainText(key);
-  const list = async () => (await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  const list = async () => (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const before = await list(), task = before.tasks.find(task => task.key === key);
   expect(task.checkout).toContain('simulated-worktree-');
   expect(before.launches.filter(launch => launch.taskId === task.id)).toHaveLength(0);
   await app.locator('.task-card').click();
   await expect(app.getByRole('dialog', { name: 'Task details' })).toContainText('Simulated worker checkpoint');
   await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
-  await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Resume task' })).toHaveCount(0);
+  await expect.poll(async () => (await list()).tasks.find(candidate => candidate.id === task.id).revision).toBeGreaterThan(task.revision);
   const after = await list(), resumed = after.tasks.find(candidate => candidate.id === task.id);
   expect(resumed.threadId).toBe(task.threadId); expect(resumed.checkout).toBe(task.checkout); expect(resumed.revision).toBeGreaterThan(task.revision);
   expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(2);
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions.length)).toBe(2);
   expect(errors).toEqual([]);
 });
 
@@ -255,8 +281,8 @@ test('compact board makes attention actionable and provides one recoverable no-r
   const bounds = await app.locator('.task-card').first().boundingBox(); expect(bounds.y).toBeLessThan(340);
   await expect(app.getByText('Keep work moving.', { exact: true })).toHaveCount(0);
   await app.getByRole('button', { name: /Needs attention/ }).click();
+  await expect(app.locator('.task-card').filter({ hasText: 'WEB-112' })).toContainText('Make the test account available');
   await expect(app.locator('.task-card')).toHaveCount(1);
-  await expect(app.locator('.task-card')).toContainText('Make the test account available');
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('no-such-task');
   await expect(app.getByRole('heading', { name: 'No matching tasks' })).toBeVisible();
   await expect(app.getByText('No tasks here', { exact: true })).toHaveCount(0);
@@ -350,7 +376,7 @@ test('initial discovery offers existing notes for explicit one-click import', as
   expect(await page.evaluate(() => window.__workbenchPreview.requests.filter(request => request.params?.name === 'workbench.repository_add').length)).toBe(0);
   await app.getByRole('button', { name: 'Import 1 task from project', exact: true }).click();
   await expect(app.locator('.task-card').filter({ hasText: 'EX-123' })).toBeVisible();
-  await expect(app.locator('.column[data-stage=done] .task-card').filter({ hasText: 'EX-123' })).toBeVisible();
+  await expect(app.locator('.column[data-stage=pr] .task-card').filter({ hasText: 'EX-123' })).toContainText('Unverified');
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 existing task imported read-only');
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 linked PR checked against GitHub');
 });
@@ -381,9 +407,11 @@ test('card Resume opens confirmation directly, keeps Autopilot off and confirms 
   await app.getByRole('button', { name: 'Resume original chat · Clarify the first-run setup', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Task details' })).toHaveCount(0);
   await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
-  await expect(app.getByRole('button', { name: 'Resume original chat', exact: true })).toBeVisible();
+  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
-  await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
+  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
   await expect(app.getByRole('region', { name: 'Chat handoff' })).toContainText('Chat confirmed');
   const messages = await page.evaluate(() => window.__workbenchPreview.messages);
   expect(messages).toHaveLength(1);
@@ -397,7 +425,7 @@ test('SDK repository selector stays inside the modal focus flow and Escape close
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Start a task' });
   const close = dialog.getByRole('button', { name: 'Close start a task', exact: true });
-  const submit = dialog.getByRole('button', { name: 'Start new chat', exact: true });
+  const submit = dialog.getByRole('button', { name: 'Continue in chat', exact: true });
   await close.press('Shift+Tab'); await expect(submit).toBeFocused();
   await submit.press('Tab'); await expect(close).toBeFocused();
   const repository = dialog.getByRole('button', { name: /^Repository:/ });
@@ -481,9 +509,9 @@ test('connection has its own loading state, retains saved work on refresh and sh
 test('long saved keys stay searchable and readable in details while enlarged text keeps narrow controls usable', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 1000 });
   const { app } = await open(page, '?theme=dark');
-  const board = (await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const key = 'WB_PREVIEW_SMOKE_20261020_DESIGN';
-  await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.task_register', arguments: { repositoryId: board.repositories[0].id, key, title: 'A useful human task title', threadId: '33345678-1234-4123-8123-123456789abc', checkout: board.repositories[0].path } } });
+  await page.request.post('/rpc', { data: { name: 'workbench.task_register', arguments: { repositoryId: board.repositories[0].id, key, title: 'A useful human task title', threadId: '33345678-1234-4123-8123-123456789abc', checkout: board.repositories[0].path } } });
   await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
   await revealFilters(app);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill(key);
@@ -522,7 +550,7 @@ test('long discovered paths keep Import visible and the complete path keyboard a
   expect(errors).toEqual([]);
 });
 
-test('an unstarted task keeps Start task across card details and confirmation without claiming a saved note', async ({ page }) => {
+test('an unstarted task keeps Start task on its card and prepares the launch in chat without claiming a saved note', async ({ page }) => {
   const { app } = await open(page);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-121');
   await expect(app.getByRole('button', { name: 'Start task · Add a clearer save confirmation', exact: true })).toBeVisible();
@@ -533,7 +561,7 @@ test('an unstarted task keeps Start task across card details and confirmation wi
   await expect(details).toContainText('No saved note yet.');
   await details.getByRole('button', { name: 'Start task', exact: true }).click();
   const launch = app.getByRole('dialog', { name: 'Start task', exact: true });
-  await expect(launch.getByRole('button', { name: 'Start task', exact: true })).toBeVisible();
+  await expect(launch.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
   await expect(launch).not.toContainText('continuation');
   await expect(launch).not.toContainText('saved note');
   await expect(launch.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
@@ -626,10 +654,10 @@ test('desired outcome grows across lines and Enter never starts a chat before th
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
   await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
   await page.screenshot({ path: 'dist/workbench-preview-verification/frontend-implementation/new-task.png', fullPage: true });
-  await app.getByRole('button', { name: 'Start new chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(1);
-  const board = (await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   expect(board.tasks.find(task => task.key === 'MULTILINE-123').title).toContain('\nKeep the search');
   expect(errors).toEqual([]);
 });
@@ -677,23 +705,72 @@ test('attention stays near the board and a zero-result selection can always be s
 
 test('release pending request requires confirmation and never dispatches a chat', async ({ page }) => {
   const { app } = await open(page);
-  const listing = await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.list', arguments: {} } })).json();
+  const listing = await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json();
   const repositoryId = listing.structuredContent.repositories[0].id;
-  const prepared = await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.launch_prepare', arguments: { repositoryId, title: 'REC-901 Recover an undelivered request', autopilot: true } } })).json();
+  const prepared = await (await page.request.post('/rpc', { data: { name: 'workbench.launch_prepare', arguments: { repositoryId, title: 'REC-901 Recover an undelivered request', autopilot: true } } })).json();
   expect(prepared.isError).not.toBe(true);
   await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
-  await app.getByRole('button', { name: 'Review pending request', exact: true }).click();
+  await app.getByRole('button', { name: 'Review request', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Release chat request' });
   await expect(dialog.getByRole('button', { name: 'Release request', exact: true })).toBeDisabled();
   await dialog.getByRole('checkbox', { name: 'I checked that this request was not delivered' }).check();
   await page.screenshot({ path: test.info().outputPath('recovery-dialog.png'), fullPage: true });
   await dialog.getByRole('button', { name: 'Release request', exact: true }).click();
   await expect(dialog).toBeHidden();
-  const result = await (await page.request.post('http://127.0.0.1:4372/rpc', { data: { name: 'workbench.launch_get', arguments: { requestId: prepared.structuredContent.launch.id } } })).json();
+  const result = await (await page.request.post('/rpc', { data: { name: 'workbench.launch_get', arguments: { requestId: prepared.structuredContent.launch.id } } })).json();
   expect(result.structuredContent.launch.state).toBe('failed');
   expect(result.structuredContent.launch.resolution.kind).toBe('not_delivered');
   expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(0);
   const card = app.locator('.task-card').filter({ hasText: 'REC-901' });
   await card.getByRole('button', { name: /Start/ }).click();
   await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
+});
+
+test('delivery status checks expose freshness without requesting a worker or external mutation', async ({ page }) => {
+  const { app, errors } = await open(page);
+  await app.getByRole('button', { name: 'Check status', exact: true }).click();
+  await expect(app.getByRole('status', { name: 'Board update' })).toContainText('checked');
+  await app.locator('.task-card').filter({ hasText: 'WEB-112' }).click();
+  const status = app.getByRole('region', { name: 'Delivery status' });
+  await expect(status).toContainText('Last checked');
+  await expect(status).not.toContainText('Not checked');
+  expect(await page.evaluate(() => window.__workbenchPreview.messages)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('verified non-PR delivery reaches Done and archives with its original identity and artifact receipt', async ({ page }) => {
+  const { app, errors } = await open(page);
+  const rpc = async (name, args) => {
+    const result = await (await page.request.post('/rpc', { data: { name, arguments: args } })).json();
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    return result.structuredContent;
+  };
+  let task = (await rpc('workbench.list', {})).tasks.find(task => task.key === 'WEB-112');
+  task = (await rpc('workbench.requirements_set', { taskId: task.id, expectedRevision: task.revision, threadId: task.threadId, content: 'Deliver the verified fixture artifact.', baseRef: 'HEAD' })).task;
+  const stamp = new Date().toISOString(), threadUrl = `codex://threads/${task.threadId}`, artifactUrl = 'https://example.invalid/results/WEB-112', artifactDigest = 'a'.repeat(64);
+  const source = { sourceUrl: threadUrl, sourceEventId: 'fixture-final', sourceEventAt: stamp, observedAt: stamp, taskKey: task.key, threadId: task.threadId };
+  const proof = { artifactUrl, artifactDigest, scopeDigest: task.requirements.digest };
+  const result = await rpc('workbench.observation_record', {
+    taskId: task.id, expectedRevision: task.revision,
+    worker: { ...source, state: 'completed', pendingReview: false, summary: 'The fixture artifact covers all accepted scope.' },
+    coverage: { ...source, sourceEventId: 'fixture-scope', requirementsDigest: task.requirements.digest, deliverables: [{ kind: 'artifact', url: artifactUrl }], remaining: [] },
+    completion: { ...source, ...proof, allScopeComplete: true, pendingReview: false, verification: { ...source, ...proof, sourceEventId: 'fixture-verification', result: 'passed', summary: 'The synthetic artifact content was verified for the accepted scope.' } }
+  });
+  expect(result.task.stage).toBe('done');
+  const card = app.locator('.task-card').filter({ hasText: 'WEB-112' });
+  await expect(card).toContainText('Delivery verified');
+  await expect(card).not.toContainText('Merged');
+  await card.click();
+  const detail = app.getByRole('dialog', { name: 'Task details' });
+  await expect(detail.getByRole('link', { name: 'Open verified result' })).toHaveAttribute('href', artifactUrl);
+  await detail.getByRole('button', { name: 'Archive task', exact: true }).click();
+  await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 task archived');
+  const saved = (await rpc('workbench.get', { taskId: task.id })).task;
+  expect(saved.id).toBe(task.id); expect(saved.archivedAt).toBeTruthy();
+  expect(saved.completion.artifactDigest).toBe(artifactDigest);
+  await app.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(app.getByRole('status', { name: 'Board update' })).toContainText('restored to Done');
+  expect((await rpc('workbench.get', { taskId: task.id })).task.archivedAt).toBeUndefined();
+  expect(await page.evaluate(() => window.__workbenchPreview.messages)).toEqual([]);
+  expect(errors).toEqual([]);
 });

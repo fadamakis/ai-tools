@@ -58,6 +58,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 .connecting { min-height: 280px; display: flex; align-items: center; justify-content: center; gap: 16px; flex-direction: column; }
 .connecting > p { display: flex; align-items: center; gap: 12px; color: var(--muted); }
 .launch-status { margin-bottom: 20px; }
+.launch-request-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .launch-status details { margin-top: 12px; font-size: var(--font-text-xs-size, 12px); }
 .launch-status summary { cursor: pointer; color: var(--muted); }
 .launch-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 8px; }

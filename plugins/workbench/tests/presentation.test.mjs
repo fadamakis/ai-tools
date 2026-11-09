@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attentionReason, cardNextAction, displayTitle } from '../app/presentation.mjs';
+import { attentionReason, cardNextAction, displayTitle, taskStatus } from '../app/presentation.mjs';
 
 test('attention explains blockers, failed checks, stale PR snapshots and evidence from another revision', () => {
   const at = Date.parse('2026-10-20T12:00:00Z');
@@ -30,4 +30,22 @@ test('card titles avoid a repeated ticket while preserving meaningful text', () 
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-123: Preserve the draft' }), 'Preserve the draft');
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-123' }), 'EX-123');
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-1234: Another task' }), 'EX-1234: Another task');
+});
+
+test('completed artifacts have a delivery label without claiming a PR merge', () => {
+  assert.equal(taskStatus({ stage: 'done', status: 'complete', completion: { kind: 'artifact' } }), 'Delivery verified');
+  assert.equal(taskStatus({ stage: 'done', status: 'complete', completion: { kind: 'merge' } }), 'Merge verified');
+  assert.equal(taskStatus({ stage: 'done', status: 'complete' }), 'Merge verified');
+  assert.equal(taskStatus({ stage: 'review', status: 'waiting', completion: { kind: 'artifact' } }), 'Waiting');
+});
+
+test('specific blockers remain actionable while other reconciliation conflicts need attention', () => {
+  const task = { stage: 'plan', status: 'blocked', nextAction: 'Provide the test account.' };
+  for (const outcome of ['conflict', 'unavailable']) {
+    const observed = { ...task, reconciliation: { outcome, reason: 'Accepted deliverables remain unverified.' } };
+    assert.equal(attentionReason(observed), task.nextAction);
+    assert.equal(cardNextAction(observed), task.nextAction);
+    assert.equal(attentionReason({ ...observed, status: 'waiting' }), observed.reconciliation.reason);
+  }
+  assert.equal(attentionReason({ ...task, stage: 'done', reconciliation: { outcome: 'conflict', reason: 'Historical conflict.' } }), '');
 });

@@ -14,7 +14,7 @@ export class LaunchLifecycle {
   async prepareLaunch({ taskId, repositoryId, title, environment = 'local', autopilot = false, continuation = false }) {
     return this.store.mutate(data => {
       const task = taskId ? this.store.task(data, taskId) : this.store.makeTask(data, repositoryId, taskKey(title), title);
-      if (task.stage === 'done') throw new Error('This task is merged. Start a separate task.');
+      if (task.stage === 'done') throw new Error('This task is complete. Start a separate task.');
       const existing = data.launches.find(item => item.taskId === task.id && unresolvedLaunchStates.includes(item.state));
       if (existing) return { launch: existing, task: { key: task.key, title: task.title }, dispatch: false };
       const repository = this.store.repository(data, task.repositoryId);

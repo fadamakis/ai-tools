@@ -46,7 +46,8 @@ test('installed-format stdio server discovers UI, imports notes, saves progress 
   const rejectedArchive = await client.callTool({ name: 'workbench.archive', arguments: { tasks: [{ taskId: (await client.callTool({ name: 'workbench.list', arguments: {} })).structuredContent.tasks[0].id, expectedRevision: 2 }] } });
   assert.equal(rejectedArchive.isError, true); assert.match(rejectedArchive.content[0].text, /verified merge/);
   const imported = (await client.callTool({ name: 'workbench.list', arguments: {} })).structuredContent.tasks[0];
-  assert.equal(imported.stage, 'pr'); assert.equal(imported.status, 'waiting');
+  assert.equal(imported.stage, 'pr'); assert.equal(imported.status, 'unverified');
+  assert.match(imported.reconciliation.reason, /worker activity is unknown/);
   const registered = await client.callTool({ name: 'workbench.task_register', arguments: { repositoryId: added.structuredContent.repository.id, key: 'EX-123', title: 'Existing task', threadId, checkout: sample.repo }, _meta: { 'openai/session': 'test-worker' } });
   const task = registered.structuredContent.task;
   const panel = await client.callTool({ name: 'workbench.task', arguments: {}, _meta: { 'openai/session': 'test-worker' } });

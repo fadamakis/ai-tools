@@ -16,6 +16,12 @@ Verify old and candidate readers against disposable saved-state copies before lo
 
 ## Workbench
 
+### Delivery status reconciliation
+
+Board schema 1, store location, task identities, notes, ownership and original handoff/publication receipts remain unchanged. Optional reconciliation observations, accepted-scope coverage, completion receipts, pause provenance and a short-lived check lease are additive. Legacy records remain readable without migration. An absent pause cause is unknown, not permission to resume or close a task. A completion receipt for non-PR work is distinct from a verified PR merge.
+
+Test the candidate against disposable copies with all legacy fields intact before installation. Plain reads must leave saved data byte-for-byte unchanged. Never use a test fixture against the live board, rewrite old receipts, or run a candidate alongside the installed runtime as a second background writer. Activate through the existing supported installer, then verify native activation separately from tests. No data relocation or direct record repair is needed.
+
 ### Content-bound delivery and recovery
 
 Version 0.4.0 retains board schema 1, the existing data directory, task and repository IDs, chat links, notes, launches and archives. Requirements, content snapshots, required-CI observations, publication attempts and remote-run observations are optional versioned additions. No data migration or relocation is required.
