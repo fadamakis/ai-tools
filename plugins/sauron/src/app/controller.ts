@@ -26,6 +26,7 @@ export function useSauronController(){
   const [query,setQuery]=useState('');
   const currentView=useRef({filter:'needs_you' as TaskState,source:'all' as SourceKind|'all',query:''});
   const [pending,setPending]=useState<Pending|null>(readPending);
+  const [recovering,setRecovering]=useState(()=>!!readPending());
   const [adding,setAdding]=useState(()=>!!storage.read(draftKey)&&!readPending());
   const [draft,setDraft]=useState<Draft>(()=>storage.read(draftKey)??emptyDraft);
   const changeDraft=(patch:Partial<Draft>)=>{const next={...draft,...patch};setDraft(next);storage.write(draftKey,next);};
@@ -39,11 +40,11 @@ export function useSauronController(){
   const gate=useRef(false);
   const c=useRef<Client|null>(null);
   const apply=(next:Result)=>setView(old=>mergeSavedView(old,next));
-  async function run(work:()=>Promise<Result>, success?:()=>void){
+  async function run(work:()=>Promise<Result>, success?:()=>void, failure?:()=>void){
     if(gate.current)return;
     gate.current=true;setBusy(true);setError('');
     try{apply(await work());success?.();}
-    catch(e){setError(e instanceof Error?e.message:'Request failed. Refresh to check saved state.');}
+    catch(e){setError(e instanceof Error?e.message:'Request failed. Refresh to check saved state.');failure?.();}
     finally{gate.current=false;setBusy(false);}
   }
   const readSaved=()=>{if(c.current)void run(()=>c.current!.call('list_attention'));};
@@ -93,7 +94,7 @@ export function useSauronController(){
     const confirmed=pending.kind==='create'?!!task:task?.userDecision===(pending.input.action==='reopen'?null:pending.input.action) && task.version>pending.input.expectedVersion &&
       (pending.input.action!=='snooze'||task.snoozedUntil===pending.input.snoozedUntil);
     if(confirmed){
-      remember(null);setPending(null);setNotice(pending.kind==='create'?'Task saved.':'Saved decision confirmed.');
+      remember(null);setPending(null);setRecovering(false);setNotice(pending.kind==='create'?'Task saved.':'Saved decision confirmed.');
       if(pending.kind==='decision'){
         setReopenId(pending.input.action==='reopen'?null:task!.id);
         if(pending.input.action==='reopen'){setFilter(task!.sourceState);setSource('all');setQuery('');}
@@ -103,16 +104,18 @@ export function useSauronController(){
   },[view,pending]);
   function save(operation:Pending){
     if(!client || gate.current)return;
+    if(!pending)setRecovering(false);
+    setNotice('');setReopenId(null);
     remember(operation);setPending(operation);
     void run(()=>client.call(operation.kind==='create'?'create_personal_task':'decide_attention_item',operation.input),()=>{
-      remember(null);setPending(null);setNotice(operation.kind==='create'?'Task added.':operation.input.action==='complete'?'Task completed.':operation.input.action==='dismiss'?'Task dismissed.':operation.input.action==='reopen'?'Task reopened.':'Task snoozed for one hour.');
+      remember(null);setPending(null);setRecovering(false);setNotice(operation.kind==='create'?'Task added.':operation.input.action==='complete'?'Task completed.':operation.input.action==='dismiss'?'Task dismissed.':operation.input.action==='reopen'?'Task reopened.':'Task snoozed for one hour.');
       setReopenId(operation.kind==='decision'&&operation.input.action!=='reopen'?operation.input.id:null);
       if(operation.kind==='decision'&&operation.input.action==='reopen'){
         const reopened=view?.items.find(task=>task.id===operation.input.id);
         if(reopened)selectState(reopened.sourceState);
       }
       if(operation.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(operation.input.sourceState);setSource('all');setQuery('');}
-    });
+    },()=>setRecovering(true));
   }
   function decide(task:Task,action:DecisionInput['action']){
     save({kind:'decision',input:{id:task.id,action,expectedVersion:task.version,operationId:operationId(),
@@ -159,7 +162,8 @@ export function useSauronController(){
     snoozed: 'Snoozed tasks return at the time you chose.',
     dismissed: 'Tasks you dismiss will appear here.',
   };
-  function cancelPending(){remember(null);setPending(null);if(pending?.kind==='create')cancelDraft();}
-  return {view,client,filter,source,busy,error,query,pending,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,seed,replay,c,changeDraft,cancelDraft,cancelPending,apply};
+  function dismissNotice(){setNotice('');setReopenId(null);}
+  function cancelPending(){remember(null);setPending(null);setRecovering(false);if(pending?.kind==='create')cancelDraft();}
+  return {view,client,filter,source,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;
