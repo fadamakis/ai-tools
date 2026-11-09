@@ -10,9 +10,10 @@ export function githubPr(value) {
 }
 
 const prArgs = url => ['pr', 'view', githubPr(url), '--json', 'url,title,state,mergedAt,headRefOid,headRefName,baseRefName,baseRefOid,potentialMergeCommit,reviewDecision,mergeable,statusCheckRollup'];
-export async function readPr(url) {
-  const read = async () => JSON.parse((await promisify(execFile)('gh', prArgs(url), { encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 })).stdout);
+export async function readPr(url, { signal, passive = false } = {}) {
+  const read = async () => JSON.parse((await promisify(execFile)('gh', prArgs(url), { signal, encoding: 'utf8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 })).stdout);
   const pr = await read();
+  if (passive) return pr;
   const ci = await collectRequiredCi(pr, api);
   const current = await read();
   if (['url', 'headRefOid', 'baseRefOid', 'baseRefName', 'state'].some(key => current[key] !== pr[key])) throw new Error('The PR head or base changed during CI observation. Check again.');

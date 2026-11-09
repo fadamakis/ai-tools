@@ -1,13 +1,13 @@
 export const stages = [
   ['backlog', 'Backlog', 'Ready to begin'], ['plan', 'Plan', 'Scope & decisions'], ['build', 'Build', 'Implement & simplify'],
-  ['verify', 'Verify', 'Behavior & evidence'], ['review', 'Review', 'Independent review'], ['pr', 'PR', 'CI & feedback'], ['done', 'Done', 'Merge verified']
+  ['verify', 'Verify', 'Behavior & evidence'], ['review', 'Review', 'Independent review'], ['pr', 'PR', 'CI & feedback'], ['done', 'Done', 'Delivery verified']
 ];
 
 export function launchMessage(launch, task) {
   const destination = launch.target === 'existing' ? 'Resume' : 'Start';
   const target = launch.target === 'existing' ? 'in its original chat' : `in one new native Codex ${launch.environment} chat`;
   const mode = launch.autopilot ? 'Autopilot is on: commits, ordinary pushes, a draft PR and addressed review replies are authorized. Never merge.' : 'Autopilot is off. No commits, pushes, PR publication or review replies are authorized.';
-  return `Use /workbench:start board-request ${launch.id}.\n${destination} task ${JSON.stringify(task.key)} ${target}. ${mode} This click authorizes only this one launch.`;
+  return `Use /workbench:start board-request ${launch.id}.\n${destination} task ${JSON.stringify(task.key)} ${target}. ${mode} I authorize only this one launch.`;
 }
 
 export class BoardController {
@@ -17,6 +17,7 @@ export class BoardController {
     this.error = ''; this.errorDetails = ''; this.notice = ''; this.undoArchive = null; this.connected = false; this.hasBoard = false; this.busy = false; this.busyLabel = ''; this.lastLaunch = null; this.version = 0;
     this.listeners = new Set(); this.epoch = 0; this.detailEpoch = 0; this.disposed = false;
     this.discovery = { repositories: [], pickerAvailable: true }; this.discovering = false; this.discoveryError = '';
+    this.statusChecking = false; this.statusError = ''; this.nextStatusCheckAt = 0;
     app.ontoolresult = result => this.consume(result);
     app.addEventListener('hostcontextchanged', context => this.hostContext(context));
     app.onteardown = async () => { this.disposed = true; clearTimeout(this.timer); this.epoch++; this.detailEpoch++; return {}; };
@@ -110,11 +111,11 @@ export class BoardController {
     const task = result.task || (await this.call('workbench.launch_get', { requestId: result.launch.id })).task;
     this.lastLaunch = { ...result.launch, title: task.title }; this.publish();
     try {
-      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task) }], _meta: { 'openai/message': { target: 'active', send: true } } });
+      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task) }], _meta: { 'openai/message': { target: 'active', send: false } } });
     } catch (error) {
       await this.call('workbench.launch_uncertain', { requestId: result.launch.id });
       this.lastLaunch = { ...this.lastLaunch, state: 'uncertain' }; this.publish();
-      throw new Error(`Launch delivery is unconfirmed. Check the board chat; Workbench Preview will not resend it automatically. ${error.message || ''}`);
+      throw new Error(`Could not confirm the launch draft. Check the chat composer before trying again; Workbench will not add another request automatically. ${error.message || ''}`);
     }
     this.modal = null; await this.refresh();
   }
@@ -133,6 +134,20 @@ export class BoardController {
     const id = this.selected.task.id;
     await this.call('workbench.pr_refresh', { taskId: id });
     await this.refresh();
+  }
+  async reconcile(force = false, taskId) {
+    if (this.statusChecking || this.disposed || !this.board.reconciliation?.available) return;
+    this.statusChecking = true; this.statusError = ''; this.publish();
+    this.nextStatusCheckAt = Date.now() + 5 * 60 * 1000;
+    try {
+      const result = await this.call('workbench.reconcile', { force, ...(taskId ? { taskId } : {}) }, { timeout: 125000 });
+      this.nextStatusCheckAt = Math.max(this.nextStatusCheckAt, Date.parse(result.nextCheckAt) || 0);
+      if (force) this.notice = result.status === 'busy' ? 'Another status check is in progress.' : `${result.checked} task${result.checked === 1 ? '' : 's'} checked. Open a task for its evidence and any unresolved conflict.`;
+      await this.refresh();
+    } catch (error) {
+      this.statusError = error.message || 'Delivery status could not be checked. Saved work is preserved.';
+      if (force) throw error;
+    } finally { this.statusChecking = false; this.publish(); }
   }
   async resolveLaunch(launch) {
     const result = await this.call('workbench.launch_resolve', { requestId: launch.id, expectedState: launch.state, expectedUpdatedAt: launch.updatedAt, confirmedNotDelivered: true });
@@ -161,7 +176,7 @@ export class BoardController {
     clearTimeout(this.timer);
     if (this.disposed || !this.connected) return;
     this.timer = setTimeout(async () => {
-      if (!document.hidden && !this.busy) { try { await this.refresh(); } catch (error) { this.error = error.message; this.publish(); } }
+      if (!document.hidden && !this.busy) { try { await this.refresh(); if (Date.now() >= this.nextStatusCheckAt) await this.reconcile(); } catch (error) { this.error = error.message; this.publish(); } }
       this.schedule();
     }, 2000);
   }
@@ -171,5 +186,6 @@ export class BoardController {
     if (!this.hasBoard) await this.refresh();
     await this.discover();
     this.publish(); await this.context(); this.schedule();
+    if (!document.hidden) await this.reconcile();
   }
 }

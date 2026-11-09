@@ -3,6 +3,7 @@ import { evidenceChecks, evidenceFreshness } from '../shared/evidence.mjs';
 export function attentionReason(task, at = Date.now()) {
   if (task.archivedAt || task.stage === 'done') return '';
   if (task.status === 'blocked') return task.nextAction || task.summary || 'Resolve the blocker before continuing.';
+  if (['conflict', 'unavailable'].includes(task.reconciliation?.outcome)) return task.reconciliation.reason;
   if (task.status === 'unverified') return task.nextAction || 'Check the imported task against current evidence.';
   if (task.pr?.checks === 'failed') return 'CI failed. Check the pull request.';
   const checks = evidenceChecks(task);
@@ -36,6 +37,7 @@ export function taskLaunch(task, continuation = false) {
 }
 
 export function taskStatus(task) {
+  if (task.stage === 'done' && task.completion?.kind === 'artifact') return 'Delivery verified';
   return { active: 'In progress · reported', unverified: 'Unverified', complete: 'Merge verified', blocked: 'Blocked', paused: 'Paused', waiting: 'Waiting' }[task.status] || task.status;
 }
 
@@ -53,4 +55,4 @@ export function evidenceLabel(task, kind) {
   return check.head === task.head ? `${value} · unbound · recorded commit only` : `${value} · unbound · earlier revision`;
 }
 
-export const launchStatus = { prepared: 'Chat requested', dispatching: 'Sending request', queued: 'Creating chat', sent: 'Waiting for task confirmation', accepted: 'Chat confirmed', uncertain: 'Receipt unconfirmed', failed: 'Handoff failed' };
+export const launchStatus = { prepared: 'Awaiting Send in chat', dispatching: 'Sending request', queued: 'Creating chat', sent: 'Waiting for task confirmation', accepted: 'Chat confirmed', uncertain: 'Receipt unconfirmed', failed: 'Handoff failed' };

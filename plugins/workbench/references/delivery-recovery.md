@@ -1,5 +1,21 @@
 # Delivery evidence and recovery
 
+## Delivery status reconciliation
+
+The open board checks linked PRs at most every five minutes, in batches of up to five unfinished tasks. `workbench.reconcile` runs the same check on demand; `force: true` bypasses freshness throttling, never the shared check lease or task revision checks. It saves local observations and evidence-backed completion only. It cannot start or resume a worker, retry a job, approve, publish, post or merge. Closing the panel stops periodic checks. Plain `list` and `get` remain read-only.
+
+Jira and native worker status come from the host's connected tools, rather than a second credential store or a scheduled agent. During an already requested status check or delivery stage:
+
+1. Read the task and its accepted requirements. Read current Jira, the exact owning chat, and relevant PRs or artifacts through the available tools. A finished turn can contain a blocker or a result awaiting user review; inspect the outcome.
+2. Call `workbench.observation_record` with the current task revision and only evidence actually read. Every source includes the task key, exact owner thread ID, source URL, original `sourceEventId` and `sourceEventAt`, and the separate time it was checked, `observedAt`. Observations must be checked within ten minutes. Reading an old event today does not make the event new.
+3. Supply `coverage` only after comparing every accepted requirement with the deliverables. Bind it to the current requirements digest, enumerate required PR/artifact URLs, and retain all remaining work. A closed Jira issue or one merged PR cannot prove a stack, configuration change or rollout complete.
+4. For a non-PR result, supply a completed worker outcome with no pending review, plus `completion` and its artifact verification. The artifact URL, SHA-256 content digest and scope digest must agree with the verification receipt and accepted coverage. These are traceable host observations, not independent server verification of a private external artifact. Include source-event provenance for both the outcome and its verification.
+5. Read back the result. Missing evidence, access failures, active or unknown workers, pending reviews and uncertain external writes remain explicit conflicts or preserved decisions. Existing publication and handoff recovery tools retain their separate requirements; a status check never replays them.
+
+New paused checkpoints can record `pauseKind: user` or `orchestration`. Only a known orchestration pause with `pauseCause: merge_gate` has an automatic completion route: `pauseResolution` must identify its original stored pause event and exact checkpoint. User pauses and ambiguous legacy pauses remain intact. Do not manufacture a new checkpoint to classify an old pause retrospectively.
+
+The task panel shows the last check, its reason and bounded history. Metadata checks do not make old worker activity current. A global lease and revision fences prevent overlapping checks from overwriting newer worker checkpoints. No check is scheduled after the panel closes, and installation does not scan repositories or start work.
+
 ## Accepted requirements and evidence
 
 After planning resolves material decisions, call `workbench.requirements_set` with the task's current revision, worker chat ID, explicit base ref and the accepted criteria, non-goals and consequential decisions. Freeze requirements only; omit changing status and check results. Update this checkpoint when accepted scope changes. It is evidence, not permission.
