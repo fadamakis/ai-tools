@@ -32,6 +32,8 @@ Reopen the panel after an update; restart Codex if it still shows the old build.
 
 Use the root repository's pnpm workspace, lockfile, build, and verification commands. Existing tool names, UI resource aliases, operation IDs, and `ATTENTION_DB` remain supported. The standalone personal adapter helper remains an authoring/testing utility and is not the distributable team package.
 
+For an isolated fixture-based native Codex workflow from this checkout, see [Sauron Dev](docs/development.md).
+
 ## Local automatic updates candidate
 
 The unreleased local-managed implementation, verification boundary and safe writer cutover are documented in [Local updates](docs/local-updates.md). The current headless CLI cannot execute all five connected sources; local ownership remains guarded and must not be enabled until that runtime check succeeds. No schedule is installed automatically.
