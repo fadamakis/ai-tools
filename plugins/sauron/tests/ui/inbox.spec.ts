@@ -229,3 +229,75 @@ test('reader tools stay clear of scrolling content and portaled menus',async({pa
   expect(await option.evaluate((node,point)=>node.contains(document.elementFromPoint(point.x,point.y)),{x:optionBox.x+optionBox.width/2,y:optionBox.y+optionBox.height/2})).toBeTruthy();
   await page.keyboard.press('Escape');
 });
+
+for(const width of [1440,375])test(`completion feedback keeps the task list stable at ${width}px`,async({page,request})=>{
+  await page.setViewportSize({width,height:1000});
+  await page.emulateMedia({colorScheme:width===375?'dark':'light'});
+  await add(request,'Complete without flashing');await add(request,'Keep this task');await add(request,'Another remaining task');await open(page);
+  expect((await page.getByRole('heading',{name:'Your attention list',exact:true}).boundingBox())!.y).toBeLessThan(120);
+  const reader=page.locator('.inbox-reader'),before=(await reader.boundingBox())!;
+  let release!:()=>void,started!:()=>void;
+  const held=new Promise<void>(resolve=>{release=resolve;}),sending=new Promise<void>(resolve=>{started=resolve;});
+  await page.route('**/api/tool',async route=>{
+    if(route.request().postDataJSON().name==='decide_attention_item'){started();await held;}
+    await route.continue();
+  });
+  try{
+    const complete=page.getByRole('button',{name:'Complete Complete without flashing',exact:true});
+    await complete.click();await sending;
+    await expect(complete).toHaveAttribute('aria-busy','true');
+    await expect(page.getByText('Check an interrupted save',{exact:true})).toHaveCount(0);
+    const during=(await reader.boundingBox())!;
+    expect(during.y).toBeCloseTo(before.y,1);expect(during.height).toBeCloseTo(before.height,1);
+    release();
+    await expect(complete).toHaveCount(0);
+    const notice=page.locator('.inbox-notice');await expect(notice).toContainText('Task completed.');
+    const after=(await reader.boundingBox())!;
+    expect(after.y).toBeCloseTo(before.y,1);
+    if(width>=960)expect(after.height).toBeCloseTo(before.height,1);
+    const bounds=(await notice.boundingBox())!,list=(await page.locator('.inbox-list').boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(list.x);expect(bounds.x+bounds.width).toBeLessThanOrEqual(list.x+list.width);
+    mkdirSync(evidence,{recursive:true});await page.screenshot({path:`${evidence}/save-feedback-${width}.png`,fullPage:true});
+    await notice.getByRole('button',{name:'Reopen task',exact:true}).click();
+    await expect(complete).toBeVisible();
+    expect((await reader.boundingBox())!.y).toBeCloseTo(before.y,1);
+    await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
+    await expect(notice).toHaveCount(0);
+    const saved=await call(request,'list_attention');expect(saved.items.find(task=>task.title==='Complete without flashing')?.state).toBe('needs_you');
+  }finally{release();}
+});
+
+test('failed decisions retain recovery across reopening and a slow retry',async({page,request})=>{
+  const original=await add(request,'Recover a failed decision');await add(request,'Keep another task');await open(page);
+  let attempts=0,release!:()=>void,started!:()=>void;
+  const held=new Promise<void>(resolve=>{release=resolve;}),retrying=new Promise<void>(resolve=>{started=resolve;});
+  await page.route('**/api/tool',async route=>{
+    if(route.request().postDataJSON().name!=='decide_attention_item'){await route.continue();return;}
+    if(++attempts===1){await route.abort('failed');return;}
+    started();await held;await route.continue();
+  });
+  try{
+    await page.getByRole('button',{name:'Complete Recover a failed decision',exact:true}).click();
+    const recovery=page.getByText('Check an interrupted save',{exact:true});await expect(recovery).toBeVisible();
+    await page.reload();await expect(recovery).toBeVisible();
+    const retry=page.getByRole('button',{name:'Retry decision',exact:true});await retry.click();await retrying;
+    await expect(recovery).toBeVisible();await expect(retry).toBeDisabled();
+    release();await expect(recovery).toHaveCount(0);
+    await expect(page.getByRole('button',{name:/^History 1/})).toBeVisible();
+    const saved=await call(request,'list_attention'),task=saved.items.find(item=>item.title==='Recover a failed decision')!;
+    expect(task.state).toBe('done');expect(task.version).toBe(original.items[0].version+1);expect(attempts).toBe(2);
+  }finally{release();}
+});
+
+test('completion notification remains in view on a long narrow task list',async({page,request})=>{
+  await page.setViewportSize({width:375,height:900});
+  for(let i=0;i<12;i++)await add(request,`Task in a long list ${i}`);
+  await open(page);
+  await page.locator('.inbox-task').first().getByRole('button',{name:/^Complete /}).click();
+  const notice=page.locator('.inbox-notice');await expect(notice).toContainText('Task completed.');
+  const bounds=(await notice.boundingBox())!;
+  expect(bounds.y).toBeGreaterThanOrEqual(0);expect(bounds.y+bounds.height).toBeLessThanOrEqual(900);
+  expect((await page.locator('.inbox-footer').boundingBox())!.y).toBeGreaterThan(900);
+  await notice.getByRole('button',{name:'Dismiss notification',exact:true}).click();
+  await expect(notice).toHaveCount(0);
+});

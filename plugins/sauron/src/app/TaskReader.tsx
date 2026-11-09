@@ -18,11 +18,12 @@ function TaskActions({task,vm,label=`Actions for ${task.title}`}:{task:Task;vm:S
 function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:SauronController;position:number;total:number;back:()=>void;previous?:()=>void;next?:()=>void}){
   const titleId=useId();const historical=task.state==='done'||task.state==='dismissed';
   const disabled=vm.busy||!!vm.pending;
+  const completing=vm.busy&&vm.pending?.kind==='decision'&&vm.pending.input.id===task.id&&vm.pending.input.action==='complete';
   const source=()=>{if(task.sourceUrl)void vm.client?.open(task.sourceUrl).catch(()=>vm.setError('The source link could not be opened. Try again from the task.'));};
   return <section className="inbox-task-detail" aria-labelledby={titleId}>
     <div className="inbox-reader-tools">
       <Button className="inbox-back" color="secondary" variant="ghost" size="sm" onClick={back}><Icon name="back"/> Back to tasks</Button>
-      {!historical&&<Button color="secondary" variant="outline" size="sm" disabled={disabled} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/> Complete</Button>}
+      {!historical&&<Button color="secondary" variant="outline" size="sm" loading={completing} disabled={disabled} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/> Complete</Button>}
       {historical&&!('resolved' in task&&task.resolved&&!task.userDecision)&&<Button variant="outline" color="secondary" size="sm" disabled={disabled} onClick={()=>vm.decide(task,'reopen')}>Reopen task</Button>}
       {!historical&&<TaskActions task={task} vm={vm} label="More task actions"/>}
       <div className="inbox-reader-paging"><span>{position} of {total}</span><Button uniform size="sm" color="secondary" variant="ghost" aria-label="Previous task" disabled={!previous} onClick={previous}><Icon name="back"/></Button><Button uniform size="sm" color="secondary" variant="ghost" aria-label="Next task" disabled={!next} onClick={next}><Icon name="forward"/></Button></div>
@@ -64,9 +65,9 @@ export function TaskReader({vm}:{vm:SauronController}){
   const back=()=>{setSelection(old=>old?{...old,mobileOpen:false}:null);requestAnimationFrame(()=>rowRefs.current.get(active?.id)?.focus());};
   return <div ref={readerRef} className={`inbox-reader ${mobileOpen?'is-reading':''}`}>
     <section aria-label={`${labels[vm.filter]} tasks`} aria-busy={vm.busy} className="inbox-tasks">
-      {vm.items.map((task,i)=>{const historical=task.state==='done'||task.state==='dismissed',selected=task.id===active?.id;return <article key={task.id} className={`inbox-task ${selected?'is-selected':''}`}>
+      {vm.items.map((task,i)=>{const historical=task.state==='done'||task.state==='dismissed',selected=task.id===active?.id,completing=vm.busy&&vm.pending?.kind==='decision'&&vm.pending.input.id===task.id&&vm.pending.input.action==='complete';return <article key={task.id} className={`inbox-task ${selected?'is-selected':''}`}>
         <div className="inbox-row">
-          {!historical&&<Button className="inbox-complete" color="secondary" variant="outline" size="sm" uniform aria-label={`Complete ${task.title}`} title="Complete task" disabled={vm.busy||!!vm.pending} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/></Button>}
+          {!historical&&<Button className="inbox-complete" color="secondary" variant="outline" size="sm" uniform aria-label={`Complete ${task.title}`} title="Complete task" loading={completing} aria-busy={completing} disabled={vm.busy||!!vm.pending} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/></Button>}
           <button ref={node=>{if(node)rowRefs.current.set(task.id,node);else rowRefs.current.delete(task.id);}} className="inbox-task-open" type="button" aria-current={selected?'true':undefined} aria-controls={detailId} onClick={()=>select(task)} onKeyDown={event=>{
             const next=event.key==='ArrowDown'?i+1:event.key==='ArrowUp'?i-1:event.key==='Home'?0:event.key==='End'?vm.items.length-1:-1;
             if(next>=0&&next<vm.items.length){event.preventDefault();select(vm.items[next],'row');}
