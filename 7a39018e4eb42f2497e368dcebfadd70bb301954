@@ -1,0 +1,19 @@
+plugins/shelob/tests/fixtures.mjs
+  s_fdd038876479aa::t_38802ec52a7bb5 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7a39018e4eb42f2497e368dcebfadd70bb301954",
+  "prompts": {},
+  "sessions": {
+    "s_fdd038876479aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15a74-9309-71b1-967c-27e9c8b98240",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}

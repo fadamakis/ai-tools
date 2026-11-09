@@ -1,0 +1,21 @@
+plugins/workbench/.codex-plugin/plugin.json
+  s_9368bd7cc2f482::t_6adb58384989f1 3
+plugins/workbench/plugin.json
+  s_9368bd7cc2f482::t_65f7ba6066d3c3 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0c855dc758bea2e2404434fbdad17d950c342bd7",
+  "prompts": {},
+  "sessions": {
+    "s_9368bd7cc2f482": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18215-cd63-7581-9e5f-3272516b3466",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
