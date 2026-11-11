@@ -1,7 +1,7 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { Markdown } from '@openai/apps-sdk-ui/components/Markdown';
 import { stages } from './controller.mjs';
-import { attentionReason, cardNextAction, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskLaunch, taskStatus } from './presentation.mjs';
+import { attentionReason, cardNextAction, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskChatUrl, taskTicketUrl, taskLaunch, taskStatus } from './presentation.mjs';
 import { Button, Secondary, Quiet, Input, Textarea, Menu, Checkbox, SegmentedControl, Badge, Icon, Dialog, Select, Tooltip, TextLink, Alert, EmptyMessage, LoadingIndicator, submitForm, enterSubmits } from './ui.jsx';
 import { HowItWorks } from './HowItWorks.jsx';
 import { PublicationDetails, RemoteRunDetails } from './DeliveryDetails.jsx';
@@ -45,7 +45,7 @@ function TaskCard({ vm, task, repository }) {
       <Badge size="md" color={reason ? 'warning' : tone(task.status)}>{task.stage === 'done' && task.completion?.kind !== 'artifact' ? 'Merged' : taskStatus(task)}</Badge>
       {next && <p className={`card-next ${reason ? 'needs-attention' : ''}`}>{next}</p>}
     </button>
-    {task.stage !== 'done' && !task.archivedAt && <footer className="card-actions"><Quiet size="md" disabled={vm.busy || pending} aria-label={`${action} · ${displayTitle(task)}`} onClick={() => vm.showModal({ kind: 'launch', task })}>{pending ? 'Request pending' : task.threadId ? 'Resume' : action}</Quiet></footer>}
+    {task.stage !== 'done' && !task.archivedAt && <footer className="card-actions"><Quiet size="md" disabled={vm.busy || pending && !task.threadId} aria-label={`${action} · ${displayTitle(task)}`} onClick={() => task.threadId ? vm.action(() => vm.resume(task), 'Opening chat…') : vm.showModal({ kind: 'launch', task })}>{pending && !task.threadId ? 'Request pending' : task.threadId ? 'Resume' : action}</Quiet></footer>}
   </article>;
 }
 
@@ -59,7 +59,7 @@ function ChatRequests({ vm }) {
   return <section className="launch-status" aria-label="Chat handoff">
     <Alert color={latest.state === 'accepted' ? 'success' : ['failed', 'uncertain'].includes(latest.state) ? 'warning' : 'info'} variant="soft" role="status" actionsPlacement="bottom"
       title={`${launchStatus[latest.state]}${task ? ` · ${displayTitle(task)}` : ''}`} description={description}
-      actions={<div className="launch-request-actions"><Quiet size="sm" onClick={() => vm.action(() => vm.select(latest.taskId), 'Opening task…')}>View task</Quiet>{unresolvedLaunchStates.includes(latest.state) && <Quiet size="sm" disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch: latest })}>Review request</Quiet>}</div>}/>
+      actions={<div className="launch-request-actions">{taskChatUrl(task || {}) && <TextLink href={taskChatUrl(task)} onClick={event => { event.preventDefault(); vm.action(() => vm.resume(task), 'Opening chat…'); }}>Open chat</TextLink>}<Quiet size="sm" onClick={() => vm.action(() => vm.select(latest.taskId), 'Opening task…')}>View task</Quiet>{unresolvedLaunchStates.includes(latest.state) && <Quiet size="sm" disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch: latest })}>Review request</Quiet>}</div>}/>
     {earlier.length > 0 && <details><summary>{earlier.length} earlier chat request{earlier.length === 1 ? '' : 's'}</summary>{earlier.map(launch => <div className="launch-row" key={launch.id}><Quiet size="sm" onClick={() => vm.action(() => vm.select(launch.taskId), 'Opening task…')}>{vm.board.tasks.find(task => task.id === launch.taskId)?.title || 'View task'}</Quiet><Badge color={tone(launch.state)}>{launchStatus[launch.state]}</Badge>{launch.error && <span>{launch.error}</span>}</div>)}</details>}
   </section>;
 }
@@ -202,17 +202,10 @@ function RepositoryForm({ vm }) {
   </Dialog>;
 }
 
-function LaunchDestination({ task, continuation, setContinuation, environment, setEnvironment, busy }) {
-  const original = Boolean(task?.threadId && !continuation);
-  return <>
-    {task?.threadId && <div className="checkbox-field"><Checkbox id="new-continuation" checked={continuation} onCheckedChange={setContinuation} label="Use a new chat instead" disabled={busy}/></div>}
-    {!original && <><p className="field-label">Run in</p><SegmentedControl aria-label="Native Codex environment" value={environment} onChange={setEnvironment} disabled={busy}><SegmentedControl.Option value="local">Local</SegmentedControl.Option><SegmentedControl.Option value="worktree">Worktree</SegmentedControl.Option></SegmentedControl></>}
-  </>;
-}
-
 function LaunchForm({ vm, task, initialRepositoryId }) {
   const [title, setTitle] = useState(''), [repositoryId, setRepositoryId] = useState(initialRepositoryId || vm.board.repositories[0]?.id || '');
-  const [environment, setEnvironment] = useState('local'), [autopilot, setAutopilot] = useState(false), [continuation, setContinuation] = useState(false);
+  const [environment, setEnvironment] = useState('local'), [autopilot, setAutopilot] = useState(false);
+  const continuation = Boolean(task?.threadId);
   const { title: modalTitle, description } = taskLaunch(task, continuation);
   const submit = () => vm.action(() => vm.launch({ ...(task ? { taskId: task.id } : { repositoryId, title }), environment, autopilot, continuation }), 'Preparing chat request…');
   return <Dialog title={modalTitle} close={() => vm.closeModal()} busy={vm.busy}>
@@ -221,8 +214,8 @@ function LaunchForm({ vm, task, initialRepositoryId }) {
         <label className="field-label" htmlFor="task-description">Ticket or desired outcome</label><Textarea id="task-description" size="lg" rows={2} maxRows={8} autoResize required maxLength={2000} value={title} onChange={event => setTitle(event.target.value)} placeholder="A ticket, link, or what you want to build" disabled={vm.busy}/>
         <p className="field-label">Repository</p><RepositorySelect includeAll={false} repositories={vm.board.repositories} value={repositoryId} onChange={setRepositoryId} disabled={vm.busy}/>
       </>}
-      <LaunchDestination task={task} continuation={continuation} setContinuation={setContinuation} environment={environment} setEnvironment={setEnvironment} busy={vm.busy}/>
-      <p className="dialog-copy">Review the request in chat, then press Send to start or resume. Sending authorizes the scope selected below.</p>
+      <p className="field-label">Run in</p><SegmentedControl aria-label="Native Codex environment" value={environment} onChange={setEnvironment} disabled={vm.busy}><SegmentedControl.Option value="local">Local</SegmentedControl.Option><SegmentedControl.Option value="worktree">Worktree</SegmentedControl.Option></SegmentedControl>
+      <p className="dialog-copy">A new draft opens for this task. Select its repository and Local or Worktree mode in Codex, then review and Send. This draft becomes the worker chat.</p>
       <div className="autopilot-field"><Checkbox id="autopilot" checked={autopilot} onCheckedChange={setAutopilot} label="Autopilot" disabled={vm.busy}/><p>{autopilot ? 'Includes commits, ordinary pushes, a draft PR and addressed review replies during this run. Stops when waiting for CI or review. Never merges.' : 'Continue the next Workbench stage. Commits, pushes, PR publication and review replies require separate authorization.'}</p></div>
       {!vm.extensions.message && <Alert color="warning" variant="soft" description="This host does not support launching chats from the board. Use /workbench:start in a native project chat."/>}
       <ActionError vm={vm}/><BusyStatus vm={vm}/><div className="dialog-actions"><Quiet onClick={() => vm.closeModal()} disabled={vm.busy}>Cancel</Quiet><Button loading={vm.busy} disabled={vm.busy || !vm.extensions.message} onClick={event => submitForm(event, submit)}>Continue in chat</Button></div>
@@ -274,7 +267,10 @@ function TaskDetail({ vm, selected }) {
     <div className="detail-title"><span className="task-key">{task.key} · {repository.name}</span><h3>{displayTitle(task)}</h3><div className="detail-badges"><Badge>{task.archivedAt ? 'Archived' : stage}</Badge><Badge color={tone(task.status)}>{taskStatus(task)}</Badge></div></div>
     {task.summary && <p className="dialog-copy">{task.summary}</p>}
     <div className="detail-actions">
-      {task.stage !== 'done' && <Button disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>{taskLaunch(task).action}<Icon name="arrow"/></Button>}
+      {task.stage !== 'done' && <Button disabled={vm.busy} onClick={() => task.threadId ? vm.action(() => vm.resume(task), 'Opening chat…') : vm.showModal({ kind: 'launch', task })}>{task.threadId ? 'Open chat' : taskLaunch(task).action}<Icon name="arrow"/></Button>}
+      {task.threadId && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>Start new chat</Secondary>}
+      {task.stage === 'done' && taskChatUrl(task) && <TextLink href={taskChatUrl(task)} onClick={link(taskChatUrl(task))}>Open chat</TextLink>}
+      {taskTicketUrl(task) && <TextLink href={taskTicketUrl(task)} onClick={link(taskTicketUrl(task))}>Open ticket</TextLink>}
       {task.stage === 'done' && <Button disabled={vm.busy} loading={vm.busy} onClick={() => vm.action(() => vm.archive([task], !task.archivedAt), task.archivedAt ? 'Restoring task…' : 'Archiving task…')}>{task.archivedAt ? 'Restore to Done' : 'Archive task'}</Button>}
       {task.threadId && task.requirements && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.refreshEvidence(), 'Checking evidence freshness…')}>Recheck evidence</Secondary>}
       {task.prUrl && <><Secondary disabled={vm.busy} loading={vm.busy && vm.busyLabel === 'Checking pull request…'} onClick={() => vm.action(() => vm.refreshPr(), 'Checking pull request…')}>Check PR now</Secondary><TextLink href={task.prUrl} onClick={link(task.prUrl)}>Open pull request</TextLink></>}

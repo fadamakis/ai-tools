@@ -16,6 +16,11 @@ Verify old and candidate readers against disposable saved-state copies before lo
 
 ## Workbench
 
+Board launches may carry an optional `delivery: draft` field. These requests bind
+the receiving native chat directly; older requests retain their coordinator
+handoff. Schema 1, task IDs, ticket URLs, worker ownership and existing receipts
+remain readable without migration. Resume opens the bound chat without dispatch.
+
 ### Delivery status reconciliation
 
 Board schema 1, store location, task identities, notes, ownership and original handoff/publication receipts remain unchanged. Optional reconciliation observations, accepted-scope coverage, completion receipts, pause provenance and a short-lived check lease are additive. Legacy records remain readable without migration. An absent pause cause is unknown, not permission to resume or close a task. A completion receipt for non-PR work is distinct from a verified PR merge.

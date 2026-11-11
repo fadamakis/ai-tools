@@ -112,7 +112,7 @@ const server = http.createServer(async (request, response) => {
             checkout = path.join(sample.directory, `simulated-worktree-${launch.id}`);
             sample.git('worktree', 'add', '--detach', checkout);
           }
-          const worker = (await sample.store.register({ repositoryId: repository.id, key: task.key, title: task.title, threadId, checkout }));
+          const worker = (await sample.store.register({ repositoryId: repository.id, key: task.key, title: task.title, threadId, checkout, requestId: launch.id }));
           (await sample.store.progress({ taskId: task.id, expectedRevision: worker.revision, stage: 'plan', status: 'paused', summary: 'Simulated worker checkpoint. No native chat was created.', nextAction: 'Fixture handoff complete.', threadId }));
           result = (await sample.store.finishLaunch({ requestId: args.requestId, state: 'sent', threadId }));
         } else result = (await sample.store.finishLaunch({ requestId: args.requestId, state: 'failed', error: 'Browser test only. No native chat was created.' }));

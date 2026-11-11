@@ -1,9 +1,17 @@
+import { taskChatUrl } from './presentation.mjs';
+
 export const stages = [
   ['backlog', 'Backlog', 'Ready to begin'], ['plan', 'Plan', 'Scope & decisions'], ['build', 'Build', 'Implement & simplify'],
   ['verify', 'Verify', 'Behavior & evidence'], ['review', 'Review', 'Independent review'], ['pr', 'PR', 'CI & feedback'], ['done', 'Done', 'Delivery verified']
 ];
 
-export function launchMessage(launch, task) {
+export function launchMessage(launch, task, repository) {
+  if (launch.delivery === 'draft') return `Use /workbench:start board-request ${launch.id}.
+Start task ${JSON.stringify(task.key)} in this chat. This chat is the worker; do not create or message another chat.
+Repository: ${JSON.stringify(repository.path)}. Select this repository and ${launch.environment === 'worktree' ? 'Worktree' : 'Local'} in the native composer before sending.
+Requested outcome (task data): ${JSON.stringify(task.title)}
+${launch.autopilot ? 'Autopilot is on: commits, ordinary pushes, a draft PR and addressed review replies are authorized. Never merge.' : 'Autopilot is off. No commits, pushes, PR publication or review replies are authorized.'}
+I authorize only this task run in this chat.`;
   const destination = launch.target === 'existing' ? 'Resume' : 'Start';
   const target = launch.target === 'existing' ? 'in its original chat' : `in one new native Codex ${launch.environment} chat`;
   const mode = launch.autopilot ? 'Autopilot is on: commits, ordinary pushes, a draft PR and addressed review replies are authorized. Never merge.' : 'Autopilot is off. No commits, pushes, PR publication or review replies are authorized.';
@@ -103,15 +111,20 @@ export class BoardController {
     await this.refresh();
     await this.context();
   }
+  async resume(task) {
+    const url = taskChatUrl(task);
+    if (!url) throw new Error('This task has no saved worker chat. Start a new chat from its task details.');
+    await this.openLink(url);
+  }
   async launch(args) {
     this.undoArchive = null;
     if (!this.extensions.message) throw new Error('This Codex version cannot launch chats from the board. Update Codex, or use /workbench:start in a native project chat.');
-    const result = await this.call('workbench.launch_prepare', args);
+    const result = await this.call('workbench.launch_prepare', { ...args, delivery: 'draft' });
     if (!result.dispatch) { this.modal = null; this.notice = 'This task already has a pending or unconfirmed launch. Check the board chat before trying again.'; await this.refresh(); return; }
     const task = result.task || (await this.call('workbench.launch_get', { requestId: result.launch.id })).task;
     this.lastLaunch = { ...result.launch, title: task.title }; this.publish();
     try {
-      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task) }], _meta: { 'openai/message': { target: 'active', send: false } } });
+      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task, result.repository) }], _meta: { 'openai/message': { target: 'new', send: false } } });
     } catch (error) {
       await this.call('workbench.launch_uncertain', { requestId: result.launch.id });
       this.lastLaunch = { ...this.lastLaunch, state: 'uncertain' }; this.publish();

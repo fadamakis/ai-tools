@@ -21,8 +21,12 @@ A team delivery workflow that coordinates the skills you already use. Start with
 Install `workbench@ai-tools` using [getting started](https://github.com/fadamakis/ai-tools/blob/main/docs/getting-started.md), then use the explicit `/workbench:` commands or choose a stage from the native picker.
 
 From the board, choose the chat and run mode, then select **Continue in chat**.
-Workbench adds the exact launch request to the native composer. Review it and
-press **Send** to authorize that run. This uses the host's editable-draft API;
+Workbench opens one new editable draft. Select the repository and Local/Worktree
+mode in the native composer, review the request, and press **Send**. That chat runs
+the task directly; no launcher conversation creates a second worker. **Resume**
+opens the saved worker without sending a message. Task details expose **Open chat**
+and **Open ticket** when their saved references are available. Choose **Start new
+chat** in task details only when a separate continuation is wanted. This uses the host's editable-draft API;
 app-generated automatic messages cannot establish human authorization. Autopilot
 is off for each new request, and a saved request alone never starts work.
 
