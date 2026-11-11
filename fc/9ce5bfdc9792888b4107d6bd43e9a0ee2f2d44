@@ -1,0 +1,49 @@
+plugins/workbench/app/App.jsx
+  s_7b7f99e0cdfdfd::t_b267473c315937 4,48,62,207-208,217-218,270-273
+plugins/workbench/tests/controller.test.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 32
+plugins/workbench/app/presentation.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 59-70
+plugins/workbench/README.md
+  s_7b7f99e0cdfdfd::t_b267473c315937 24-29
+scripts/workbench-preview.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 115
+plugins/workbench/references/board-launch.md
+  s_7b7f99e0cdfdfd::t_b267473c315937 1,4-5,10,19-55
+  s_7b7f99e0cdfdfd::t_001ef29d0ba4a4 56
+plugins/workbench/server/launches.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 14,20,22,24,82,85
+plugins/workbench/tests/direct-launch.test.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 1-83
+plugins/workbench/tests/ui/board.spec.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 145,159,161-169,230,257-258,260-262,403-406,409-410,412-413,663,770-797
+  s_7b7f99e0cdfdfd::t_a6fb6b8c6df38b 798
+plugins/workbench/server/index.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 77,79,81
+plugins/workbench/app/HowItWorks.jsx
+  s_7b7f99e0cdfdfd::t_b267473c315937 23
+plugins/workbench/skills/start/SKILL.md
+  s_7b7f99e0cdfdfd::t_b267473c315937 14
+plugins/workbench/app/controller.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 1-2,8-14,114-118,122,127
+plugins/workbench/server/store.mjs
+  s_7b7f99e0cdfdfd::t_b267473c315937 181-186
+docs/compatibility.md
+  s_7b7f99e0cdfdfd::t_b267473c315937 19-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc9ce5bfdc9792888b4107d6bd43e9a0ee2f2d44",
+  "prompts": {},
+  "sessions": {
+    "s_7b7f99e0cdfdfd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cafb-ac07-78c3-91e1-632dd8772fee",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
