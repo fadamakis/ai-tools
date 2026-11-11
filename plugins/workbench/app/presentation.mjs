@@ -56,3 +56,15 @@ export function evidenceLabel(task, kind) {
 }
 
 export const launchStatus = { prepared: 'Awaiting Send in chat', dispatching: 'Sending request', queued: 'Creating chat', sent: 'Waiting for task confirmation', accepted: 'Chat confirmed', uncertain: 'Receipt unconfirmed', failed: 'Handoff failed' };
+
+export function taskTicketUrl(task) {
+  const candidate = task.sourceUrl || task.title?.match(/https?:\/\/[^\s<>"']+/)?.[0];
+  try {
+    const url = new URL(candidate);
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
+  } catch { return ''; }
+}
+
+export function taskChatUrl(task) {
+  return /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(task.threadId || '') ? `codex://threads/${task.threadId}` : '';
+}

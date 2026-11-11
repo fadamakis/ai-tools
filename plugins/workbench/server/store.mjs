@@ -178,6 +178,12 @@ export class BoardStore {
     return this.mutate(data => {
       const repository = this.repository(data, repositoryId);
       if (resolved !== repository.commonDir) throw new Error('The current native checkout belongs to another repository.');
+      const request = requestId && data.launches.find(item => item.id === requestId);
+      if (request?.delivery === 'draft') {
+        const assigned = fs.realpathSync(git(checkout, 'rev-parse', '--show-toplevel'));
+        const linked = fs.realpathSync(path.resolve(assigned, git(assigned, 'rev-parse', '--git-dir'))) !== resolved;
+        if (request.environment === 'worktree' ? !linked || assigned === fs.realpathSync(repository.path) : assigned !== fs.realpathSync(repository.path)) throw new Error('Select the requested repository and Local or Worktree environment in Codex before sending. No worker was bound.');
+      }
       const task = this.makeTask(data, repositoryId, key, title);
       this.launches.bindWorker(data, task, threadId, requestId);
       task.checkout = checkout; task.updatedAt = now(); task.revision++;

@@ -11,16 +11,17 @@ export function taskKey(value) {
 export class LaunchLifecycle {
   constructor(store) { this.store = store; }
 
-  async prepareLaunch({ taskId, repositoryId, title, environment = 'local', autopilot = false, continuation = false }) {
+  async prepareLaunch({ taskId, repositoryId, title, environment = 'local', autopilot = false, continuation = false, delivery }) {
     return this.store.mutate(data => {
       const task = taskId ? this.store.task(data, taskId) : this.store.makeTask(data, repositoryId, taskKey(title), title);
       if (task.stage === 'done') throw new Error('This task is complete. Start a separate task.');
       const existing = data.launches.find(item => item.taskId === task.id && unresolvedLaunchStates.includes(item.state));
       if (existing) return { launch: existing, task: { key: task.key, title: task.title }, dispatch: false };
+      if (delivery === 'draft' && task.threadId && !continuation) throw new Error('Open the saved worker chat to resume. A new chat requires an explicit continuation choice.');
       const repository = this.store.repository(data, task.repositoryId);
-      const launch = { id: randomUUID(), taskId: task.id, repositoryId: repository.id, ownerThreadId: task.threadId || null, autopilot, environment, continuation, target: task.threadId && !continuation ? 'existing' : 'new', ...(task.threadId && !continuation ? { threadId: task.threadId } : {}), state: 'prepared', createdAt: now(), updatedAt: now() };
+      const launch = { id: randomUUID(), taskId: task.id, repositoryId: repository.id, ownerThreadId: task.threadId || null, ...(delivery === 'draft' ? { delivery } : {}), autopilot, environment, continuation, target: task.threadId && !continuation ? 'existing' : 'new', ...(task.threadId && !continuation ? { threadId: task.threadId } : {}), state: 'prepared', createdAt: now(), updatedAt: now() };
       data.launches.push(launch);
-      return { launch, task: { key: task.key, title: task.title }, dispatch: true };
+      return { launch, task: { key: task.key, title: task.title }, repository: { path: repository.path }, dispatch: true };
     });
   }
 
@@ -78,9 +79,10 @@ export class LaunchLifecycle {
   }
 
   bindWorker(data, task, threadId, requestId) {
+      if (!requestId && threadId !== task.threadId && data.launches.some(item => item.taskId === task.id && item.delivery === 'draft' && unresolvedLaunchStates.includes(item.state))) throw new Error('This draft requires its exact launch request ID.');
       const requested = requestId && data.launches.find(item => item.id === requestId);
       if (requestId && (!requested || requested.taskId !== task.id || requested.threadId && requested.threadId !== threadId)) throw new Error('The worker does not match its board launch.');
-      const workerLaunch = data.launches.find(item => item.taskId === task.id && item.target === 'new' && (!requestId || item.id === requestId) && (['dispatching', 'queued', 'sent', 'uncertain'].includes(item.state) || requestId && item.state === 'failed' && item.resolution?.kind === 'not_delivered') && (!item.threadId || item.threadId === threadId));
+      const workerLaunch = data.launches.find(item => item.taskId === task.id && item.target === 'new' && (requestId ? item.id === requestId : item.delivery !== 'draft') && (['dispatching', 'queued', 'sent', 'uncertain'].includes(item.state) || requestId && item.state === 'failed' && item.resolution?.kind === 'not_delivered') && (!item.threadId || item.threadId === threadId));
       if (workerLaunch && Object.hasOwn(workerLaunch, 'ownerThreadId') && workerLaunch.ownerThreadId !== (task.threadId || null) && task.threadId !== threadId) throw new Error('Another chat already confirmed ownership after this launch.');
       if (requested?.target === 'new' && !workerLaunch && !(requested.state === 'accepted' && requested.threadId === threadId)) throw new Error('This new-chat request cannot confirm a worker in its current state.');
       if (threadId && task.threadId && threadId !== task.threadId) {
