@@ -142,7 +142,7 @@ test('Autopilot is off each time and native environment plus explicit consent tr
   await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task' })).toHaveCount(0);
   const messages = await page.evaluate(() => window.__workbenchPreview.messages);
-  expect(messages).toHaveLength(1); expect(messages[0]._meta['openai/message']).toEqual({ target: 'active', send: false }); expect(messages[0].content[0].text).toContain('native Codex worktree chat'); expect(messages[0].content[0].text).toContain('Autopilot is on: commits');
+  expect(messages).toHaveLength(1); expect(messages[0]._meta['openai/message']).toEqual({ target: 'new', send: false }); expect(messages[0].content[0].text).toContain('Select this repository and Worktree'); expect(messages[0].content[0].text).toContain('Autopilot is on: commits');
   expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
   await page.setViewportSize({ width: 390, height: 1000 });
   await app.locator('html').evaluate(root => { root.style.fontSize = '200%'; });
@@ -156,15 +156,17 @@ test('Autopilot is off each time and native environment plus explicit consent tr
   await expect(app.getByRole('radio', { name: 'Local', exact: true })).toBeChecked(); expect(errors).toEqual([]);
 });
 
-test('resume preserves the original chat and hides new-environment controls until continuation is chosen', async ({ page }) => {
+test('resume opens the saved worker while a new continuation is an explicit task action', async ({ page }) => {
   const { app } = await open(page);
-  await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104'); await app.locator('.task-card').click();
-  await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
-  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
-  await expect(app.getByRole('radiogroup', { name: 'Native Codex environment' })).toHaveCount(0);
-  await app.getByRole('checkbox', { name: 'Use a new chat instead' }).check();
-  await expect(app.getByRole('radiogroup', { name: 'Native Codex environment' })).toBeVisible();
-  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
+  await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104');
+  await app.locator('.task-card').click();
+  await app.getByRole('button', { name: 'Open chat', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toHaveLength(1);
+  expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
+  await app.getByRole('button', { name: 'Start new chat', exact: true }).click();
+  const dialog = app.getByRole('dialog', { name: 'Start a new chat', exact: true });
+  await expect(dialog.getByRole('radio', { name: 'Worktree', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
 });
 
 test('save errors preserve the repository draft, and Enter works without sandbox allow-forms', async ({ page }) => {
@@ -225,7 +227,7 @@ test('task details label passed evidence from an earlier revision after a new ch
   const details = app.getByRole('dialog', { name: 'Task details' });
   await expect(details.locator('dt').filter({ hasText: /^Verification$/ }).locator('+ dd')).toHaveText('passed · unbound · earlier revision');
   await expect(details.locator('dt').filter({ hasText: /^Code review$/ }).locator('+ dd')).toHaveText('passed · unbound · earlier revision');
-  await expect(details.getByRole('button', { name: 'Resume original chat', exact: true })).toBeEnabled();
+  await expect(details.getByRole('button', { name: 'Open chat', exact: true })).toBeEnabled();
   await page.screenshot({ path: 'repair-evidence/evidence-revision-after.png', fullPage: true });
 });
 
@@ -252,15 +254,12 @@ test('board drafts start no work until Send and then preserve the same worker ch
   expect(before.launches.filter(launch => launch.taskId === task.id)).toHaveLength(0);
   await app.locator('.task-card').click();
   await expect(app.getByRole('dialog', { name: 'Task details' })).toContainText('Simulated worker checkpoint');
-  await app.getByRole('button', { name: 'Resume original chat', exact: true }).click();
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
-  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
-  await expect(app.getByRole('dialog', { name: 'Resume task' })).toHaveCount(0);
-  await expect.poll(async () => (await list()).tasks.find(candidate => candidate.id === task.id).revision).toBeGreaterThan(task.revision);
+  await app.getByRole('button', { name: 'Open chat', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toEqual([`codex://threads/${task.threadId}`]);
   const after = await list(), resumed = after.tasks.find(candidate => candidate.id === task.id);
-  expect(resumed.threadId).toBe(task.threadId); expect(resumed.checkout).toBe(task.checkout); expect(resumed.revision).toBeGreaterThan(task.revision);
-  expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(2);
-  expect(await page.evaluate(() => window.__workbenchPreview.submissions.length)).toBe(2);
+  expect(resumed.threadId).toBe(task.threadId); expect(resumed.checkout).toBe(task.checkout); expect(resumed.revision).toBe(task.revision);
+  expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(1);
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions.length)).toBe(1);
   expect(errors).toEqual([]);
 });
 
@@ -401,23 +400,17 @@ test('compact board keeps every stage reachable and Done archive inline beside t
   expect(sizes.scroll).toBeLessThanOrEqual(sizes.viewport); expect(errors).toEqual([]);
 });
 
-test('card Resume opens confirmation directly, keeps Autopilot off and confirms exactly one same-chat request', async ({ page }) => {
-  const { app } = await open(page, '?handoff=success');
+test('card Resume opens the exact chat without another draft or launch request', async ({ page }) => {
+  const { app } = await open(page);
+  const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  const worker = board.tasks.find(task => task.key === 'WEB-104');
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104');
   await app.getByRole('button', { name: 'Resume original chat · Clarify the first-run setup', exact: true }).click();
-  await expect(app.getByRole('dialog', { name: 'Task details' })).toHaveCount(0);
-  await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
-  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
+  await expect(app.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toEqual([`codex://threads/${worker.threadId}`]);
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
-  expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
-  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
-  await expect(app.getByRole('region', { name: 'Chat handoff' })).toContainText('Chat confirmed');
-  const messages = await page.evaluate(() => window.__workbenchPreview.messages);
-  expect(messages).toHaveLength(1);
-  expect(messages[0].content[0].text).toContain('Resume task "WEB-104" in its original chat');
-  expect(messages[0].content[0].text).toContain('Autopilot is off');
-  expect(messages[0].content[0].text.match(/[a-f0-9-]{36}/g)).toHaveLength(1);
+  const after = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
+  expect(after.launches).toEqual(board.launches);
 });
 
 test('SDK repository selector stays inside the modal focus flow and Escape closes only its open menu', async ({ page }) => {
@@ -667,7 +660,7 @@ test('task evidence precedes the saved note and full technical facts expand only
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-112');
   await app.getByRole('button', { name: 'Open Show a useful empty state', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Task details', exact: true });
-  await expect(dialog.getByRole('button', { name: 'Resume original chat', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Open chat', exact: true })).toBeEnabled();
   const evidence = dialog.getByRole('region', { name: 'Verification and review' });
   await expect(evidence).toContainText('Verification');
   await expect(evidence).toContainText('Code review');
@@ -773,4 +766,33 @@ test('verified non-PR delivery reaches Done and archives with its original ident
   expect((await rpc('workbench.get', { taskId: task.id })).task.archivedAt).toBeUndefined();
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+for (const width of [1440, 390]) test(`URL tickets and worker chats stay linked in task details (${width})`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 });
+  const { app } = await open(page, '?handoff=success');
+  const ticket = 'https://issues.example.com/browse/LINK-123';
+  await app.getByRole('button', { name: 'New task', exact: true }).click();
+  await app.getByLabel('Ticket or desired outcome').fill(ticket);
+  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Send launch request', exact: true })).toBeVisible();
+  const draft = await page.evaluate(() => window.__workbenchPreview.draft);
+  expect(draft._meta['openai/message']).toEqual({ target: 'new', send: false });
+  expect(draft.content[0].text).toContain('This chat is the worker');
+  expect(draft.content[0].text).toContain(ticket);
+  await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
+  await revealFilters(app);
+  await app.getByRole('textbox', { name: 'Search tasks' }).fill('LINK-123');
+  await app.locator('.task-card').click();
+  const details = app.getByRole('dialog', { name: 'Task details', exact: true });
+  await details.getByRole('link', { name: 'Open ticket', exact: true }).click();
+  await details.getByRole('button', { name: 'Open chat', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks.length)).toBe(2);
+  const links = await page.evaluate(() => window.__workbenchPreview.openedLinks);
+  expect(links[0]).toBe(ticket); expect(links[1]).toMatch(/^codex:\/\/threads\/[a-f0-9-]{36}$/);
+  expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(1);
+  expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(1);
+  await page.screenshot({ path: `dist/workbench-preview-verification/task-links-${width}.png`, fullPage: true });
+  const bounds = await details.evaluate(dialog => ({ scroll: dialog.scrollWidth, client: dialog.clientWidth }));
+  expect(bounds.scroll).toBeLessThanOrEqual(bounds.client);
 });

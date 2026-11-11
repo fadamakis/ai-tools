@@ -29,7 +29,7 @@ test('launch prepares one editable draft without submitting it or claiming deliv
   const launch = { id, taskId: id, target: 'new', environment: 'local', autopilot: false, state: 'prepared' };
   const { vm, messages, requests } = setup(t, request => request.name === 'workbench.launch_prepare' ? { launch, task: { key: 'EX-123', title: 'Save the draft' }, dispatch: true } : { launch });
   await vm.launch({ title: 'EX-123', repositoryId: 'a'.repeat(24), autopilot: false });
-  assert.equal(messages.length, 1); assert.deepEqual(messages[0]._meta['openai/message'], { target: 'active', send: false });
+  assert.equal(messages.length, 1); assert.deepEqual(messages[0]._meta['openai/message'], { target: 'new', send: false });
   assert.equal(requests[0].name, 'workbench.launch_prepare');
   assert.equal(requests.some(request => ['workbench.launch_claim', 'workbench.launch_finish'].includes(request.name)), false);
   assert.equal(vm.lastLaunch.state, 'prepared');
