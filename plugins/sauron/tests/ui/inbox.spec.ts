@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { mkdtempSync,rmSync,writeFileSync,mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { syntheticObservation, type Result } from '../../src/shared/contracts.js';
 import { contrastRatio } from '../../../../tests/ui/contrast.mjs';
 let child:ChildProcess,dir:string,origin:string;let port=4610;
@@ -20,6 +21,10 @@ async function call(request:APIRequestContext,name:string,args:unknown={}):Promi
 async function open(page:Page){await page.goto(origin);await expect(page.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();}
 async function add(request:APIRequestContext,title='Review launch notes'){return call(request,'create_personal_task',{title,nextAction:'Decide the next step after reviewing the meeting notes.',sourceState:'needs_you',operationId:crypto.randomUUID()});}
 async function actions(page:Page,title:string,action:string){await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).click();await page.getByRole('menuitem',{name:action,exact:true}).click();}
+async function keyboardAction(page:Page,title:string,action:string){
+  await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).focus();await page.keyboard.press('Enter');
+  await page.getByRole('menuitem',{name:action,exact:true}).focus();await page.keyboard.press('Enter');
+}
 
 for(const theme of ['light','dark'] as const){
   test(`preview starts with the system ${theme} theme and readable field hints`,async({page})=>{
@@ -46,17 +51,87 @@ test('Inbox opens directly after reopening and has no layout selector',async({pa
 });
 test('Inbox supports source links, completion, snooze, dismissal and reopening',async({page,request})=>{
   await call(request,'upsert_attention_items',{batchId:'inbox-source',items:[syntheticObservation()]});await add(request);await open(page);
+  await page.getByRole('radio',{name:/^Inbox /}).click();
   await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();await expect(page.getByRole('button',{name:'Open sample source'})).toBeVisible();
+  await page.getByRole('button',{name:'Accept task'}).click();
   await actions(page,'Review launch notes','Snooze 1 hour');await page.getByRole('button',{name:/^Snoozed/}).click();await expect(page.getByRole('heading',{name:'Review launch notes',exact:true})).toBeVisible();
-  await actions(page,'Review launch notes','Bring back now');await page.getByRole('radio',{name:/^Needs you/}).click();
+  await actions(page,'Review launch notes','Bring back now');await page.getByRole('radio',{name:/^Today/}).click();
   await actions(page,'Review launch notes','Dismiss');await page.getByRole('button',{name:'Confirm dismiss'}).click();await page.getByRole('button',{name:/^History/}).click();await page.getByRole('radio',{name:/^Dismissed/}).click();
   await page.getByRole('button',{name:/^Review launch notes/}).click();await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task'}).click();
   await page.getByRole('button',{name:'Complete Review launch notes',exact:true}).click();await page.getByRole('button',{name:/^History/}).click();await expect(page.getByRole('heading',{name:'Review launch notes',exact:true})).toBeVisible();
 });
+test('new source work is reviewed before entering Today, with area and distinct dates',async({page,request})=>{
+  await call(request,'upsert_attention_items',{batchId:'review-source',items:[syntheticObservation()]});
+  await open(page);
+  await expect(page.getByRole('radio',{name:/^Today 0/})).toBeVisible();
+  await page.getByRole('radio',{name:/^Inbox 1/}).click();
+  await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
+  await expect(page.getByRole('button',{name:/^Complete /})).toHaveCount(0);
+  const editor=page.getByRole('form',{name:'Plan Review the synthetic launch note'});
+  await editor.getByRole('combobox',{name:'Area'}).selectOption('blex');
+  await editor.getByRole('textbox',{name:'Real due date'}).fill('2026-11-05');
+  await editor.getByRole('textbox',{name:'Review date'}).fill('2026-11-04');
+  await editor.getByRole('textbox',{name:'Next action'}).fill('Ask Ayhan about learner impact.');
+  await editor.getByRole('button',{name:'Accept task'}).click();
+  await expect(page.getByRole('radio',{name:/^Today 1/})).toBeVisible();
+  await call(request,'upsert_attention_items',{batchId:'review-source-newer',items:[syntheticObservation(2)]});
+  await page.reload();
+  await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
+  await expect(page.getByText('A repeated check still asks for review.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Your next action: Ask Ayhan about learner impact.',{exact:true})).toBeVisible();
+  const saved=(await call(request,'list_attention')).items[0];
+  expect(saved.area).toBe('blex');expect(saved.dueDate).toBe('2026-11-05');expect(saved.reviewDate).toBe('2026-11-04');
+  await page.getByRole('button',{name:/^Filter by area:/}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'PEX',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'No matching tasks'})).toBeVisible();
+});
+test('Top 3 and task order are user-confirmed and keyboard reorder persists',async({page,request})=>{
+  for(const title of ['Review BLEX','Check PEX','Write feedback','Plan week'])await add(request,title);
+  await open(page);
+  for(const title of ['Review BLEX','Check PEX','Write feedback'])await actions(page,title,'Add to Top 3');
+  const chosen=(await call(request,'list_attention')).items.filter(task=>task.focusOrder);
+  expect(chosen).toHaveLength(3);
+  const fourth=page.getByRole('button',{name:'Actions for Plan week'});await fourth.click();
+  await expect(page.getByRole('menuitem',{name:'Add to Top 3'})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const reorder=page.getByRole('button',{name:'Actions for Check PEX'});await reorder.focus();await page.keyboard.press('Enter');
+  const up=page.getByRole('menuitem',{name:'Move up'});await up.focus();await page.keyboard.press('Enter');
+  await expect(page.getByText('Order saved.',{exact:true})).toBeVisible();
+  await page.reload();
+  const saved=(await call(request,'list_attention')).items;
+  const ordered=saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title);
+  expect(ordered).toEqual(['Check PEX','Review BLEX','Write feedback']);
+  const rest=saved.filter(task=>task.state==='ready').sort((a,b)=>(a.order??0)-(b.order??0)).map(task=>task.title);
+  expect(rest.indexOf('Check PEX')).toBeLessThan(rest.indexOf('Review BLEX'));
+});
+test('keyboard moves swap Top 3 membership but stop at the In progress and Ready boundary',async({page,request})=>{
+  for(const title of ['Review BLEX','Check PEX','Write feedback','Plan week'])await add(request,title);
+  await open(page);
+  for(const title of ['Review BLEX','Check PEX','Write feedback'])await actions(page,title,'Add to Top 3');
+  await actions(page,'Plan week','Start work');
+  await expect(page.getByRole('heading',{name:'In progress',exact:true})).toBeVisible();
+  await keyboardAction(page,'Write feedback','Move down');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Review BLEX','Check PEX','Plan week','Write feedback']);
+  await page.reload();
+  let saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Review BLEX','Check PEX','Plan week']);
+  expect(saved.find(task=>task.title==='Plan week')?.state).toBe('in_progress');
+  expect(saved.find(task=>task.title==='Write feedback')?.state).toBe('ready');
+  await keyboardAction(page,'Write feedback','Move up');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Review BLEX','Check PEX','Write feedback','Plan week']);
+  await add(request,'Next ready');await page.reload();
+  saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Review BLEX','Check PEX','Write feedback']);
+  await page.getByRole('button',{name:'Actions for Plan week'}).click();
+  await expect(page.getByRole('menuitem',{name:'Move down'})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Actions for Next ready'}).click();
+  await expect(page.getByRole('menuitem',{name:'Move up'})).toHaveCount(0);
+});
 test('Inbox fits long titles, mobile, dark mode, empty filters and keyboard menus',async({page,request})=>{
   mkdirSync(evidence,{recursive:true});
   const title='Review '+('a very long meeting topic '.repeat(5));await add(request,title);await open(page);
-  const menu=page.getByRole('button',{name:`Actions for ${title}`});await menu.focus();await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Snooze 1 hour'})).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toBeFocused();
+  const menu=page.getByRole('button',{name:`Actions for ${title}`});await menu.focus();await page.keyboard.press('Enter');await expect(page.getByRole('menuitem',{name:'Add to Top 3'})).toBeFocused();await page.keyboard.press('Escape');await expect(menu).toBeFocused();
   for(const width of [320,375,768,1440]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   await page.setViewportSize({width:375,height:900});await page.screenshot({path:evidence+'/inbox-mobile.png',fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Switch to dark theme'}).click();await page.screenshot({path:evidence+'/inbox-mobile-dark.png',fullPage:true,animations:'disabled'});
@@ -180,7 +255,7 @@ test('History returns to the previous task state and filters from either exit',a
   await page.getByRole('button',{name:'Back to current tasks',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Waiting for launch review',exact:true})).toBeVisible();
   await page.getByRole('button',{name:/^History/}).click();
-  const needsYou=page.getByRole('radio',{name:/^Needs you/});
+  const needsYou=page.getByRole('radio',{name:/^Today/});
   await needsYou.focus();await page.keyboard.press('Space');
   await expect(needsYou).toBeFocused();
   await expect(page.getByRole('heading',{name:'Current launch review',exact:true})).toBeVisible();
@@ -234,7 +309,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
   await page.setViewportSize({width,height:1000});
   await page.emulateMedia({colorScheme:width===375?'dark':'light'});
   await add(request,'Complete without flashing');await add(request,'Keep this task');await add(request,'Another remaining task');await open(page);
-  expect((await page.getByRole('heading',{name:'Your attention list',exact:true}).boundingBox())!.y).toBeLessThan(120);
+  expect((await page.getByRole('heading',{name:'Your working day',exact:true}).boundingBox())!.y).toBeLessThan(120);
   const reader=page.locator('.inbox-reader'),before=(await reader.boundingBox())!;
   let release!:()=>void,started!:()=>void;
   const held=new Promise<void>(resolve=>{release=resolve;}),sending=new Promise<void>(resolve=>{started=resolve;});
@@ -263,7 +338,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
     expect((await reader.boundingBox())!.y).toBeCloseTo(before.y,1);
     await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
     await expect(notice).toHaveCount(0);
-    const saved=await call(request,'list_attention');expect(saved.items.find(task=>task.title==='Complete without flashing')?.state).toBe('needs_you');
+    const saved=await call(request,'list_attention');expect(saved.items.find(task=>task.title==='Complete without flashing')?.state).toBe('ready');
   }finally{release();}
 });
 
@@ -300,4 +375,173 @@ test('completion notification remains in view on a long narrow task list',async(
   expect((await page.locator('.inbox-footer').boundingBox())!.y).toBeGreaterThan(900);
   await notice.getByRole('button',{name:'Dismiss notification',exact:true}).click();
   await expect(notice).toHaveCount(0);
+});
+
+for(const scenario of [
+  {sourceState:'needs_you',workflowState:'waiting',tab:'Waiting'},
+  {sourceState:'waiting',workflowState:'in_progress',tab:'Today'},
+] as const)test(`reopening restores ${scenario.workflowState} and clears task filters`,async({page,request})=>{
+  const title='Restore saved workflow';
+  const created=await call(request,'create_personal_task',{operationId:crypto.randomUUID(),title,sourceState:scenario.sourceState});
+  const task=created.items.find(item=>item.title===title)!;
+  await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,workflowState:scenario.workflowState});
+  await open(page);await page.getByRole('radio',{name:new RegExp(`^${scenario.tab} `)}).click();
+  await page.getByRole('button',{name:`Complete ${title}`,exact:true}).click();
+  await page.getByRole('button',{name:/^History /}).click();
+  await page.getByRole('button',{name:'Filter by source: All sources'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Personal',exact:true}).click();
+  await page.getByRole('button',{name:'Filter by area: All areas'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Personal',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search tasks'}).fill(title);
+  await page.locator('.inbox-task-open').filter({hasText:title}).click();
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:new RegExp(`^${scenario.tab} `)})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:title,exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'Search tasks'})).toHaveValue('');
+  await expect(page.getByRole('button',{name:'Filter by source: All sources'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Filter by area: All areas'})).toBeVisible();
+  expect((await call(request,'list_attention')).items.find(item=>item.id===task.id)?.state).toBe(scenario.workflowState);
+});
+
+test('reopening a dismissed Inbox task returns to Inbox',async({page,request})=>{
+  await call(request,'upsert_attention_items',{batchId:'reopen-inbox',items:[syntheticObservation()]});
+  await open(page);await page.getByRole('radio',{name:/^Inbox /}).click();
+  await actions(page,'Review the synthetic launch note','Dismiss');await page.getByRole('button',{name:'Confirm dismiss'}).click();
+  await page.getByRole('button',{name:/^History /}).click();await page.getByRole('radio',{name:/^Dismissed /}).click();
+  await page.locator('.inbox-task-open').click();await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:/^Inbox /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
+});
+
+test('an interrupted committed reopen recovers into Waiting without another decision',async({page,request})=>{
+  const created=await add(request,'Recover reopened workflow');const task=created.items[0];
+  const planned=await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,workflowState:'waiting'});
+  await call(request,'decide_attention_item',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:planned.items[0].version,action:'complete'});
+  await open(page);await page.getByRole('button',{name:/^History /}).click();await page.locator('.inbox-task-open').click();
+  let reopens=0;
+  await page.route('**/api/tool',async route=>{
+    const body=route.request().postDataJSON();
+    if(body.name==='decide_attention_item'&&body.arguments.action==='reopen'){
+      reopens++;await route.fetch();await route.abort('failed');
+    }else await route.continue();
+  });
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Recover reopened workflow',exact:true})).toBeVisible();
+  await expect(page.getByText('Check an interrupted save',{exact:true})).toHaveCount(0);expect(reopens).toBe(1);
+  const db=new DatabaseSync(join(dir,'test.sqlite'));try{expect(db.prepare("SELECT count(*) AS count FROM history WHERE task_id=? AND kind='reopen'").get(task.id)?.count).toBe(1);}finally{db.close();}
+});
+
+test('reopen navigation uses the authoritative response rather than the previous view',async({page,request})=>{
+  const created=await add(request,'Latest reopened workflow');const task=created.items[0];
+  await call(request,'decide_attention_item',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:task.version,action:'complete'});
+  await open(page);await page.getByRole('button',{name:/^History /}).click();await page.locator('.inbox-task-open').click();
+  await page.route('**/api/tool',async route=>{
+    const body=route.request().postDataJSON();
+    if(body.name==='decide_attention_item'&&body.arguments.action==='reopen'){
+      const result=await route.fetch();const reopened=await result.json() as Result;
+      const saved=await call(request,'plan_attention_task',{operationId:crypto.randomUUID(),id:task.id,expectedVersion:reopened.items[0].version,workflowState:'waiting'});
+      await route.fulfill({response:result,json:saved});
+    }else await route.continue();
+  });
+  await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
+  await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Latest reopened workflow',exact:true})).toBeVisible();
+});
+
+async function pollSaved(page:Page){
+  const response=page.waitForResponse(res=>res.url().endsWith('/api/tool')&&res.request().postDataJSON().name==='list_attention');
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await response;
+}
+test('task drafts survive updates and explicitly reconcile changed fields',async({page,request})=>{
+  const created=await add(request,'Edit this plan');const id=created.items[0].id;
+  await open(page);await page.locator('.inbox-task-open').click();
+  const editor=page.locator('.inbox-plan-editor'),name=editor.getByLabel('Task name',{exact:true});
+  const update=async(patch:Record<string,unknown>)=>{
+    const current=(await call(request,'list_attention')).items.find(task=>task.id===id)!;
+    await call(request,'plan_attention_task',{id,expectedVersion:current.version,operationId:crypto.randomUUID(),...patch});
+    await pollSaved(page);
+  };
+  await update({nextAction:'Latest clean action'});
+  await expect(editor.getByLabel('Next action')).toHaveValue('Latest clean action');
+  await name.fill('My unfinished title');await editor.getByLabel('Real due date').fill('2026-12-12');await name.focus();
+  await update({nextAction:'New action from another view',area:'blex'});
+  await expect(name).toHaveValue('My unfinished title');await expect(name).toBeFocused();
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  for(const theme of ['light','dark'] as const){
+    await page.emulateMedia({colorScheme:theme});
+    if(await page.locator('html').getAttribute('data-theme')!==theme)await page.getByRole('button',{name:`Switch to ${theme} theme`}).click();
+    await page.setViewportSize({width:theme==='light'?1440:375,height:1100});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+    await editor.screenshot({path:`../../.data/task-draft-conflict-${theme}.png`});
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await editor.getByRole('button',{name:'Keep my edits'}).click();
+  await expect(name).toHaveValue('My unfinished title');
+  await expect(editor.getByLabel('Real due date')).toHaveValue('2026-12-12');
+  await expect(editor.getByLabel('Next action')).toHaveValue('New action from another view');
+  await expect(editor.getByRole('combobox',{name:'Area'})).toHaveValue('blex');
+  await update({reviewDate:'2026-12-10'});
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  await editor.getByRole('button',{name:'Load latest'}).click();
+  await expect(name).toHaveValue('Edit this plan');
+  await expect(editor.getByLabel('Review date')).toHaveValue('2026-12-10');
+  await name.fill('My saved title');
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByText('Task plan saved.',{exact:true})).toBeVisible();
+  await update({title:'Updated after my save'});
+  await expect(name).toHaveValue('Updated after my save');
+  await expect(editor.getByRole('status')).toHaveCount(0);
+});
+test('failed and conflicting plan saves retain drafts and use the original version',async({page,request})=>{
+  const created=await add(request,'Save failure task');const task=created.items[0];
+  await open(page);await page.locator('.inbox-task-open').click();
+  const editor=page.locator('.inbox-plan-editor'),name=editor.getByLabel('Task name',{exact:true});
+  await name.fill('Keep this draft');let fail=true;
+  await page.route('**/api/tool',async route=>{
+    if(fail&&route.request().postDataJSON().name==='plan_attention_task'){
+      fail=false;await route.fulfill({status:503,json:{error:'Fixture save unavailable'}});
+    }else await route.continue();
+  });
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Fixture save unavailable'})).toBeVisible();
+  await expect(name).toHaveValue('Keep this draft');
+  await call(request,'plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:crypto.randomUUID(),nextAction:'Concurrent saved action'});
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Task changed in another view'})).toBeVisible();
+  await expect(name).toHaveValue('Keep this draft');
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  expect((await call(request,'list_attention')).items[0].title).toBe('Save failure task');
+  await editor.getByRole('button',{name:'Keep my edits'}).click();
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByText('Task plan saved.',{exact:true})).toBeVisible();
+  const saved=(await call(request,'list_attention')).items[0];
+  expect(saved.title).toBe('Keep this draft');expect(saved.nextAction).toBe('Concurrent saved action');
+});
+for(const recovered of [false,true])test(`personal creation clears filters after ${recovered?'recovery':'immediate save'}`,async({page,request})=>{
+  await add(request,'Existing task');await open(page);
+  await page.getByRole('button',{name:'Filter by source: All sources'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Slack',exact:true}).click();
+  await page.getByRole('button',{name:'Filter by area: All areas'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'BLEX',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search tasks'}).fill('cannot match new task');
+  await page.getByRole('button',{name:'Add task',exact:true}).click();
+  await page.getByLabel('Task name',{exact:true}).fill('New visible task');
+  if(recovered){
+    await page.getByRole('radio',{name:'Waiting',exact:true}).click();
+    await page.route('**/api/tool',async route=>{
+      if(route.request().postDataJSON().name==='create_personal_task'){await route.fetch();await route.abort('failed');}
+      else await route.continue();
+    });
+  }
+  await page.getByRole('button',{name:'Save task',exact:true}).click();
+  if(recovered){await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();await pollSaved(page);}
+  await expect(page.getByRole('radio',{name:recovered?/^Waiting /:/^Today /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'New visible task',exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'Search tasks'})).toHaveValue('');
+  await expect(page.getByRole('button',{name:'Filter by source: All sources'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Filter by area: All areas'})).toBeVisible();
+  expect((await call(request,'list_attention')).items.filter(task=>task.title==='New visible task')).toHaveLength(1);
 });

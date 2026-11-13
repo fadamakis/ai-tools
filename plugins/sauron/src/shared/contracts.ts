@@ -146,6 +146,26 @@ export const personalTaskSchema = z.strictObject({
   sourceState: z.enum(['needs_you', 'waiting']).default('needs_you'),
 });
 
+export const workAreas = ['blex', 'pex', 'personal', 'unassigned'] as const;
+export const workflowStates = ['inbox', 'ready', 'in_progress', 'waiting'] as const;
+export const planningTimeZone = 'Europe/Berlin';
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => !Number.isNaN(Date.parse(value)) && new Date(value+'T00:00:00Z').toISOString().startsWith(value), 'Use a valid calendar date.');
+export const planTaskSchema = z.strictObject({
+  operationId:z.string().uuid(), id:taskIdSchema, expectedVersion:z.number().int().nonnegative(),
+  workflowState:z.enum(workflowStates).optional(), area:z.enum(workAreas).optional(),
+  title:z.string().trim().min(1).max(160).optional(), nextAction:z.string().trim().max(400).optional(),
+  dueDate:calendarDate.nullable().optional(), reviewDate:calendarDate.nullable().optional(),
+}).refine(value=>['workflowState','area','title','nextAction','dueDate','reviewDate'].some(key=>key in value),'Choose a change to save.');
+export const orderTasksSchema=z.strictObject({
+  operationId:z.string().uuid(), expectedStoreId:z.string().uuid(),
+  orderedIds:z.array(taskIdSchema), focusIds:z.array(taskIdSchema).max(3),
+  expectedVersions:z.array(z.strictObject({id:taskIdSchema,version:z.number().int().nonnegative()})),
+});
+export const proposeCodexFollowupsSchema=z.strictObject({
+  expectedStoreId:z.string().uuid(), threadId:z.string().uuid(),
+  proposals:z.array(z.strictObject({actionKey:z.string().trim().min(1).max(500),title:z.string().trim().min(1).max(160),nextAction:z.string().trim().max(400).default('')})).min(1).max(20),
+});
+
 export const trackCodexThreadsSchema = z.strictObject({
   expectedStoreId: z.string().uuid(),
   threads: z.array(z.strictObject({
@@ -160,7 +180,9 @@ export type Observation = z.infer<typeof observationSchema>;
 export type DecisionInput = z.infer<typeof decisionSchema>;
 export type PersonalTaskInput = z.infer<typeof personalTaskSchema>;
 export type SourceKind = typeof sourceKinds[number];
-export type TaskState = 'needs_you' | 'waiting' | 'done' | 'snoozed' | 'dismissed';
+export type WorkArea = typeof workAreas[number];
+export type WorkflowState = typeof workflowStates[number];
+export type TaskState = WorkflowState | 'needs_you' | 'done' | 'snoozed' | 'dismissed';
 type PersonalTask = Omit<Observation, 'provider' | 'sourceUrl' | 'lastCheckedAt'> & {
   provider: 'personal'; sourceUrl: null; lastCheckedAt: null;
 };
@@ -173,6 +195,19 @@ export type Task = (Observation | PersonalTask) & {
   updatedAt: string;
   createdAt?: string;
   state: TaskState;
+  workflowState?: WorkflowState;
+  area?: WorkArea;
+  userTitle?: string | null;
+  plannedAction?: string | null;
+  dueDate?: string | null;
+  reviewDate?: string | null;
+  order?: number | null;
+  focusOrder?: number | null;
+  acceptedAt?: string | null;
+  sourceTitle?: string;
+  sourceNextAction?: string;
+  priorityReason?: string | null;
+  suggestedFocus?: boolean;
 };
 export function canonicalDiscussionUrl(value:string):string {
   const url=new URL(value),id=url.pathname.split('/').at(-1)!;
@@ -187,7 +222,7 @@ export const saveDiscussionSchema=linkDiscussionSchema.extend({url:z.string().ma
 })});
 export type DiscussionLink={taskId:string;url:string;createdAt:string};
 export type View = { items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
-export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[] };
+export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[];proposedFollowups?:{id:string;status:'created'|'already_proposed'}[] };
 
 export const syntheticObservation = (version = 1): Observation => ({
   obligationKey: 'synthetic:review-proof', sourceVersion: version, provider: 'manual',

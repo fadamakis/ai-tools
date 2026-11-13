@@ -61,9 +61,11 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     await expect(app.getByText('MCP app · Local store')).toBeVisible();
     await app.getByRole('button',{name:'Create synthetic task',exact:true}).click();
     await app.getByRole('button',{name:'Close diagnostics'}).click();
+    await app.getByRole('radio',{name:/^Inbox /}).click();
     await app.getByRole('button',{name:/^Review the synthetic launch note/}).click();
     await app.getByRole('button',{name:'Open sample source'}).click();
     await expect(page.locator('output')).toHaveText('https://example.invalid/attention/review-proof');
+    await app.getByRole('button',{name:'Accept task'}).click();
     const beforeComplete=(await client.callTool({name:'list_attention',arguments:{}})).structuredContent as any;
     await app.getByRole('button',{name:/^Complete /}).click();
     await expect(app.getByRole('button',{name:/^History 1/})).toBeVisible();
@@ -71,10 +73,12 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     expect((result.structuredContent as any).items[0].state).toBe('done');
     // Two responses can carry the same millisecond readAt. A delayed pre-save
     // host result must not visually undo the newer saved task version.
-    const unrelated=(await client.callTool({name:'upsert_attention_items',arguments:{batchId:'unrelated-saved-task',items:[{
+    const unreviewed=(await client.callTool({name:'upsert_attention_items',arguments:{batchId:'unrelated-saved-task',items:[{
       obligationKey:'synthetic:waiting',sourceVersion:1,provider:'manual',title:'Unrelated saved task',nextAction:'Waiting for a synthetic fixture.',
       sourceState:'waiting',sourceUrl:'https://example.invalid/unrelated',lastCheckedAt:new Date().toISOString(),
     }]}})).structuredContent as any;
+    const waitingCandidate=unreviewed.items.find((task:any)=>task.id==='synthetic:waiting');
+    const unrelated=(await client.callTool({name:'plan_attention_task',arguments:{id:waitingCandidate.id,expectedVersion:waitingCandidate.version,operationId:crypto.randomUUID(),workflowState:'waiting'}})).structuredContent as any;
     await page.evaluate(view=>(window as any).sendSauronView(view),{...unrelated,
       items:unrelated.items.map((task:any)=>task.id===beforeComplete.items[0].id?beforeComplete.items[0]:task),
       readAt:(result.structuredContent as any).readAt});
@@ -110,13 +114,15 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     await app.getByRole('button',{name:'Reopen task',exact:true}).click();
     await expect(app.getByRole('heading',{name:'Personal task through MCP Apps',exact:true})).toBeVisible();
     const reopened=await client.callTool({name:'list_attention',arguments:{}});
-    expect((reopened.structuredContent as any).items.find((t:any)=>t.provider==='personal').state).toBe('needs_you');
+    expect((reopened.structuredContent as any).items.find((t:any)=>t.provider==='personal').state).toBe('ready');
     const seeded=await client.callTool({name:'upsert_attention_items',arguments:{batchId:'slack-reply-fixture',items:[{
       obligationKey:'slack:'+createHash('sha256').update(JSON.stringify([canonicalSourceUrl('slack','https://example.slack.com/archives/C123/p1792313076000000'),'Please review'])).digest('hex'),provider:'slack',sourceVersion:1,sourceKind:'slack',
       sourceUrl:'https://example.slack.com/archives/C123/p1792313076000000',actionKey:'Please review',
       title:'Slack discussion through MCP Apps',nextAction:'Reply to the discussion.',sourceState:'needs_you',resolved:false,lastCheckedAt:new Date().toISOString(),
     }]}});
     expect(seeded.isError).toBeUndefined();
+    const slackCandidate=(seeded.structuredContent as any).items.find((task:any)=>task.provider==='slack');
+    await client.callTool({name:'plan_attention_task',arguments:{id:slackCandidate.id,expectedVersion:slackCandidate.version,operationId:crypto.randomUUID(),workflowState:'ready'}});
     // Refresh is a source scan and would resolve this unobserved fixture.
     // Deliver the saved tool result as the host does after an explicit upsert.
     await page.evaluate(()=>(window as any).sendSauronSavedView());

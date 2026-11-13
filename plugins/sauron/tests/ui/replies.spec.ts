@@ -26,7 +26,7 @@ test.beforeEach(async()=>{
   dir=mkdtempSync(join(tmpdir(),'sauron-reply-ui-'));dbPath=join(dir,'test.sqlite');port++;origin='http://127.0.0.1:'+port;
   const store=new SauronStore(dbPath);try{store.finishScan(store.beginScan().run.id,{sources:{slack:{status:'checked',detail:'Test'},granola:{status:'checked',detail:'Test'}},items:[{
     provider:'slack',sourceUrl:'https://example.slack.com/archives/C123/p1792313076000000',actionKey:'Please review',title:'Discuss the example',nextAction:'Reply to the discussion.',sourceState:'needs_you',resolved:false,
-  }]});}finally{store.close();}
+  }]});const task=store.view().items[0];store.planTask({id:task.id,expectedVersion:task.version,operationId:crypto.randomUUID(),workflowState:'ready'});}finally{store.close();}
   await start();
 });
 test.afterEach(async()=>{await stop();rmSync(dir,{recursive:true,force:true});});
@@ -49,7 +49,7 @@ test('prepare, edit, persist, copy and send only the reviewed text to its origin
   expect(sent).toEqual([{channel_id:'C123',thread_ts:'1792313070.000000',message:text,reply_broadcast:false,unfurl_app_links:false}]);
   await page.reload();await page.getByRole('button',{name:/^Discuss the example/}).click();await page.getByRole('button',{name:'Prepare reply'}).click();await expect(page.getByText('Sent to Slack',{exact:true})).toBeVisible();
   const response=await request.post(origin+'/api/tool',{data:{name:'list_attention',arguments:{}}});const view=await response.json() as Result;
-  expect(view.items[0].userDecision).toBeNull();expect(view.items[0].state).toBe('needs_you');
+  expect(view.items[0].userDecision).toBeNull();expect(view.items[0].state).toBe('ready');
 });
 test('unconfirmed delivery keeps the copyable draft and blocks an automatic or repeated send',async({page})=>{
   await stop();await start(true);await page.goto(origin);await page.getByRole('button',{name:/^Discuss the example/}).click();await page.getByRole('button',{name:'Prepare reply'}).click();
