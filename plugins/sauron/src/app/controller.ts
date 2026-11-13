@@ -46,7 +46,7 @@ export function useSauronController(){
   async function run(work:()=>Promise<Result>, success?:(saved:Result)=>void, failure?:()=>void){
     if(gate.current)return;
     gate.current=true;setBusy(true);setError('');
-    try{const saved=await work();apply(saved);success?.(saved);}
+    try{const saved=await work();apply(saved);success?.(saved);return saved;}
     catch(e){setError(e instanceof Error?e.message:'Request failed. Refresh to check saved state.');failure?.();}
     finally{gate.current=false;setBusy(false);}
   }
@@ -100,9 +100,9 @@ export function useSauronController(){
       remember(null);setPending(null);setRecovering(false);setNotice(pending.kind==='create'?'Task saved.':'Saved decision confirmed.');
       if(pending.kind==='decision'){
         setReopenId(pending.input.action==='reopen'?null:task!.id);
-        if(pending.input.action==='reopen')selectReopened(task!);
+        if(pending.input.action==='reopen')selectTaskWorkflow(task!);
       }
-      if(pending.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(pending.input.sourceState==='waiting'?'waiting':'today');}
+      if(pending.kind==='create')finishCreation(task!);
     }
   },[view,pending]);
   function save(operation:Pending){
@@ -115,21 +115,29 @@ export function useSauronController(){
       setReopenId(operation.kind==='decision'&&operation.input.action!=='reopen'?operation.input.id:null);
       if(operation.kind==='decision'&&operation.input.action==='reopen'){
         const reopened=saved.items.find(task=>task.id===operation.input.id);
-        if(reopened)selectReopened(reopened);
+        if(reopened)selectTaskWorkflow(reopened);
       }
-      if(operation.kind==='create'){storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);setFilter(operation.input.sourceState==='waiting'?'waiting':'today');setSource('all');setQuery('');}
+      if(operation.kind==='create'){
+        const created=saved.items.find(task=>task.id==='personal:'+operation.input.operationId);
+        if(created)finishCreation(created);
+      }
     },()=>setRecovering(true));
   }
   function decide(task:Task,action:DecisionInput['action']){
     save({kind:'decision',input:{id:task.id,action,expectedVersion:task.version,operationId:operationId(),
       ...(action==='snooze'?{snoozedUntil:new Date(Date.now()+3_600_000).toISOString()}:{}),}});
   }
-  function plan(task:Task,patch:Record<string,unknown>){
-    if(!client)return;
-    void run(()=>client.call('plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:operationId(),...patch}),()=>{
+  function finishCreation(task:Task){
+    storage.write(draftKey,null);setDraft(emptyDraft);setAdding(false);selectTaskWorkflow(task);
+  }
+  async function plan(task:Task,patch:Record<string,unknown>){
+    if(!client||gate.current)return;
+    const saved=await run(()=>client.call('plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:operationId(),...patch}),()=>{
       setNotice('Task plan saved.');
       if('workflowState' in patch)setFilter(patch.workflowState==='waiting'?'waiting':patch.workflowState==='inbox'?'inbox':'today');
     });
+    if(saved)return saved.items.find(item=>item.id===task.id);
+    try{apply(await client.call('list_attention'));}catch{}
   }
   function order(orderedIds:string[],focusIds:string[]){
     if(!client||!view)return;
@@ -163,7 +171,7 @@ export function useSauronController(){
   const showTools = !!view && (stateItems.length > 0 || hasFilters);
   const reopenTask = allTasks.find(task => task.id === reopenId && task.userDecision !== null
     && (task.state === 'done' || task.state === 'dismissed' || task.state === 'snoozed'));
-  function selectReopened(task:Task){
+  function selectTaskWorkflow(task:Task){
     const workflow=task.workflowState??(task.sourceState==='waiting'?'waiting':'ready');
     selectState(workflow==='waiting'?'waiting':workflow==='inbox'?'inbox':'today');
   }
