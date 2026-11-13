@@ -1,0 +1,70 @@
+plugins/workbench/README.md
+  s_af23be25f95f24::t_d4c3e04e308018 26-34
+plugins/workbench/references/board-launch.md
+  s_af23be25f95f24::t_cc1886b4609d7f 102
+  s_af23be25f95f24::t_d4c3e04e308018 19-35,40-44,49-53,57-72
+  s_af23be25f95f24::t_121339979d1e00 54-56
+  s_af23be25f95f24::t_24bee85b7e34cf 36-39
+  s_af23be25f95f24::t_9f5ba13a537510 45-48
+plugins/workbench/app/presentation.mjs
+  s_af23be25f95f24::t_4d0cc979755fc1 2,29,36-44,46-51,53-55,57-60,70,88
+  s_af23be25f95f24::t_b5ccc0d6f9ebea 7,45
+  s_af23be25f95f24::t_b318348e0d5919 8,52,56
+docs/compatibility.md
+  s_af23be25f95f24::t_b318348e0d5919 19-25
+plugins/workbench/skills/start/SKILL.md
+  s_af23be25f95f24::t_cc1886b4609d7f 14-16
+plugins/workbench/server/index.mjs
+  s_af23be25f95f24::t_121339979d1e00 81
+  s_af23be25f95f24::t_4d0cc979755fc1 77,83-84
+plugins/workbench/tests/recovery.test.mjs
+  s_af23be25f95f24::t_f2b40cee3a0fcd 1-19,24-101
+  s_af23be25f95f24::t_b5ccc0d6f9ebea 20-23
+plugins/workbench/app/App.jsx
+  s_af23be25f95f24::t_d4c3e04e308018 4,36-42,44-45,63-64
+  s_af23be25f95f24::t_dc11b8077e60c7 274,292
+  s_af23be25f95f24::t_9f5ba13a537510 43
+  s_af23be25f95f24::t_87a23319215fa0 35,47,58,273,282-283
+plugins/workbench/app/app.css
+  s_af23be25f95f24::t_d4c3e04e308018 99,101-102
+plugins/workbench/references/workflow.md
+  s_af23be25f95f24::t_d4c3e04e308018 63-64
+  s_af23be25f95f24::t_9c3180dc3c8698 65-70
+plugins/workbench/app/HowItWorks.jsx
+  s_af23be25f95f24::t_cc1886b4609d7f 23
+plugins/workbench/tests/ui/board.spec.mjs
+  s_af23be25f95f24::t_dc11b8077e60c7 378
+  s_af23be25f95f24::t_24bee85b7e34cf 403,408
+plugins/workbench/server/launches.mjs
+  s_af23be25f95f24::t_4d0cc979755fc1 18,23,49-50,58
+  s_af23be25f95f24::t_9f5ba13a537510 39
+plugins/workbench/tests/ui/recovery.spec.mjs
+  s_af23be25f95f24::t_24bee85b7e34cf 1-53
+plugins/workbench/app/controller.mjs
+  s_af23be25f95f24::t_4d0cc979755fc1 9-14,59,128,133,141-143
+  s_b68d44f896e34b::t_6556c121d35331 144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1d96d7c684fc6d54806755434d3545fcd364f23b",
+  "prompts": {},
+  "sessions": {
+    "s_af23be25f95f24": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d58c-bf3d-7963-9a87-5c7ad3bf0c30",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    },
+    "s_b68d44f896e34b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d51b-701a-7601-84f9-609185ac3506",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
