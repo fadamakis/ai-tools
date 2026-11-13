@@ -11,7 +11,9 @@ description: >
 # Start or resume Workbench
 
 For `board-request REQUEST_ID`, load [the board launch coordinator](../../references/board-launch.md)
-and follow the saved delivery mode. A direct draft runs in this chat; legacy requests use the native handoff.
+and follow the saved delivery mode. A direct draft runs in this chat; a recovery
+draft checks and resumes the saved worker; legacy requests use the native handoff.
+Finish that coordinator route before considering ordinary stage selection below.
 
 For an explicit autopilot-mode request, use [autopilot](../autopilot/SKILL.md), which defines its publication and PR-maintenance scope. Ordinary start does not imply autopilot mode.
 

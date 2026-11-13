@@ -60,7 +60,14 @@ tested. Do not duplicate or generate structured status fields into the task note
 On revision conflict, re-read and reconcile before updating; do not
 overwrite another chat's progress. Do not claim a pending or skipped check passed.
 Use `workbench.pr_refresh` only when the user requests a current GitHub check or
-the active delivery stage already requires one. Only a verified merge reaches Done.
+the active delivery stage already requires one. Done requires verified coverage of
+all accepted deliverables: merged PRs or verified non-PR artifacts, a completed
+worker and no pending review. Save scope, deliverable and verification observations
+at handoff using [delivery recovery](delivery-recovery.md), so a later recovery can
+establish what finished without reconstructing the scope from chat history. Record
+a completed worker observation only after its owning turn has actually finished
+and been read; do not invent a final event while still running. Recovery can add
+that later observation. A user or legacy pause is not a completion checkpoint.
 Open `workbench.task` with the exact task ID when a conversation panel is useful.
 
 If preview tools or note writes are unavailable, preserve the task summary in the
