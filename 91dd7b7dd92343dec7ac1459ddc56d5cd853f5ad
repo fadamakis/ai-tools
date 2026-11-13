@@ -1,0 +1,26 @@
+plugins/workbench/tests/mcp.test.mjs
+  s_fdd038876479aa::t_5917aff8950e21 9,79-103
+  s_fdd038876479aa::t_2a5561af39c807 104
+plugins/workbench/server/index.mjs
+  s_fdd038876479aa::t_c982f9361cbb7e 65
+plugins/workbench/server/pr-observation.mjs
+  s_fdd038876479aa::t_9cdce2cc4a1398 1-15
+plugins/workbench/server/store.mjs
+  s_fdd038876479aa::t_e8b5a0716bd99c 5,8-9,32-33,112,207,210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "91dd7b7dd92343dec7ac1459ddc56d5cd853f5ad",
+  "prompts": {},
+  "sessions": {
+    "s_fdd038876479aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15a74-9309-71b1-967c-27e9c8b98240",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}

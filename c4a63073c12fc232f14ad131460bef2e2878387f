@@ -1,0 +1,557 @@
+.gitattributes
+  s_fdd038876479aa::t_857deb7da9e90a 1-2
+.github/workflows/ci.yml
+  s_fdd038876479aa::t_a2281235dbde12 1-66
+.gitignore
+  s_fdd038876479aa::t_5dacbf11ec79b6 1-17
+.npmrc
+  s_fdd038876479aa::t_6ff66b90bf8a14 1
+AGENTS.md
+  s_fdd038876479aa::t_79b6ba86d88f69 1-3
+README.md
+  s_fdd038876479aa::t_2dcfb126665153 1-40
+docs/compatibility.md
+  s_fdd038876479aa::t_199c40e00343b9 1-37
+docs/rollout.md
+  s_fdd038876479aa::t_9ac1a7bd93de6c 1-25
+docs/source-baselines.json
+  s_fdd038876479aa::t_ac24358ff40885 1-393
+docs/workspace-setup.md
+  s_fdd038876479aa::t_473b098cd56c14 1-24
+package.json
+  s_fdd038876479aa::t_9390dcfb539b67 1-49
+packages/ui/dialogs.jsx
+  s_fdd038876479aa::t_8e9a6f1fca63b7 1-47
+packages/ui/index.d.ts
+  s_fdd038876479aa::t_943ba0ee3cf30b 1-16
+packages/ui/index.jsx
+  s_fdd038876479aa::t_089bb2e1dd16d2 1-17
+packages/ui/package.json
+  s_fdd038876479aa::t_028b78b2326591 1-20
+packages/ui/theme.css
+  s_fdd038876479aa::t_bbdae5756b2f16 1-17
+playwright.config.mjs
+  s_fdd038876479aa::t_83518e3031e5bf 1-4
+plugins/sauron/.codex-plugin/plugin.json
+  s_fdd038876479aa::t_68625cf4232885 1-24
+plugins/sauron/.gitignore
+  s_fdd038876479aa::t_b3fc0c83e446e2 1-8
+plugins/sauron/README.md
+  s_fdd038876479aa::t_d6248adff67894 1-197
+plugins/sauron/THIRD_PARTY_NOTICES.md
+  s_fdd038876479aa::t_51f0b95ab2f91d 1-3237
+plugins/sauron/assets/sidebar-icon.svg
+  s_fdd038876479aa::t_828be10b9a479d 1
+plugins/sauron/docs/Sauron-consolidated-plan.md
+  s_fdd038876479aa::t_2c26cb4e90e633 1-158
+plugins/sauron/docs/compatibility.md
+  s_fdd038876479aa::t_c1a734b096cccf 1-147
+plugins/sauron/docs/dot-compatibility-request.md
+  s_fdd038876479aa::t_42fe67eee0f226 1-76
+plugins/sauron/docs/dot-managed-0.6.1.md
+  s_fdd038876479aa::t_6ea7cecef20b2b 1-226
+plugins/sauron/docs/dot-sync-0.6.0.md
+  s_fdd038876479aa::t_431c782e641394 1-149
+plugins/sauron/docs/inbox-0.4.2.md
+  s_fdd038876479aa::t_3652fc4aed237c 1-35
+plugins/sauron/docs/live-attention-0.3.0.md
+  s_fdd038876479aa::t_2827aa8bcbfef8 1-72
+plugins/sauron/docs/local-tool-check-task.md
+  s_fdd038876479aa::t_80ba7620b5e935 1-31
+plugins/sauron/docs/morning-brief-bridge.md
+  s_fdd038876479aa::t_65f6246e49dc36 1-90
+plugins/sauron/docs/reading-pane-0.5.0.md
+  s_fdd038876479aa::t_a65633fe69d597 1-48
+plugins/sauron/docs/refresh-icon-0.2.3.md
+  s_fdd038876479aa::t_7aa685451e3966 1-15
+plugins/sauron/docs/repair-0.6.3.md
+  s_fdd038876479aa::t_400e373b831472 1-93
+plugins/sauron/docs/sidebar-icon-0.2.1.md
+  s_fdd038876479aa::t_b523f306a610ef 1-24
+plugins/sauron/docs/slack-replies-0.4.0.md
+  s_fdd038876479aa::t_f97643691a4375 1-22
+plugins/sauron/docs/sync-attention.schema.json
+  s_fdd038876479aa::t_1cdc316dce3d3c 1-309
+plugins/sauron/docs/ui-polish-0.3.1.md
+  s_fdd038876479aa::t_6d342477b1d0b4 1-26
+plugins/sauron/docs/ui-update-0.2.0.md
+  s_fdd038876479aa::t_a800e82a0a0c86 1-97
+plugins/sauron/docs/ui-update-0.2.2.md
+  s_fdd038876479aa::t_7e4073f9e733ed 1-79
+plugins/sauron/docs/verification.md
+  s_fdd038876479aa::t_38c6c774745c9e 1-261
+plugins/sauron/mcp.json
+  s_fdd038876479aa::t_4e4619fb06490e 1-13
+plugins/sauron/package.json
+  s_fdd038876479aa::t_cbab9ea84d811d 1-43
+plugins/sauron/playwright.config.ts
+  s_fdd038876479aa::t_34506c02bbdd7d 1-5
+plugins/sauron/plugin.json
+  s_fdd038876479aa::t_1947a3bda38af7 1-27
+plugins/sauron/scripts/build.mjs
+  s_fdd038876479aa::t_b2007bba5319d1 1-23
+plugins/sauron/scripts/check-attention.mjs
+  s_fdd038876479aa::t_c9f100005e4227 1-51
+plugins/sauron/scripts/check-host-plugin.mjs
+  s_fdd038876479aa::t_cd2fa723ea0655 1-71
+plugins/sauron/scripts/migrate-data.mjs
+  s_fdd038876479aa::t_aa1848fe72bb68 1-48
+plugins/sauron/scripts/prepare-local-plugin.d.mts
+  s_fdd038876479aa::t_56527085c4e41d 1-5
+plugins/sauron/scripts/prepare-local-plugin.mjs
+  s_fdd038876479aa::t_3e1c400d3da2e2 1-45
+plugins/sauron/scripts/sync-attention.mjs
+  s_fdd038876479aa::t_89207492e66cf3 1-22
+plugins/sauron/skills/update-sauron/SKILL.md
+  s_fdd038876479aa::t_762394a5d01077 1-160
+plugins/sauron/src/app/DiscussTask.tsx
+  s_fdd038876479aa::t_ef242b68032e43 1-23
+plugins/sauron/src/app/InboxBoundary.tsx
+  s_fdd038876479aa::t_b2265f81a0afc4 1-6
+plugins/sauron/src/app/InboxView.tsx
+  s_fdd038876479aa::t_e270a43540cf22 1-62
+plugins/sauron/src/app/ReplyComposer.tsx
+  s_fdd038876479aa::t_fddba08c2a15ac 1-102
+plugins/sauron/src/app/TaskReader.tsx
+  s_fdd038876479aa::t_c1cb4995a8cd73 1-83
+plugins/sauron/src/app/UpdateStatus.tsx
+  s_fdd038876479aa::t_09749c20d6a02e 1-43
+plugins/sauron/src/app/UpdatedTime.tsx
+  s_fdd038876479aa::t_2afa0ea58cddd7 1-13
+plugins/sauron/src/app/assets.d.ts
+  s_fdd038876479aa::t_cf3cc38b8f8c8a 1-3
+plugins/sauron/src/app/client.ts
+  s_fdd038876479aa::t_55abcaeeef346b 1-51
+plugins/sauron/src/app/controller.ts
+  s_fdd038876479aa::t_7f5516eac31ebf 1-153
+plugins/sauron/src/app/discussion.ts
+  s_fdd038876479aa::t_49ef12869882c7 1-8
+plugins/sauron/src/app/icons.tsx
+  s_fdd038876479aa::t_4b8051012d35ed 1-45
+plugins/sauron/src/app/inbox.css
+  s_fdd038876479aa::t_5c6c40bc2eb29f 1-99
+plugins/sauron/src/app/main.tsx
+  s_fdd038876479aa::t_e9e4cf22c76a49 1-11
+plugins/sauron/src/app/operation.ts
+  s_fdd038876479aa::t_9a446fde11c7ec 1-6
+plugins/sauron/src/app/presentation.ts
+  s_fdd038876479aa::t_eb51bc1ec42f6e 1-25
+plugins/sauron/src/app/product-theme.css
+  s_fdd038876479aa::t_1390a5a9adf451 1
+plugins/sauron/src/server/codex-cli.d.mts
+  s_fdd038876479aa::t_9ac2d2021ae223 1
+plugins/sauron/src/server/codex-cli.mjs
+  s_fdd038876479aa::t_0d4071b3bd16be 1-27
+plugins/sauron/src/server/data-path.d.mts
+  s_fdd038876479aa::t_a7df1ba84a1b47 1
+plugins/sauron/src/server/data-path.mjs
+  s_fdd038876479aa::t_c1e8c82551578a 1-6
+plugins/sauron/src/server/index.ts
+  s_fdd038876479aa::t_eedc6c4703509e 1-9
+plugins/sauron/src/server/preview.ts
+  s_fdd038876479aa::t_3ee96bf3c4eda8 1-36
+plugins/sauron/src/server/reply-store.ts
+  s_fdd038876479aa::t_72202e9af53549 1-99
+plugins/sauron/src/server/reply-worker.ts
+  s_fdd038876479aa::t_fb3252deed23c9 1-55
+plugins/sauron/src/server/reply.ts
+  s_fdd038876479aa::t_b0d00e9a4e1e69 1-25
+plugins/sauron/src/server/scan-worker.ts
+  s_fdd038876479aa::t_bebc908bfe7fc5 1-58
+plugins/sauron/src/server/scan.ts
+  s_fdd038876479aa::t_f8c1a242466fb6 1-22
+plugins/sauron/src/server/service.ts
+  s_fdd038876479aa::t_fbb4f745ecbd82 1-24
+plugins/sauron/src/server/store.ts
+  s_fdd038876479aa::t_b2ec6f75437714 1-305
+plugins/sauron/src/shared/contracts.ts
+  s_fdd038876479aa::t_d679476a7a19d8 1-160
+plugins/sauron/src/shared/replies.ts
+  s_fdd038876479aa::t_87febcefc5a598 1-29
+plugins/sauron/tests/coordination.test.ts
+  s_fdd038876479aa::t_362da21779f6f8 1-58
+plugins/sauron/tests/local-plugin.test.ts
+  s_fdd038876479aa::t_ea2529e3042ab1 1-66
+plugins/sauron/tests/mcp.test.ts
+  s_fdd038876479aa::t_ec4b38598369a6 1-74
+plugins/sauron/tests/reply.test.ts
+  s_fdd038876479aa::t_8715b9bde5056d 1-77
+plugins/sauron/tests/scan.test.ts
+  s_fdd038876479aa::t_33c0df77154f6f 1-54
+plugins/sauron/tests/store.test.ts
+  s_fdd038876479aa::t_6e2386bcdbcefe 1-158
+plugins/sauron/tests/sync.test.ts
+  s_fdd038876479aa::t_04f026eadb76ed 1-165
+plugins/sauron/tests/ui/attention.spec.ts
+  s_fdd038876479aa::t_7537683a68a6d2 1-371
+plugins/sauron/tests/ui/discussion.spec.ts
+  s_fdd038876479aa::t_7e15fea05e6691 1-70
+plugins/sauron/tests/ui/inbox.spec.ts
+  s_fdd038876479aa::t_ad36df8ba35521 1-143
+plugins/sauron/tests/ui/mcp-app.spec.ts
+  s_fdd038876479aa::t_c8df2207b5a9a7 1-132
+plugins/sauron/tests/ui/replies.spec.ts
+  s_fdd038876479aa::t_d505fa5b95d541 1-98
+plugins/sauron/tsconfig.json
+  s_fdd038876479aa::t_a0792f2822ff22 1-9
+plugins/shelob/.codex-plugin/plugin.json
+  s_fdd038876479aa::t_cd013080d1122c 1-25
+plugins/shelob/README.md
+  s_fdd038876479aa::t_0a5b859cbdd5bc 1-170
+plugins/shelob/THIRD_PARTY_NOTICES.md
+  s_fdd038876479aa::t_3f6a4ae58b8068 1-2917
+plugins/shelob/app/App.jsx
+  s_fdd038876479aa::t_37e709cf9baa83 1-45
+plugins/shelob/app/Boundary.jsx
+  s_fdd038876479aa::t_f1a6ede2a8e162 1-6
+plugins/shelob/app/CheckStatus.jsx
+  s_fdd038876479aa::t_22b9652a8c2d09 1-27
+plugins/shelob/app/ChecksPanel.jsx
+  s_fdd038876479aa::t_81520504763192 1-49
+plugins/shelob/app/Modals.jsx
+  s_fdd038876479aa::t_b6a08b9934b905 1-43
+plugins/shelob/app/Report.jsx
+  s_fdd038876479aa::t_1e2480af9d5a21 1-86
+plugins/shelob/app/Rules.jsx
+  s_fdd038876479aa::t_8b5d1422f06d2d 1-33
+plugins/shelob/app/app.css
+  s_fdd038876479aa::t_dda64951a9eb5b 1-58
+plugins/shelob/app/bridge.mjs
+  s_fdd038876479aa::t_8db1fd2a9831da 1-31
+plugins/shelob/app/check-results.mjs
+  s_fdd038876479aa::t_fa75ee84d7172a 1-30
+plugins/shelob/app/controller.mjs
+  s_fdd038876479aa::t_7c2924ed11e0cb 1-131
+plugins/shelob/app/export-client.jsx
+  s_fdd038876479aa::t_fdbeedda01c5c7 1-15
+plugins/shelob/app/export-server.jsx
+  s_fdd038876479aa::t_75a59cb9ef370e 1-7
+plugins/shelob/app/links.jsx
+  s_fdd038876479aa::t_64ac964e70ce38 1-6
+plugins/shelob/app/main.jsx
+  s_fdd038876479aa::t_8b86732278d2f1 1-14
+plugins/shelob/app/model.mjs
+  s_fdd038876479aa::t_5ec1402b665fc8 1-18
+plugins/shelob/app/review-action.mjs
+  s_fdd038876479aa::t_c1b568d8e5d992 1-12
+plugins/shelob/app/ui.jsx
+  s_fdd038876479aa::t_3f14e0e8cf5579 1-30
+plugins/shelob/assets/finding-policy.mjs
+  s_fdd038876479aa::t_6f627b30c45fc3 1-20
+plugins/shelob/assets/product-theme.css
+  s_fdd038876479aa::t_6913a9f6dca96c 1
+plugins/shelob/assets/report-model.mjs
+  s_fdd038876479aa::t_1d83f700e2a7f7 1-47
+plugins/shelob/assets/report-view.mjs
+  s_fdd038876479aa::t_c9441747f2ec50 1-2
+plugins/shelob/assets/review-decision.mjs
+  s_fdd038876479aa::t_a3ab507eb844aa 1-50
+plugins/shelob/assets/review-execution.mjs
+  s_fdd038876479aa::t_d1aa46562a8020 1-28
+plugins/shelob/assets/sidebar-icon.svg
+  s_fdd038876479aa::t_d21f20d1f78d6b 1
+plugins/shelob/mcp.json
+  s_fdd038876479aa::t_53c06da5e8c004 1-13
+plugins/shelob/plugin.json
+  s_fdd038876479aa::t_4aef416c11b1fb 1-28
+plugins/shelob/references/review-protocol.md
+  s_fdd038876479aa::t_417ece99adf49a 1-97
+plugins/shelob/references/ui-and-recovery.md
+  s_fdd038876479aa::t_3402477a3594af 1-89
+plugins/shelob/rules/baseline.json
+  s_fdd038876479aa::t_3561efb8995da5 1-19
+plugins/shelob/schemas/assessments.schema.json
+  s_fdd038876479aa::t_870bd810fba3fb 1-245
+plugins/shelob/schemas/report.schema.json
+  s_fdd038876479aa::t_cbdc2fe0f3f601 1-640
+plugins/shelob/scripts/lib/combined-review.mjs
+  s_fdd038876479aa::t_2914aca4c461ae 1-45
+plugins/shelob/scripts/lib/git.mjs
+  s_fdd038876479aa::t_b5768c45c5b358 1-110
+plugins/shelob/scripts/lib/report.mjs
+  s_fdd038876479aa::t_f9d00eabcb76b3 1-15
+plugins/shelob/scripts/lib/rules.mjs
+  s_fdd038876479aa::t_9e984ebfcedce4 1-254
+plugins/shelob/scripts/lib/snapshot.mjs
+  s_fdd038876479aa::t_bbdcab4d76ab09 1-15
+plugins/shelob/scripts/shelob.mjs
+  s_fdd038876479aa::t_e42d29d468c8b2 1-115
+plugins/shelob/server/auto-approval.mjs
+  s_fdd038876479aa::t_14de2f842e5ab2 1-52
+plugins/shelob/server/codex-cli.mjs
+  s_fdd038876479aa::t_0f0072c5dd2081 1-27
+plugins/shelob/server/comment-suggestions.mjs
+  s_fdd038876479aa::t_a1a17b5a8dcdaa 1-35
+plugins/shelob/server/comments.mjs
+  s_fdd038876479aa::t_9bd21c55c31a6f 1-83
+plugins/shelob/server/github.mjs
+  s_fdd038876479aa::t_a900386ef6d6d5 1-151
+plugins/shelob/server/index.mjs
+  s_fdd038876479aa::t_abd056bd8cce37 1-142
+plugins/shelob/server/native-review.mjs
+  s_fdd038876479aa::t_3ab49df95facd6 1-77
+plugins/shelob/server/reviews.mjs
+  s_fdd038876479aa::t_9c9c09a01c1850 1-113
+plugins/shelob/server/rules.mjs
+  s_fdd038876479aa::t_842738f48e44e5 1-76
+plugins/shelob/server/settings.mjs
+  s_fdd038876479aa::t_fe139ed56ec4d6 1-59
+plugins/shelob/server/store.mjs
+  s_fdd038876479aa::t_9b356c5b1237b8 1-281
+plugins/shelob/skills/shelob-review/SKILL.md
+  s_fdd038876479aa::t_0c07f7e555d03a 1-105
+plugins/shelob/tests/app.test.mjs
+  s_fdd038876479aa::t_2dbd142e83a2fb 1-110
+plugins/shelob/tests/auto-approval.test.mjs
+  s_fdd038876479aa::t_881d6ec8ce1817 1-58
+plugins/shelob/tests/check-results.test.mjs
+  s_fdd038876479aa::t_28b5472244e7ab 1-35
+plugins/shelob/tests/codex-cli.test.mjs
+  s_fdd038876479aa::t_b7f551f2b02e72 1-57
+plugins/shelob/tests/comment-suggestions.test.mjs
+  s_fdd038876479aa::t_ab5bff09ea67ad 1-21
+plugins/shelob/tests/comments.test.mjs
+  s_fdd038876479aa::t_a5f36c0c4c953b 1-106
+plugins/shelob/tests/decision.test.mjs
+  s_fdd038876479aa::t_5622f19f7b5312 1-63
+plugins/shelob/tests/execution.test.mjs
+  s_fdd038876479aa::t_e867fd371cab19 1-143
+plugins/shelob/tests/fixtures.mjs
+  s_fdd038876479aa::t_a672e9280352d8 1-32
+plugins/shelob/tests/helpers/interrupted-worker.mjs
+  s_fdd038876479aa::t_4bba0e9b89c400 1-14
+plugins/shelob/tests/integration.test.mjs
+  s_fdd038876479aa::t_57964cc1e6dd5c 1-173
+plugins/shelob/tests/lifecycle-regression.test.mjs
+  s_fdd038876479aa::t_54a9a13908cf53 1-134
+plugins/shelob/tests/mcp.test.mjs
+  s_fdd038876479aa::t_4b78ea128c4938 1-159
+plugins/shelob/tests/native-review.test.mjs
+  s_fdd038876479aa::t_aa9305c3bc640e 1-189
+plugins/shelob/tests/pr-only.test.mjs
+  s_fdd038876479aa::t_6a8f49800b4c60 1-179
+plugins/shelob/tests/report.test.mjs
+  s_fdd038876479aa::t_92ab5ea1d07eaf 1-120
+plugins/shelob/tests/review.test.mjs
+  s_fdd038876479aa::t_89bf68a8cdca83 1-281
+plugins/shelob/tests/reviews.test.mjs
+  s_fdd038876479aa::t_3228ef7e104ed5 1-154
+plugins/shelob/tests/rules.test.mjs
+  s_fdd038876479aa::t_16429cb74c4218 1-88
+plugins/shelob/tests/settings.test.mjs
+  s_fdd038876479aa::t_dc416d59994470 1-46
+plugins/workbench/.codex-plugin/plugin.json
+  s_fdd038876479aa::t_7a2212f0f03f19 1-36
+plugins/workbench/PREVIEW.md
+  s_fdd038876479aa::t_9643a05f3ebf48 1-153
+plugins/workbench/README.md
+  s_fdd038876479aa::t_fd15fab76fa8b9 1-88
+plugins/workbench/THIRD_PARTY_NOTICES.md
+  s_fdd038876479aa::t_514e45822f57ba 1-5824
+plugins/workbench/app/App.jsx
+  s_fdd038876479aa::t_0f969cd1514d3f 1-256
+plugins/workbench/app/HowItWorks.jsx
+  s_fdd038876479aa::t_707a36b3c97230 1-38
+plugins/workbench/app/app.css
+  s_fdd038876479aa::t_79cb829986aa08 1-210
+plugins/workbench/app/controller.mjs
+  s_fdd038876479aa::t_cc201dbbf8ebaa 1-157
+plugins/workbench/app/main.jsx
+  s_fdd038876479aa::t_db1d07894615e7 1-18
+plugins/workbench/app/presentation.mjs
+  s_fdd038876479aa::t_27a747ec8c7a87 1-50
+plugins/workbench/app/ui.jsx
+  s_fdd038876479aa::t_93e518005400a9 1-31
+plugins/workbench/assets/task.md
+  s_fdd038876479aa::t_ff051ed02f63ae 1-59
+plugins/workbench/assets/verification-recipe.md
+  s_fdd038876479aa::t_900164a94b968a 1-31
+plugins/workbench/claude-code-skills/workbench-autopilot/SKILL.md.template
+  s_fdd038876479aa::t_08e18860fb298a 1-36
+plugins/workbench/claude-code-skills/workbench-greenlight/SKILL.md.template
+  s_fdd038876479aa::t_707dd82057ee1e 1-31
+plugins/workbench/claude-code-skills/workbench-help/SKILL.md.template
+  s_fdd038876479aa::t_d5ae06f126521e 1-41
+plugins/workbench/claude-code-skills/workbench-implement/SKILL.md.template
+  s_fdd038876479aa::t_d7d7f8556fc8fa 1-46
+plugins/workbench/claude-code-skills/workbench-improve/SKILL.md.template
+  s_fdd038876479aa::t_ea3608751b240f 1-22
+plugins/workbench/claude-code-skills/workbench-plan/SKILL.md.template
+  s_fdd038876479aa::t_6c2563e867523d 1-22
+plugins/workbench/claude-code-skills/workbench-prepare/SKILL.md.template
+  s_fdd038876479aa::t_f8f683d7a102f6 1-19
+plugins/workbench/claude-code-skills/workbench-publish/SKILL.md.template
+  s_fdd038876479aa::t_6cb2c00e34b1db 1-19
+plugins/workbench/claude-code-skills/workbench-review/SKILL.md.template
+  s_fdd038876479aa::t_6591e2c139df8e 1-28
+plugins/workbench/claude-code-skills/workbench-run/SKILL.md.template
+  s_fdd038876479aa::t_edc242c16980e3 1-16
+plugins/workbench/claude-code-skills/workbench-start/SKILL.md.template
+  s_fdd038876479aa::t_e30fc7e5d14802 1-42
+plugins/workbench/claude-code-skills/workbench-translations/SKILL.md.template
+  s_fdd038876479aa::t_c1588cd10a432e 1-43
+plugins/workbench/claude-code-skills/workbench-verify/SKILL.md.template
+  s_fdd038876479aa::t_b38a9270c62237 1-23
+plugins/workbench/mcp.json
+  s_fdd038876479aa::t_4193b100e30648 1-13
+plugins/workbench/plugin.json
+  s_fdd038876479aa::t_9f93a2d14b1e6b 1-39
+plugins/workbench/references/board-launch.md
+  s_fdd038876479aa::t_4bc9e1355b2108 1-58
+plugins/workbench/references/monitoring.md
+  s_fdd038876479aa::t_ef9eb1260526cc 1-21
+plugins/workbench/references/recipes/apollo-preply-space.md
+  s_fdd038876479aa::t_ab6f8c630b477b 1-49
+plugins/workbench/references/regression-proof.md
+  s_fdd038876479aa::t_0ef9df3cbcbb1f 1-10
+plugins/workbench/references/reviewer.md
+  s_fdd038876479aa::t_ae0838b71d2452 1-29
+plugins/workbench/references/specialists.md
+  s_fdd038876479aa::t_75e9a76fa49ef7 1-22
+plugins/workbench/references/verification-recipes.md
+  s_fdd038876479aa::t_bb9d8c754cdeec 1-23
+plugins/workbench/references/visual-evidence.md
+  s_fdd038876479aa::t_d7852418b4f15a 1-44
+plugins/workbench/references/workflow.md
+  s_fdd038876479aa::t_07b8067c372801 1-130
+plugins/workbench/server/index.mjs
+  s_fdd038876479aa::t_2f318277405865 1-79
+plugins/workbench/server/repository-import.mjs
+  s_fdd038876479aa::t_6fab6950b98706 1-85
+plugins/workbench/server/store.mjs
+  s_fdd038876479aa::t_06a91d227f1673 1-331
+plugins/workbench/skills/autopilot/SKILL.md
+  s_fdd038876479aa::t_63635f575be9b8 1-56
+plugins/workbench/skills/autopilot/agents/openai.yaml
+  s_fdd038876479aa::t_a250d5c0dc2e63 1-2
+plugins/workbench/skills/greenlight/SKILL.md
+  s_fdd038876479aa::t_266da6451d6b42 1-27
+plugins/workbench/skills/greenlight/agents/openai.yaml
+  s_fdd038876479aa::t_5cfd5877e4e053 1-2
+plugins/workbench/skills/help/SKILL.md
+  s_fdd038876479aa::t_d26bd2b6da5867 1-19
+plugins/workbench/skills/help/agents/openai.yaml
+  s_fdd038876479aa::t_4d2dd74d1703ff 1-2
+plugins/workbench/skills/implement/SKILL.md
+  s_fdd038876479aa::t_4f4b05c60eea45 1-74
+plugins/workbench/skills/implement/agents/openai.yaml
+  s_fdd038876479aa::t_4c65250a987c02 1-2
+plugins/workbench/skills/improve/SKILL.md
+  s_fdd038876479aa::t_586440f94577c4 1-38
+plugins/workbench/skills/improve/agents/openai.yaml
+  s_fdd038876479aa::t_b1fa18ecdc4f8a 1-2
+plugins/workbench/skills/plan/SKILL.md
+  s_fdd038876479aa::t_d2fbd86db79fd4 1-28
+plugins/workbench/skills/plan/agents/openai.yaml
+  s_fdd038876479aa::t_3ace93594f70c7 1-2
+plugins/workbench/skills/prepare/SKILL.md
+  s_fdd038876479aa::t_4a9f57823aff36 1-28
+plugins/workbench/skills/prepare/agents/openai.yaml
+  s_fdd038876479aa::t_cb2da79cf38f37 1-2
+plugins/workbench/skills/publish/SKILL.md
+  s_fdd038876479aa::t_bb52c052b0ce8a 1-25
+plugins/workbench/skills/publish/agents/openai.yaml
+  s_fdd038876479aa::t_2f07853f6cca66 1-2
+plugins/workbench/skills/review/SKILL.md
+  s_fdd038876479aa::t_3cb39e4714ce27 1-25
+plugins/workbench/skills/review/agents/openai.yaml
+  s_fdd038876479aa::t_1bbffb8671037c 1-2
+plugins/workbench/skills/run/SKILL.md
+  s_fdd038876479aa::t_aa9f1386c71768 1-23
+plugins/workbench/skills/run/agents/openai.yaml
+  s_fdd038876479aa::t_8054b13a9b1bd2 1-2
+plugins/workbench/skills/start/SKILL.md
+  s_fdd038876479aa::t_2ac08bc45db447 1-46
+plugins/workbench/skills/start/agents/openai.yaml
+  s_fdd038876479aa::t_eea5792a9ce31c 1-2
+plugins/workbench/skills/translations/SKILL.md
+  s_fdd038876479aa::t_39659627f8cc94 1-77
+plugins/workbench/skills/translations/agents/openai.yaml
+  s_fdd038876479aa::t_ed4c474f9866c5 1-2
+plugins/workbench/skills/verify/SKILL.md
+  s_fdd038876479aa::t_424b90cd8d19b6 1-24
+plugins/workbench/skills/verify/agents/openai.yaml
+  s_fdd038876479aa::t_5e1fe5b845809b 1-2
+plugins/workbench/tests/controller.test.mjs
+  s_fdd038876479aa::t_4648367d309562 1-98
+plugins/workbench/tests/fixtures.mjs
+  s_fdd038876479aa::t_06363bc8fe1e81 1-49
+plugins/workbench/tests/mcp.test.mjs
+  s_fdd038876479aa::t_85b9dbf3333e75 1-78
+plugins/workbench/tests/presentation.test.mjs
+  s_fdd038876479aa::t_1fff19aaf06c12 1-33
+plugins/workbench/tests/preservation.test.mjs
+  s_fdd038876479aa::t_330f7bfd2e1dc6 1-52
+plugins/workbench/tests/repository-import.test.mjs
+  s_fdd038876479aa::t_5b87e867ca52f8 1-61
+plugins/workbench/tests/skill-catalog.test.mjs
+  s_fdd038876479aa::t_a190283605202c 1-25
+plugins/workbench/tests/store.test.mjs
+  s_fdd038876479aa::t_8bb35bf9a293ab 1-263
+plugins/workbench/tests/ui/board.spec.mjs
+  s_fdd038876479aa::t_1f640d1476c73a 1-661
+pnpm-workspace.yaml
+  s_fdd038876479aa::t_b384181dfda0f7 1-3
+scripts/build-all.mjs
+  s_fdd038876479aa::t_79cc9b2a4b794d 1-4
+scripts/build.mjs
+  s_fdd038876479aa::t_bafdc539977d10 1-51
+scripts/check-saved-state.mjs
+  s_fdd038876479aa::t_ed42d7e17a56c2 1-50
+scripts/demo.mjs
+  s_fdd038876479aa::t_00f5b96a43fe4c 1-14
+scripts/notices.mjs
+  s_fdd038876479aa::t_841fd0b9afd832 1-21
+scripts/preview.mjs
+  s_fdd038876479aa::t_4ace595d451580 1-69
+scripts/publish-release.mjs
+  s_fdd038876479aa::t_7fb09776c5a5fb 1-59
+scripts/release.mjs
+  s_fdd038876479aa::t_314f813193294f 1-100
+scripts/smoke-packages.mjs
+  s_fdd038876479aa::t_e75cc0e28b4a01 1-33
+scripts/test-all.mjs
+  s_fdd038876479aa::t_c04673c46daa05 1-8
+scripts/test-ui.mjs
+  s_fdd038876479aa::t_5c05bf74256e6f 1-4
+scripts/validate-plugin.mjs
+  s_fdd038876479aa::t_4077e9359cac52 1-60
+scripts/validate.mjs
+  s_fdd038876479aa::t_9e8951d654a7ff 1-41
+scripts/workbench-build.mjs
+  s_fdd038876479aa::t_fe77b26b9b4a08 1-39
+scripts/workbench-preservation.mjs
+  s_fdd038876479aa::t_64d7f5b171adc6 1-38
+scripts/workbench-preview.mjs
+  s_fdd038876479aa::t_565bcd9d7dac35 1-113
+tests/release/migration.test.mjs
+  s_fdd038876479aa::t_836195810d0f7b 1-30
+tests/release/release.test.mjs
+  s_fdd038876479aa::t_8bbb29c090727d 1-37
+tests/release/versioning.test.mjs
+  s_fdd038876479aa::t_7b06f4e8fde392 1-11
+tests/ui/app.spec.mjs
+  s_fdd038876479aa::t_a9b8b743f211bb 1-172
+tests/ui/export.spec.mjs
+  s_fdd038876479aa::t_aa685b61ad8a45 1-36
+workbench.playwright.config.mjs
+  s_fdd038876479aa::t_e2f65d25e0ceae 1-4
+workspace-plugins.json
+  s_fdd038876479aa::t_3560e25e2fd3d6 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4a63073c12fc232f14ad131460bef2e2878387f",
+  "prompts": {},
+  "sessions": {
+    "s_fdd038876479aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15a74-9309-71b1-967c-27e9c8b98240",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}

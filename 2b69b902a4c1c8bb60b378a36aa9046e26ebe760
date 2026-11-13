@@ -1,0 +1,25 @@
+plugins/sauron/src/app/InboxView.tsx
+  s_3cb9b6b035e287::t_7c07d8c4421540 48,50-51
+plugins/sauron/src/app/controller.ts
+  s_3cb9b6b035e287::t_cc5278dd0557ef 27,143-149,163
+plugins/sauron/src/app/inbox.css
+  s_3cb9b6b035e287::t_600342045c60d2 10,12,20,28,50-52,57-59,63,79-84,93-94
+plugins/sauron/tests/ui/inbox.spec.ts
+  s_3cb9b6b035e287::t_310dc11b7f6383 159-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2b69b902a4c1c8bb60b378a36aa9046e26ebe760",
+  "prompts": {},
+  "sessions": {
+    "s_3cb9b6b035e287": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c09e-2734-7ea2-b3d4-c22cb6a8098a",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
