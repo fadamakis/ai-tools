@@ -1,7 +1,7 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { Markdown } from '@openai/apps-sdk-ui/components/Markdown';
 import { stages } from './controller.mjs';
-import { attentionReason, cardNextAction, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskChatUrl, taskTicketUrl, taskLaunch, taskStatus } from './presentation.mjs';
+import { attentionReason, cardNextAction, currentLaunches, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskAction, taskChatUrl, taskTicketUrl, taskLaunch, taskStatus } from './presentation.mjs';
 import { Button, Secondary, Quiet, Input, Textarea, Menu, Checkbox, SegmentedControl, Badge, Icon, Dialog, Select, Tooltip, TextLink, Alert, EmptyMessage, LoadingIndicator, submitForm, enterSubmits } from './ui.jsx';
 import { HowItWorks } from './HowItWorks.jsx';
 import { PublicationDetails, RemoteRunDetails } from './DeliveryDetails.jsx';
@@ -32,12 +32,22 @@ function RepositorySelect({ repositories, value, onChange, includeAll = true, di
   ]} onChange={option => onChange(option.value)} TriggerView={RepositoryTrigger} pill={false} size="lg" disabled={disabled}/>;
 }
 
+function TaskPrimaryAction({ vm, task, action, card = false }) {
+  const run = () => {
+    if (action.kind === 'request') return vm.showModal({ kind: 'recovery', launch: action.launch });
+    if (action.kind === 'launch') return vm.showModal({ kind: 'launch', task });
+    if (action.kind === 'archive') return vm.action(() => vm.archive([task], !task.archivedAt), task.archivedAt ? 'Restoring task…' : 'Archiving task…');
+    if (action.kind === 'chat') return vm.action(() => vm.resume(task), 'Opening chat…');
+    return vm.action(() => vm.recover(task), 'Preparing recovery request…');
+  };
+  return <Secondary size="md" disabled={vm.busy} aria-label={card ? `${action.label} · ${displayTitle(task)}` : action.label} onClick={run}>{action.label}</Secondary>;
+}
+
 function TaskCard({ vm, task, repository }) {
+  const action = taskAction(task, vm.board.launches);
   const reason = attentionReason(task);
   const next = cardNextAction(task);
   const ticket = /^[A-Z][A-Z0-9]+-\d+$/i.test(task.key) ? task.key : '';
-  const pending = vm.board.launches.some(launch => launch.taskId === task.id && unresolvedLaunchStates.includes(launch.state));
-  const action = taskLaunch(task).action;
   return <article className="task-card" data-status={task.status} data-attention={Boolean(reason)}>
     <button className="card-main" aria-label={`Open ${displayTitle(task)}`} disabled={vm.busy} onClick={() => vm.action(() => vm.select(task.id), 'Opening task…')}>
       <div className="card-heading"><h3>{displayTitle(task)}</h3></div>
@@ -45,13 +55,13 @@ function TaskCard({ vm, task, repository }) {
       <Badge size="md" color={reason ? 'warning' : tone(task.status)}>{task.stage === 'done' && task.completion?.kind !== 'artifact' ? 'Merged' : taskStatus(task)}</Badge>
       {next && <p className={`card-next ${reason ? 'needs-attention' : ''}`}>{next}</p>}
     </button>
-    {task.stage !== 'done' && !task.archivedAt && <footer className="card-actions"><Quiet size="md" disabled={vm.busy || pending && !task.threadId} aria-label={`${action} · ${displayTitle(task)}`} onClick={() => task.threadId ? vm.action(() => vm.resume(task), 'Opening chat…') : vm.showModal({ kind: 'launch', task })}>{pending && !task.threadId ? 'Request pending' : task.threadId ? 'Resume' : action}</Quiet></footer>}
+    <footer className="card-actions"><TaskPrimaryAction vm={vm} task={task} action={action} card/>{action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Quiet size="sm" disabled={vm.busy} aria-label={`Open chat · ${displayTitle(task)}`} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open chat</Quiet>}</footer>
   </article>;
 }
 
 function ChatRequests({ vm }) {
-  const requests = [...vm.board.launches].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const latest = vm.lastLaunch || requests[0];
+  const requests = currentLaunches(vm.board.tasks, vm.board.launches);
+  const latest = requests.find(request => request.id === vm.lastLaunch?.id) || requests[0];
   if (!latest) return null;
   const task = vm.board.tasks.find(task => task.id === latest.taskId);
   const description = latest.error || (latest.state === 'accepted' ? 'The worker confirmed this task in its chat.' : latest.state === 'sent' ? 'The request was delivered. Waiting for the worker to confirm the task.' : latest.state === 'prepared' ? 'Review the request in the chat composer and press Send. Work starts after you send it.' : 'Check the board chat before retrying. Unconfirmed requests are never resent automatically.');
@@ -260,6 +270,8 @@ function TechnicalDetails({ task, repository }) {
 
 function TaskDetail({ vm, selected }) {
   const { task, repository, note, noteIsLegacy, launches } = selected;
+  const action = taskAction(task, vm.board.launches);
+  const currentRequestIds = new Set(currentLaunches([task], launches).map(launch => launch.id));
   const next = cardNextAction(task);
   const stage = stages.find(([key]) => key === task.stage)?.[1] || 'Unverified';
   const link = url => event => { event.preventDefault(); vm.action(() => vm.openLink(url), 'Opening link…'); };
@@ -267,17 +279,17 @@ function TaskDetail({ vm, selected }) {
     <div className="detail-title"><span className="task-key">{task.key} · {repository.name}</span><h3>{displayTitle(task)}</h3><div className="detail-badges"><Badge>{task.archivedAt ? 'Archived' : stage}</Badge><Badge color={tone(task.status)}>{taskStatus(task)}</Badge></div></div>
     {task.summary && <p className="dialog-copy">{task.summary}</p>}
     <div className="detail-actions">
-      {task.stage !== 'done' && <Button disabled={vm.busy} onClick={() => task.threadId ? vm.action(() => vm.resume(task), 'Opening chat…') : vm.showModal({ kind: 'launch', task })}>{task.threadId ? 'Open chat' : taskLaunch(task).action}<Icon name="arrow"/></Button>}
+      <TaskPrimaryAction vm={vm} task={task} action={action}/>
+      {action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open chat</Secondary>}
       {task.threadId && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>Start new chat</Secondary>}
       {task.stage === 'done' && taskChatUrl(task) && <TextLink href={taskChatUrl(task)} onClick={link(taskChatUrl(task))}>Open chat</TextLink>}
       {taskTicketUrl(task) && <TextLink href={taskTicketUrl(task)} onClick={link(taskTicketUrl(task))}>Open ticket</TextLink>}
-      {task.stage === 'done' && <Button disabled={vm.busy} loading={vm.busy} onClick={() => vm.action(() => vm.archive([task], !task.archivedAt), task.archivedAt ? 'Restoring task…' : 'Archiving task…')}>{task.archivedAt ? 'Restore to Done' : 'Archive task'}</Button>}
       {task.threadId && task.requirements && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.refreshEvidence(), 'Checking evidence freshness…')}>Recheck evidence</Secondary>}
       {task.prUrl && <><Secondary disabled={vm.busy} loading={vm.busy && vm.busyLabel === 'Checking pull request…'} onClick={() => vm.action(() => vm.refreshPr(), 'Checking pull request…')}>Check PR now</Secondary><TextLink href={task.prUrl} onClick={link(task.prUrl)}>Open pull request</TextLink></>}
     </div>
     <BusyStatus vm={vm}/>
     {task.stage === 'done' ? <p className="merge-confirmed">{task.completion?.kind === 'artifact' ? 'Accepted scope and artifact verification recorded.' : `Merged ${date(task.pr?.mergedAt)}.`} Checks below are a historical snapshot.</p> : next && next !== task.summary && <section className="next-action"><h4>Next action</h4><p>{next}</p></section>}
-    {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color={task.stage === 'done' && launch.state === 'failed' ? 'info' : 'warning'} variant="soft" key={launch.id} title={`${task.stage === 'done' && launch.state === 'failed' ? 'Historical · ' : ''}${launchStatus[launch.state]}`} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review request</Quiet> : undefined}/>)}
+    {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color={currentRequestIds.has(launch.id) ? 'warning' : 'info'} variant="soft" key={launch.id} title={`${currentRequestIds.has(launch.id) ? '' : 'Historical · '}${launchStatus[launch.state]}`} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review request</Quiet> : undefined}/>)}
     <TaskReconciliation vm={vm} task={task} link={link}/>
     <TaskEvidence task={task}/>
     <PublicationDetails vm={vm} task={task}/>

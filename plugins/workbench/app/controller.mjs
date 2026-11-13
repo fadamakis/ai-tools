@@ -6,6 +6,12 @@ export const stages = [
 ];
 
 export function launchMessage(launch, task, repository) {
+  if (launch.delivery === 'recovery') return `Use /workbench:start board-request ${launch.id}.
+Recover and resume task ${JSON.stringify(task.key)} in its saved worker chat.
+Read the saved task, accepted scope, note, exact worker's latest outcome and live PR or artifact evidence. Recheck blockers; do not assume they are fixed. Reconcile delivery before deciding what remains.
+If work remains and is unblocked, resume the original worker once with the saved context and a concrete next step. If it is already running, leave it running. If finished, record verified completion. Preserve narrower user restrictions and uncertain operation receipts. Do not create another chat.
+${launch.autopilot ? 'Autopilot is on: commits, ordinary pushes, a draft PR and addressed review replies are authorized. Never merge.' : 'Autopilot is off. No commits, pushes, PR publication or review replies are authorized by this recovery request.'}
+I authorize this recovery check and one resume of this task, including lifting a user pause only to continue unfinished work. Do not change its accepted scope.`;
   if (launch.delivery === 'draft') return `Use /workbench:start board-request ${launch.id}.
 Start task ${JSON.stringify(task.key)} in this chat. This chat is the worker; do not create or message another chat.
 Repository: ${JSON.stringify(repository.path)}. Select this repository and ${launch.environment === 'worktree' ? 'Worktree' : 'Local'} in the native composer before sending.
@@ -50,7 +56,7 @@ export class BoardController {
     const board = await this.call('workbench.list');
     if (epoch !== this.epoch || this.disposed) return;
     this.board = board; this.hasBoard = true; this.publish();
-    if (this.lastLaunch && !['accepted', 'failed'].includes(this.lastLaunch.state)) {
+    if (this.lastLaunch && !['accepted', 'failed', 'resolved'].includes(this.lastLaunch.state)) {
       const requestId = this.lastLaunch.id;
       try {
         const { launch } = await this.call('workbench.launch_get', { requestId });
@@ -119,18 +125,22 @@ export class BoardController {
   async launch(args) {
     this.undoArchive = null;
     if (!this.extensions.message) throw new Error('This Codex version cannot launch chats from the board. Update Codex, or use /workbench:start in a native project chat.');
-    const result = await this.call('workbench.launch_prepare', { ...args, delivery: 'draft' });
+    const result = await this.call('workbench.launch_prepare', { ...args, delivery: args.delivery || 'draft' });
     if (!result.dispatch) { this.modal = null; this.notice = 'This task already has a pending or unconfirmed launch. Check the board chat before trying again.'; await this.refresh(); return; }
     const task = result.task || (await this.call('workbench.launch_get', { requestId: result.launch.id })).task;
     this.lastLaunch = { ...result.launch, title: task.title }; this.publish();
     try {
-      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task, result.repository) }], _meta: { 'openai/message': { target: 'new', send: false } } });
+      await this.extensions.message.send({ role: 'user', content: [{ type: 'text', text: launchMessage(result.launch, task, result.repository) }], _meta: { 'openai/message': { target: result.launch.delivery === 'recovery' ? 'active' : 'new', send: false } } });
     } catch (error) {
       await this.call('workbench.launch_uncertain', { requestId: result.launch.id });
       this.lastLaunch = { ...this.lastLaunch, state: 'uncertain' }; this.publish();
       throw new Error(`Could not confirm the launch draft. Check the chat composer before trying again; Workbench will not add another request automatically. ${error.message || ''}`);
     }
     this.modal = null; await this.refresh();
+  }
+  async recover(task) {
+    if (!taskChatUrl(task)) throw new Error('This task has no saved worker chat. Start a task chat first.');
+    await this.launch({ taskId: task.id, delivery: 'recovery', autopilot: false });
   }
   async refreshEvidence() {
     const task = this.selected.task;
