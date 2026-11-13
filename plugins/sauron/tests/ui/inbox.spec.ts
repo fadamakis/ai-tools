@@ -309,7 +309,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
   await page.setViewportSize({width,height:1000});
   await page.emulateMedia({colorScheme:width===375?'dark':'light'});
   await add(request,'Complete without flashing');await add(request,'Keep this task');await add(request,'Another remaining task');await open(page);
-  expect((await page.getByRole('heading',{name:'Your attention list',exact:true}).boundingBox())!.y).toBeLessThan(120);
+  expect((await page.getByRole('heading',{name:'Your working day',exact:true}).boundingBox())!.y).toBeLessThan(120);
   const reader=page.locator('.inbox-reader'),before=(await reader.boundingBox())!;
   let release!:()=>void,started!:()=>void;
   const held=new Promise<void>(resolve=>{release=resolve;}),sending=new Promise<void>(resolve=>{started=resolve;});
