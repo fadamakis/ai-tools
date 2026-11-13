@@ -1,3 +1,4 @@
+import {liveProviders,type LiveProvider} from '../shared/contracts.js';
 import {createHash} from 'node:crypto';
 /** Exact connector IDs and read operations verified with app/list + app/read.
  * Unknown apps/tools are disabled. No global Codex settings are changed. */
@@ -8,7 +9,7 @@ export const localReaders = {
   calendar:{id:'connector_947e0d954944416db111db556030eea6',tools:['get_profile','search_events','search','read_event','batch_read_event']},
   granola:{id:'asdk_app_697761cab6f48191b5ed345919a3ce8b',tools:['list_meetings','get_meetings','get_meeting_transcript']},
 } as const;
-export function localPolicyArgs() {
+export function localPolicyArgs(providers:readonly LiveProvider[]=liveProviders) {
   const values:Record<string,unknown>={
     'features.plugins':true,'features.apps':true,'features.hooks':false,'features.memories':false,
     'features.in_app_browser':false,'features.in_app_chat':false,'features.in_app_local_automation':false,'features.shell_tool':false,'features.multi_agent':false,'web_search':'disabled',
@@ -22,11 +23,12 @@ export function localPolicyArgs() {
   }
   values['mcp_servers.atlassian-mcp-server.url']='https://mcp.atlassian.com/v1/sse';
   values['mcp_servers.atlassian-mcp-server.enabled']=false;
-  for(const reader of Object.values(localReaders)){
-    values[`apps.${reader.id}.enabled`]=true;
+  for(const [provider,reader] of Object.entries(localReaders)){
+    const enabled=providers.includes(provider as LiveProvider);
+    values[`apps.${reader.id}.enabled`]=enabled;
     values[`apps.${reader.id}.default_tools_enabled`]=false;
     values[`apps.${reader.id}.destructive_enabled`]=false;
-    for(const tool of reader.tools)values[`apps.${reader.id}.tools.${tool}.enabled`]=true;
+    for(const tool of reader.tools)values[`apps.${reader.id}.tools.${tool}.enabled`]=enabled;
   }
   return Object.entries(values).flatMap(([key,value])=>['-c',`${key}=${JSON.stringify(value)}`]);
 }

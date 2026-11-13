@@ -24,7 +24,12 @@ try {
   await client.connect(transport);
   const before=await call('list_attention');
   let view=await call(manual?'refresh_attention':'check_scheduled_attention');
-  if(!manual&&view.coordination?.mode!=='independent') {
+  const enabled=view.sourcePreferences?.enabled??{slack:true,granola:true,jira:true,github:true,calendar:true};
+  const allPaused=!Object.values(enabled).some(Boolean);
+  const manualPaused=(manual||view.coordination?.mode==='independent')&&!enabled.slack&&!enabled.granola;
+  if(allPaused||manualPaused){
+    console.log(JSON.stringify({storeId:view.storeId,mode:view.coordination?.mode??'independent',checkKind:'sources_paused',sourceScanStarted:false,sourcesChecked:false,changes:[],notifyFailure:false,message:allPaused?'Source updates paused':'Manual source checks paused; enable Slack or Meetings to refresh.'},null,2));
+  } else if(!manual&&view.coordination?.mode!=='independent') {
     const freshness=view.coordination.freshness;
     const failed=freshness.businessHoursActive&&['never','stale','partial','failed'].includes(freshness.status);
     console.log(JSON.stringify({storeId:view.storeId,mode:view.coordination.mode,automaticWriter:view.coordination.mode==='local_managed'?'local':'dot',checkKind:'sync_freshness',

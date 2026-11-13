@@ -1,3 +1,4 @@
+import type {LiveProvider} from '../shared/contracts.js';
 import {spawn,execFileSync} from 'node:child_process';
 import {mkdtemp,writeFile,readFile,rm,chmod} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -8,7 +9,7 @@ import {localPolicyArgs,minimalAgentEnv} from './local-policy.js';
 export class AgentError extends Error {
   constructor(readonly code:'timeout'|'runtime'|'output'|'budget'|'policy'){super(code);}
 }
-export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string}={}) {
+export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string;providers?:LiveProvider[]}={}) {
   const dir=await mkdtemp(join(tmpdir(),'sauron-local-'));
   await chmod(dir,0o700);
   try{
@@ -16,7 +17,7 @@ export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli
     await writeFile(schemaPath,JSON.stringify(schema),{mode:0o600});
     await writeFile(resultPath,'',{mode:0o600});
     const cli=options.cli??process.env.SAURON_CODEX_BIN??resolveCodexCli();
-    const policy=localPolicyArgs();
+    const policy=localPolicyArgs(options.providers);
     // CLI inventory is configuration-only. Abort if a newly installed plugin
     // would add a local server not covered by the explicit deny list.
     let servers:{enabled?:boolean}[];

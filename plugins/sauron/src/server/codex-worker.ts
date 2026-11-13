@@ -1,3 +1,5 @@
+import {localPolicyArgs} from './local-policy.js';
+import type {LiveProvider} from '../shared/contracts.js';
 import { spawn } from 'node:child_process';
 import { mkdtemp, writeFile, readFile, rm, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -5,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { resolveCodexCli } from './codex-cli.mjs';
 
 type WorkerRequest = {
+  providers?:LiveProvider[];
   prompt: string;
   schema: object;
   prefix: string;
@@ -12,7 +15,7 @@ type WorkerRequest = {
   timeoutMs?: number;
 };
 
-export async function runCodexWorker({ prompt, schema, prefix, maxOutputLength, timeoutMs = 10 * 60_000 }: WorkerRequest): Promise<unknown> {
+export async function runCodexWorker({ providers, prompt, schema, prefix, maxOutputLength, timeoutMs = 10 * 60_000 }: WorkerRequest): Promise<unknown> {
   const directory = await mkdtemp(join(tmpdir(), prefix));
   try {
     await chmod(directory, 0o700);
@@ -21,6 +24,7 @@ export async function runCodexWorker({ prompt, schema, prefix, maxOutputLength, 
     const cli = process.env.SAURON_CODEX_BIN || resolveCodexCli();
     await new Promise<void>((resolve, reject) => {
       const child = spawn(cli, ['exec', '--ephemeral', '--sandbox', 'read-only', '--skip-git-repo-check', '--cd', directory,
+        ...(providers?['--ignore-user-config','--strict-config',...localPolicyArgs(providers)]:[]),
         '--json', '--output-schema', schemaFile, '--output-last-message', resultFile, '-'],
         { stdio: ['pipe', 'ignore', 'pipe'], detached: true, env: process.env });
       let settled = false;

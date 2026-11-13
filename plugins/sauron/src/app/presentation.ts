@@ -12,7 +12,8 @@ export function mergeSavedView(previous:Result|null,next:Result):Result {
   // Saved tasks are never deleted. Merge versions per task so delayed host
   // responses cannot undo decisions or hide unrelated newly saved tasks.
   const merged=[...items.values()].sort((a,b)=>a.id.localeCompare(b.id));
-  return {...latest,items:merged,syntheticOnly:merged.every(task=>task.provider==='manual')};
+  const sourcePreferences=(previous.sourcePreferences?.revision??0)>(next.sourcePreferences?.revision??0)?previous.sourcePreferences:next.sourcePreferences??latest.sourcePreferences;
+  return {...latest,sourcePreferences,items:merged,syntheticOnly:merged.every(task=>task.provider==='manual')};
 }
 
 export const labels: Record<TaskState, string> = {
