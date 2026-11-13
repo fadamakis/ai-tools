@@ -16,6 +16,13 @@ Verify old and candidate readers against disposable saved-state copies before lo
 
 ## Workbench
 
+Recovery actions keep board schema 1, task identities, worker ownership, checkpoints,
+notes and old launch receipts. New optional `delivery: recovery` requests target the
+existing worker and prepare an editable draft in the active chat. A terminal
+`resolved` receipt records a recovery check that dispatched nothing. Earlier readers
+preserve these fields and treat that terminal state as non-pending; their UI may show
+the raw state name. No migration or automatic task execution is required.
+
 Board launches may carry an optional `delivery: draft` field. These requests bind
 the receiving native chat directly; older requests retain their coordinator
 handoff. Schema 1, task IDs, ticket URLs, worker ownership and existing receipts

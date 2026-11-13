@@ -15,11 +15,12 @@ export class LaunchLifecycle {
     return this.store.mutate(data => {
       const task = taskId ? this.store.task(data, taskId) : this.store.makeTask(data, repositoryId, taskKey(title), title);
       if (task.stage === 'done') throw new Error('This task is complete. Start a separate task.');
+      if (delivery === 'recovery' && (!taskId || !task.threadId || continuation)) throw new Error('Recovery requires an existing task and its saved worker. Use an explicit new continuation if that chat is unavailable.');
       const existing = data.launches.find(item => item.taskId === task.id && unresolvedLaunchStates.includes(item.state));
       if (existing) return { launch: existing, task: { key: task.key, title: task.title }, dispatch: false };
       if (delivery === 'draft' && task.threadId && !continuation) throw new Error('Open the saved worker chat to resume. A new chat requires an explicit continuation choice.');
       const repository = this.store.repository(data, task.repositoryId);
-      const launch = { id: randomUUID(), taskId: task.id, repositoryId: repository.id, ownerThreadId: task.threadId || null, ...(delivery === 'draft' ? { delivery } : {}), autopilot, environment, continuation, target: task.threadId && !continuation ? 'existing' : 'new', ...(task.threadId && !continuation ? { threadId: task.threadId } : {}), state: 'prepared', createdAt: now(), updatedAt: now() };
+      const launch = { id: randomUUID(), taskId: task.id, repositoryId: repository.id, ownerThreadId: task.threadId || null, ...(['draft', 'recovery'].includes(delivery) ? { delivery } : {}), autopilot, environment, continuation, target: task.threadId && !continuation ? 'existing' : 'new', ...(task.threadId && !continuation ? { threadId: task.threadId } : {}), state: 'prepared', createdAt: now(), updatedAt: now() };
       data.launches.push(launch);
       return { launch, task: { key: task.key, title: task.title }, repository: { path: repository.path }, dispatch: true };
     });
@@ -35,6 +36,7 @@ export class LaunchLifecycle {
     return this.store.mutate(data => {
       const launch = data.launches.find(item => item.id === id);
       if (!launch || launch.state !== 'prepared') throw new Error('This launch has already been claimed. Check its saved state; do not send it again.');
+      if (launch.delivery === 'recovery' && launch.threadId !== this.store.task(data, launch.taskId).threadId) throw new Error('The owning chat changed. Refresh before recovering this task.');
       launch.state = 'dispatching'; touch(launch); return launch;
     });
   }
@@ -44,6 +46,8 @@ export class LaunchLifecycle {
       const launch = data.launches.find(item => item.id === requestId);
       if (launch?.state === 'accepted' && (launch.threadId === threadId || state === 'queued')) return launch;
       if (!launch || !['dispatching', 'queued'].includes(launch.state)) throw new Error('This launch is not awaiting a delivery result.');
+      if (state === 'resolved' && (launch.delivery !== 'recovery' || clientThreadId)) throw new Error('Only a recovery check without a dispatch can be resolved.');
+      if (launch.delivery === 'recovery' && (state === 'queued' || launch.threadId !== this.store.task(data, launch.taskId).threadId)) throw new Error('Recovery must retain the exact owning chat. Refresh before continuing.');
       if (state === 'sent' && !threadId) throw new Error('A delivered launch requires the verified Codex chat ID.');
       if (threadId && launch.threadId && launch.threadId !== threadId) throw new Error('The delivery result identifies a different chat than this launch.');
       if (state === 'queued' && !clientThreadId) throw new Error('A queued worktree launch requires its native clientThreadId.');
@@ -51,7 +55,7 @@ export class LaunchLifecycle {
       if (launch.target === 'new' && Object.hasOwn(launch, 'ownerThreadId') && launch.ownerThreadId !== (task.threadId || null) && task.threadId !== threadId) throw new Error('Another chat confirmed ownership after this launch. Check its delivery before continuing.');
       Object.assign(launch, { state, ...(threadId ? { threadId } : {}), ...(clientThreadId ? { clientThreadId } : {}), ...(error ? { error } : {}) });
       touch(launch);
-      if (threadId && state === 'sent') { task.threadId = threadId; task.updatedAt = now(); task.revision++; }
+      if (threadId && state === 'sent' && launch.delivery !== 'recovery') { task.threadId = threadId; task.updatedAt = now(); task.revision++; }
       return launch;
     });
   }
