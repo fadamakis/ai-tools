@@ -450,3 +450,98 @@ test('reopen navigation uses the authoritative response rather than the previous
   await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
   await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Latest reopened workflow',exact:true})).toBeVisible();
 });
+
+async function pollSaved(page:Page){
+  const response=page.waitForResponse(res=>res.url().endsWith('/api/tool')&&res.request().postDataJSON().name==='list_attention');
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await response;
+}
+test('task drafts survive updates and explicitly reconcile changed fields',async({page,request})=>{
+  const created=await add(request,'Edit this plan');const id=created.items[0].id;
+  await open(page);await page.locator('.inbox-task-open').click();
+  const editor=page.locator('.inbox-plan-editor'),name=editor.getByLabel('Task name',{exact:true});
+  const update=async(patch:Record<string,unknown>)=>{
+    const current=(await call(request,'list_attention')).items.find(task=>task.id===id)!;
+    await call(request,'plan_attention_task',{id,expectedVersion:current.version,operationId:crypto.randomUUID(),...patch});
+    await pollSaved(page);
+  };
+  await update({nextAction:'Latest clean action'});
+  await expect(editor.getByLabel('Next action')).toHaveValue('Latest clean action');
+  await name.fill('My unfinished title');await editor.getByLabel('Real due date').fill('2026-12-12');await name.focus();
+  await update({nextAction:'New action from another view',area:'blex'});
+  await expect(name).toHaveValue('My unfinished title');await expect(name).toBeFocused();
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  for(const theme of ['light','dark'] as const){
+    await page.emulateMedia({colorScheme:theme});
+    if(await page.locator('html').getAttribute('data-theme')!==theme)await page.getByRole('button',{name:`Switch to ${theme} theme`}).click();
+    await page.setViewportSize({width:theme==='light'?1440:375,height:1100});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+    await editor.screenshot({path:`../../.data/task-draft-conflict-${theme}.png`});
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await editor.getByRole('button',{name:'Keep my edits'}).click();
+  await expect(name).toHaveValue('My unfinished title');
+  await expect(editor.getByLabel('Real due date')).toHaveValue('2026-12-12');
+  await expect(editor.getByLabel('Next action')).toHaveValue('New action from another view');
+  await expect(editor.getByRole('combobox',{name:'Area'})).toHaveValue('blex');
+  await update({reviewDate:'2026-12-10'});
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  await editor.getByRole('button',{name:'Load latest'}).click();
+  await expect(name).toHaveValue('Edit this plan');
+  await expect(editor.getByLabel('Review date')).toHaveValue('2026-12-10');
+  await name.fill('My saved title');
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByText('Task plan saved.',{exact:true})).toBeVisible();
+  await update({title:'Updated after my save'});
+  await expect(name).toHaveValue('Updated after my save');
+  await expect(editor.getByRole('status')).toHaveCount(0);
+});
+test('failed and conflicting plan saves retain drafts and use the original version',async({page,request})=>{
+  const created=await add(request,'Save failure task');const task=created.items[0];
+  await open(page);await page.locator('.inbox-task-open').click();
+  const editor=page.locator('.inbox-plan-editor'),name=editor.getByLabel('Task name',{exact:true});
+  await name.fill('Keep this draft');let fail=true;
+  await page.route('**/api/tool',async route=>{
+    if(fail&&route.request().postDataJSON().name==='plan_attention_task'){
+      fail=false;await route.fulfill({status:503,json:{error:'Fixture save unavailable'}});
+    }else await route.continue();
+  });
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Fixture save unavailable'})).toBeVisible();
+  await expect(name).toHaveValue('Keep this draft');
+  await call(request,'plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:crypto.randomUUID(),nextAction:'Concurrent saved action'});
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Task changed in another view'})).toBeVisible();
+  await expect(name).toHaveValue('Keep this draft');
+  await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
+  expect((await call(request,'list_attention')).items[0].title).toBe('Save failure task');
+  await editor.getByRole('button',{name:'Keep my edits'}).click();
+  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
+  await expect(page.getByText('Task plan saved.',{exact:true})).toBeVisible();
+  const saved=(await call(request,'list_attention')).items[0];
+  expect(saved.title).toBe('Keep this draft');expect(saved.nextAction).toBe('Concurrent saved action');
+});
+for(const recovered of [false,true])test(`personal creation clears filters after ${recovered?'recovery':'immediate save'}`,async({page,request})=>{
+  await add(request,'Existing task');await open(page);
+  await page.getByRole('button',{name:'Filter by source: All sources'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'Slack',exact:true}).click();
+  await page.getByRole('button',{name:'Filter by area: All areas'}).click();
+  await page.getByRole('dialog').getByRole('option',{name:'BLEX',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search tasks'}).fill('cannot match new task');
+  await page.getByRole('button',{name:'Add task',exact:true}).click();
+  await page.getByLabel('Task name',{exact:true}).fill('New visible task');
+  if(recovered){
+    await page.getByRole('radio',{name:'Waiting',exact:true}).click();
+    await page.route('**/api/tool',async route=>{
+      if(route.request().postDataJSON().name==='create_personal_task'){await route.fetch();await route.abort('failed');}
+      else await route.continue();
+    });
+  }
+  await page.getByRole('button',{name:'Save task',exact:true}).click();
+  if(recovered){await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();await pollSaved(page);}
+  await expect(page.getByRole('radio',{name:recovered?/^Waiting /:/^Today /})).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'New visible task',exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'Search tasks'})).toHaveValue('');
+  await expect(page.getByRole('button',{name:'Filter by source: All sources'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Filter by area: All areas'})).toBeVisible();
+  expect((await call(request,'list_attention')).items.filter(task=>task.title==='New visible task')).toHaveLength(1);
+});

@@ -110,3 +110,5 @@
 .inbox-discuss{margin-top:20px}.inbox-discuss p{font-size:12px;line-height:1.6;margin-top:8px}.inbox-discuss [role=alert]{color:var(--color-text-danger,#b42318)}
 .inbox-discussion-actions{display:flex;gap:8px;flex-wrap:wrap}.inbox-discussion-links{margin-bottom:12px}.inbox-discussion-links button{margin-right:8px}
 .inbox-discussion-form{display:grid;gap:8px;margin-top:12px}.inbox-discussion-form label{font-size:12px}.inbox-discussion-form input{font:inherit;font-size:13px;width:100%;padding:8px 10px;color:inherit;background:transparent;border:1px solid var(--color-border-primary,#d1d5db);border-radius:8px}.inbox-discussion-form button{justify-self:start}
+
+.inbox-plan-conflict{margin-bottom:12px;color:var(--ink);font-size:13px}.inbox-plan-conflict p{margin:0 0 8px}.inbox-plan-conflict>div{display:flex;flex-wrap:wrap;gap:8px}

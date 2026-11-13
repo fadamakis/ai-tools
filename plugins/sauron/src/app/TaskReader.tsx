@@ -1,4 +1,4 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@ai-tools/ui';
 import { Menu } from '@ai-tools/ui';
 import type { Task } from '../shared/contracts.js';
@@ -40,21 +40,48 @@ function TaskActions({task,vm,label=`Actions for ${task.title}`}:{task:Task;vm:S
       <Menu.Item onSelect={()=>vm.setDismiss(task)}>Dismiss</Menu.Item>
     </Menu.Content></Menu>;
 }
+function planValues(task:Task){
+  return {title:task.title,nextAction:task.nextAction,area:task.area??'unassigned',
+    workflowState:task.state==='inbox'?(task.sourceState==='waiting'?'waiting' as const:'ready' as const):(task.workflowState??'ready'),
+    dueDate:task.dueDate??'',reviewDate:task.reviewDate??''};
+}
 function TaskPlanEditor({task,vm}:{task:Task;vm:SauronController}){
-  const [title,setTitle]=useState(task.title),[nextAction,setNextAction]=useState(task.nextAction);
-  const [area,setArea]=useState(task.area??'unassigned'),[workflowState,setWorkflowState]=useState(task.state==='inbox'?(task.sourceState==='waiting'?'waiting':'ready'):(task.workflowState??'ready'));
-  const [dueDate,setDueDate]=useState(task.dueDate??''),[reviewDate,setReviewDate]=useState(task.reviewDate??'');
+  const [baseline,setBaseline]=useState(()=>({task,values:planValues(task)}));
+  const [draft,setDraft]=useState(()=>planValues(task));
+  const keys=Object.keys(draft) as (keyof typeof draft)[];
+  const changed=keys.filter(key=>draft[key]!==baseline.values[key]);
+  const conflict=task.version!==baseline.task.version&&changed.length>0;
+  const reset=(saved:Task)=>{const values=planValues(saved);setBaseline({task:saved,values});setDraft(values);};
+  useEffect(()=>{
+    if(task.version!==baseline.task.version&&!changed.length)reset(task);
+  },[task,baseline,changed.length]);
+  const change=<K extends keyof typeof draft>(key:K,value:typeof draft[K])=>setDraft(previous=>({...previous,[key]:value}));
+  const {title,nextAction,area,workflowState,dueDate,reviewDate}=draft;
   const disabled=vm.busy||!!vm.pending;
-  const submit=()=>vm.plan(task,{title,nextAction,area,workflowState,dueDate:dueDate||null,reviewDate:reviewDate||null});
+  const submit=async()=>{
+    if(disabled||conflict)return;
+    const saved=await vm.plan(baseline.task,{...draft,dueDate:dueDate||null,reviewDate:reviewDate||null});
+    if(saved)reset(saved);
+  };
+  const keepEdits=()=>{
+    const values=planValues(task);
+    const edits=Object.fromEntries(changed.map(key=>[key,draft[key]]));
+    setBaseline({task,values});setDraft({...values,...edits});
+  };
   return <form className="inbox-plan-editor" onSubmit={event=>{event.preventDefault();submit();}} aria-label={`Plan ${task.title}`}>
     <h3>{task.state==='inbox'?'Review this task':'Task plan'}</h3>
-    <label>Task name<input value={title} maxLength={160} required disabled={disabled} onChange={event=>setTitle(event.target.value)}/></label>
-    <label>Next action<textarea value={nextAction} maxLength={400} rows={2} disabled={disabled} onChange={event=>setNextAction(event.target.value)}/></label>
-    <div className="inbox-plan-grid"><label>Area<select value={area} disabled={disabled} onChange={event=>setArea(event.target.value as typeof area)}>{Object.entries(areaLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-      <label>Status<select value={workflowState} disabled={disabled} onChange={event=>setWorkflowState(event.target.value as typeof workflowState)}><option value="ready">Ready</option><option value="in_progress">In progress</option><option value="waiting">Waiting</option>{task.state==='inbox'&&<option value="inbox">Inbox</option>}</select></label></div>
-    <div className="inbox-plan-grid"><label>Real due date<input type="date" value={dueDate} disabled={disabled} onChange={event=>setDueDate(event.target.value)}/></label>
-      <label>Review date<input type="date" value={reviewDate} disabled={disabled} onChange={event=>setReviewDate(event.target.value)}/></label></div>
-    <Button color="primary" size="sm" disabled={disabled||!title.trim()||workflowState==='inbox'} type="button" onClick={submit}>{task.state==='inbox'?'Accept task':'Save plan'}</Button>
+    {conflict&&<div className="inbox-plan-conflict" role="status">
+      <p>This task changed while you were editing. Load the latest values or keep your edits before saving.</p>
+      <div><Button color="secondary" size="sm" type="button" disabled={disabled} onClick={()=>reset(task)}>Load latest</Button>
+        <Button color="secondary" size="sm" type="button" disabled={disabled} onClick={keepEdits}>Keep my edits</Button></div>
+    </div>}
+    <label>Task name<input value={title} maxLength={160} required disabled={disabled} onChange={event=>change('title',event.target.value)}/></label>
+    <label>Next action<textarea value={nextAction} maxLength={400} rows={2} disabled={disabled} onChange={event=>change('nextAction',event.target.value)}/></label>
+    <div className="inbox-plan-grid"><label>Area<select value={area} disabled={disabled} onChange={event=>change('area',event.target.value as typeof area)}>{Object.entries(areaLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+      <label>Status<select value={workflowState} disabled={disabled} onChange={event=>change('workflowState',event.target.value as typeof workflowState)}><option value="ready">Ready</option><option value="in_progress">In progress</option><option value="waiting">Waiting</option>{task.state==='inbox'&&<option value="inbox">Inbox</option>}</select></label></div>
+    <div className="inbox-plan-grid"><label>Real due date<input type="date" value={dueDate} disabled={disabled} onChange={event=>change('dueDate',event.target.value)}/></label>
+      <label>Review date<input type="date" value={reviewDate} disabled={disabled} onChange={event=>change('reviewDate',event.target.value)}/></label></div>
+    <Button color="primary" size="sm" disabled={disabled||conflict||!title.trim()||workflowState==='inbox'} type="button" onClick={submit}>{task.state==='inbox'?'Accept task':'Save plan'}</Button>
   </form>;
 }
 function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:SauronController;position:number;total:number;back:()=>void;previous?:()=>void;next?:()=>void}){
@@ -86,7 +113,7 @@ function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:Sa
       <div className="inbox-detail-actions">{task.sourceUrl&&<Button variant="outline" color="secondary" size="sm" onClick={source}>{task.provider==='manual'?'Open sample source':'Open source'} <Icon name="arrow"/></Button>}
         {task.provider==='personal'&&<span className="inbox-muted">Added {date(task.createdAt??task.updatedAt)}</span>}
       </div>
-      {!historical&&<TaskPlanEditor key={`${task.id}:${task.version}`} task={task} vm={vm}/>}
+      {!historical&&<TaskPlanEditor key={task.id} task={task} vm={vm}/>}
       <DiscussTask task={task} storeId={vm.view!.storeId} client={vm.client} disabled={disabled} links={vm.view!.discussions?.filter(link=>link.taskId===task.id)??[]} onSaved={vm.apply}/>
       {task.provider==='slack'&&<div className="inbox-reader-reply"><ReplyComposer task={task} client={vm.client} disabled={disabled}/></div>}
     </div>
