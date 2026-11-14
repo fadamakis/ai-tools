@@ -1,3 +1,5 @@
+import {useTaskOrganisation} from './useTaskOrganisation.js';
+import {taskTree,visibleTaskRows,focusEligible} from '../shared/task-tree.js';
 import { useEffect, useRef, useState } from 'react';
 import { connect, type Client } from './client.js';
 import { syntheticObservation, defaultSourcePreferences, type LiveProvider, type SourceKind, type WorkArea, type Task, type TaskState, type Result, type DecisionInput, type PersonalTaskInput } from '../shared/contracts.js';
@@ -13,7 +15,7 @@ const storage={
 };
 const remember=(pending:Pending|null)=>{storage.write(pendingKey,pending);storage.write('attention:pending:v1',null);};
 const readPending=():Pending|null=>storage.read(pendingKey)??(storage.read('attention:pending:v1')?{kind:'decision',input:storage.read('attention:pending:v1')}:null);
-export type Draft={title:string;nextAction:string;sourceState:'needs_you'|'waiting'};
+export type Draft={parentId?:string;title:string;nextAction:string;sourceState:'needs_you'|'waiting'};
 const emptyDraft:Draft={title:'',nextAction:'',sourceState:'needs_you'};
 type Filter='today'|'inbox'|'waiting'|'snoozed'|'done'|'dismissed';
 
@@ -53,6 +55,9 @@ export function useSauronController(){
     catch(e){setError(e instanceof Error?e.message:'Request failed. Refresh to check saved state.');failure?.();}
     finally{gate.current=false;setBusy(false);}
   }
+  const organisation=useTaskOrganisation(view,client,run);
+  const [branchDecision,setBranchDecision]=useState<{task:Task;action:DecisionInput['action'];revision:number}|null>(null);
+  const addChild=(task:Task)=>{setDraft({...emptyDraft,parentId:task.id});setAdding(true);if(!organisation.expanded.has(task.id))organisation.toggle(task.id);};
   const readSaved=()=>{if(c.current)void run(()=>c.current!.call('list_attention'));};
   const refresh=()=>{if(c.current)void run(()=>c.current!.call('refresh_attention'));};
   async function saveSource(provider:LiveProvider,enabled:boolean,retry=false){
@@ -141,8 +146,11 @@ export function useSauronController(){
       }
     },()=>setRecovering(true));
   }
-  function decide(task:Task,action:DecisionInput['action']){
-    save({kind:'decision',input:{id:task.id,action,expectedVersion:task.version,operationId:operationId(),
+  function decide(task:Task,action:DecisionInput['action'],confirmed=false){
+    const tree=taskTree(view?.items??[]),hasOpen=tree.descendants(task.id).some(child=>child.state!=='done'&&child.state!=='dismissed');
+    const closedAncestors=tree.ancestors(task.id).some(parent=>parent.state==='done'||parent.state==='dismissed');
+    if(!confirmed&&((['complete','dismiss'].includes(action)&&hasOpen)||(action==='reopen'&&closedAncestors))){setBranchDecision({task,action,revision:view?.taskViewRevision??0});return;}
+    save({kind:'decision',input:{id:task.id,action,...(confirmed?{branch:true,expectedStoreId:view!.storeId,expectedRevision:branchDecision!.revision}:{}),expectedVersion:task.version,operationId:operationId(),
       ...(action==='snooze'?{snoozedUntil:new Date(Date.now()+3_600_000).toISOString()}:{}),}});
   }
   function finishCreation(task:Task){
@@ -159,7 +167,7 @@ export function useSauronController(){
   }
   function order(orderedIds:string[],focusIds:string[]){
     if(!client||!view)return;
-    const actionable=view.items.filter(task=>task.state==='ready'||task.state==='in_progress');
+    const actionable=view.items.filter(focusEligible);
     void run(()=>client.call('order_attention_tasks',{operationId:operationId(),expectedStoreId:view.storeId,orderedIds,focusIds,
       expectedVersions:actionable.map(task=>({id:task.id,version:task.version}))}),()=>setNotice('Order saved.'));
   }
@@ -179,13 +187,18 @@ export function useSauronController(){
   const count = (state: TaskState|'today') => allTasks.filter(task => state==='today'?(task.state==='ready'||task.state==='in_progress'):task.state === state).length;
   const history = filter === 'done' || filter === 'dismissed';
   const stateItems = allTasks.filter(task => filter==='today'?(task.state==='ready'||task.state==='in_progress'):task.state===filter);
-  const hasFilters = !!query.trim() || source !== 'all'||area!=='all';
-  const items = stateItems.filter(task => (source === 'all' || sourceOf(task) === source)
+  const hasFilters = !!query.trim() || source !== 'all'||area!=='all'||organisation.topic!=='all'||organisation.attentionOnly;
+  const matchedItems = stateItems.filter(task => (source === 'all' || sourceOf(task) === source)
     && (area==='all'||(task.area??(task.provider==='personal'?'personal':'unassigned'))===area)
+    && (organisation.topic==='all'||task.topicIds?.includes(organisation.topic))
+    && (!organisation.attentionOnly||task.ownNeedsAttention||!!task.descendantSummary?.attention)
     && `${task.title} ${task.nextAction}`.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a,b)=>filter==='today'?(a.focusOrder??99)-(b.focusOrder??99)||
       (a.state==='in_progress'?0:1)-(b.state==='in_progress'?0:1)||(a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id):
       (a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id));
+  const rows=visibleTaskRows(allTasks,new Set(matchedItems.map(task=>task.id)),organisation.expanded,organisation.showClosed,hasFilters||history);
+  const items=rows.map(row=>row.task);
+  const matchedCount=matchedItems.length;
   const showTools = !!view && (stateItems.length > 0 || hasFilters);
   const reopenTask = allTasks.find(task => task.id === reopenId && task.userDecision !== null
     && (task.state === 'done' || task.state === 'dismissed' || task.state === 'snoozed'));
@@ -195,7 +208,7 @@ export function useSauronController(){
   }
   function selectState(state: Filter) {
     if(!history&&(state==='done'||state==='dismissed'))currentView.current={filter,source,area,query};
-    setFilter(state);setSource('all');setArea('all');setQuery('');
+    setFilter(state);setSource('all');setArea('all');setQuery('');organisation.setTopic('all');organisation.setAttentionOnly(false);
   }
   function returnToTasks(){
     setFilter(currentView.current.filter);setSource(currentView.current.source);setArea(currentView.current.area);setQuery(currentView.current.query);
@@ -214,6 +227,6 @@ export function useSauronController(){
   };
   function dismissNotice(){setNotice('');setReopenId(null);}
   function cancelPending(){remember(null);setPending(null);setRecovering(false);if(pending?.kind==='create')cancelDraft();}
-  return {sourceSaving,sourceError,saveSource,retrySource,view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
+  return {organisation,rows,matchedCount,addChild,branchDecision,setBranchDecision,sourceSaving,sourceError,saveSource,retrySource,view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;

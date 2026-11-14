@@ -73,3 +73,17 @@ The unreleased local-managed implementation, verification boundary and safe writ
 Synthetic data in the browser preview; this image does not establish native-host acceptance.
 
 ![Sauron preview](https://raw.githubusercontent.com/fadamakis/ai-tools/main/docs/images/sauron.png)
+
+## Task grouping
+
+Tasks can contain children at multiple levels and retain their own discussion links.
+Use Move task or drag a task onto another task, then confirm the destination.
+Only top-level Ready or In progress tasks can occupy Top 3. Nesting removes the moved task's focus slot.
+Removing Top 3 deprioritises work without hiding it or clearing attention.
+
+Expand a task to inspect children. Closed children stay behind Show closed.
+Mark handled clears only the selected task's own attention; descendant counts remain independent.
+Direct topics are editable in task details. Descendants inherit topics from their current ancestors.
+Closing a parent with open descendants requires an explicit branch decision.
+
+Read the [requirements](docs/task-groups.md), [architecture](docs/architecture.md) and [upgrade notes](docs/compatibility.md) before changing this behaviour.

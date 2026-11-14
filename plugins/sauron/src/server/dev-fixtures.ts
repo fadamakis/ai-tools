@@ -55,7 +55,7 @@ export const invokeFixture:typeof invoke=(store,name,args,context)=>{
       return {...store.view(),reply:store.replies.byId(reply.id)};
     }
     default: {
-      if(!['configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
+      if(!['organise_attention_task','configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
       return invoke(store,name,args,context);
     }
   }

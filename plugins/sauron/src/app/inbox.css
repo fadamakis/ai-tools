@@ -115,3 +115,12 @@
 .inbox-source-help{font-size:12px;line-height:1.5;color:var(--muted);padding:4px 8px;white-space:normal;max-width:264px}
 .inbox-source-heading{font-size:12px;font-weight:600;color:var(--ink);padding:8px 8px 4px}
 .inbox-source-error{font-size:12px;line-height:1.5;color:var(--color-text-danger);padding:4px 8px;max-width:264px;overflow-wrap:anywhere}
+
+.inbox-task { margin-inline-start: calc(var(--task-depth, 0) * 14px); }
+.inbox-task.is-context .inbox-task-open h2 { font-weight: 500; }
+.inbox-organisation { display: grid; gap: 12px; margin-block: 24px; }
+.inbox-organisation form { display: grid; gap: 10px; }
+.inbox-organisation label, .inbox-topic-filter, .inbox-dialog label { display: grid; gap: 6px; }
+.inbox-organisation input, .inbox-topic-filter select, .inbox-dialog select { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; max-width: 100%; }
+.inbox-toolbar { flex-wrap: wrap; }
+.inbox-task .inbox-meta { flex-wrap: wrap; }

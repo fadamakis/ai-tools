@@ -79,9 +79,8 @@ test('official AppBridge harness renders Inbox and completes through stdio tools
     }]}})).structuredContent as any;
     const waitingCandidate=unreviewed.items.find((task:any)=>task.id==='synthetic:waiting');
     const unrelated=(await client.callTool({name:'plan_attention_task',arguments:{id:waitingCandidate.id,expectedVersion:waitingCandidate.version,operationId:crypto.randomUUID(),workflowState:'waiting'}})).structuredContent as any;
-    await page.evaluate(view=>(window as any).sendSauronView(view),{...unrelated,
-      items:unrelated.items.map((task:any)=>task.id===beforeComplete.items[0].id?beforeComplete.items[0]:task),
-      readAt:(result.structuredContent as any).readAt});
+    await page.evaluate(view=>(window as any).sendSauronView(view),{...unrelated,readAt:(result.structuredContent as any).readAt});
+    await page.evaluate(view=>(window as any).sendSauronView(view),{...beforeComplete,readAt:(result.structuredContent as any).readAt});
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await expect(app.getByRole('button',{name:/^History 1/})).toBeVisible();
     await expect(app.getByRole('radio',{name:/^Waiting 1/})).toBeVisible();
