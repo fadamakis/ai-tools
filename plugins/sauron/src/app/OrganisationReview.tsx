@@ -5,6 +5,7 @@ import type {Result} from '../shared/contracts.js';
 import type {ProposalChange,ReviewProposal} from '../shared/review-contracts.js';
 import type {SauronController} from './controller.js';
 import {operationId} from './operation.js';
+import {devBuildId} from '../shared/build-info.js';
 
 type Pending={tool:string;args:Record<string,unknown>;storeId:string};
 const pendingKey='sauron:review-pending:v1';
@@ -28,12 +29,17 @@ export function OrganisationReview({vm}:{vm:SauronController}){
   const state=vm.view?.organisationReview,review=vm.review;
   if(!state)return null;
   const disabled=vm.busy||!!vm.pending||!!vm.organisation.pending||!!review.pending||review.busy;
+  const origin=state.proposal?.status==='pending'?(state.proposal.origin??state.run?.origin):state.run?.origin;
+  const liveDev=!!devBuildId&&origin==='local_history'&&(state.run?.status!=='completed'||state.proposal?.status==='pending');
+  const reviewDisabled=disabled||liveDev;
   const start=(kind:'probe'|'bootstrap'|'daily')=>void review.call('review_organisation',{expectedStoreId:vm.view!.storeId,kind});
   return <details className="inbox-organisation-review"><summary>Organise tasks{state.proposal?.status==='pending'?` · ${state.proposal.changes.length} suggestions`:''}</summary>
     <p>{state.capability.detail}</p>
-    <div className="inbox-detail-actions"><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('probe')}>Check chat access</Button><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('bootstrap')}>Review last 14 days</Button><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('daily')}>Review changed chats</Button></div>
-    <p>Daily review: {state.enabled?'on at 07:00 Europe/Berlin':'off'}. Local Codex chats only. Suggestions wait here for your review.</p>
-    <Button color="secondary" size="sm" variant="outline" disabled={disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
+    {(origin||devBuildId)&&<p>{origin==='local_history'?'Real local-history review.':'Simulated chat review.'}</p>}
+    {devBuildId&&<p>Panel reviews use simulated chats. For real local history, run <code>pnpm sauron:dev:bootstrap</code>.{liveDev?' Resume that command or review its saved proposal before starting a simulated review.':''}</p>}
+    <div className="inbox-detail-actions"><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('probe')}>Check chat access</Button><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('bootstrap')}>Review last 14 days</Button><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('daily')}>Review changed chats</Button></div>
+    <p>{devBuildId?'Daily review is disabled in Sauron Dev.':`Daily review: ${state.enabled?'on at 07:00 Europe/Berlin':'off'}.`} Local Codex chats only. Suggestions wait here for your review.</p>
+    <Button color="secondary" size="sm" variant="outline" disabled={!!devBuildId||disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
     {state.run&&<p role="status">{review.busy?'Review running. Progress is saved.':state.run.status==='partial'?'Review has incomplete coverage. Resume to retry missing reads.':state.run.status==='failed'?'Review interrupted. Resume from saved progress.':'Review complete.'}</p>}
     {!!state.run?.errors.length&&<ul>{state.run.errors.map((error,i)=><li key={i}>{error}</li>)}</ul>}
     {state.proposal?.status==='pending'&&!review.busy&&<ProposalEditor key={state.proposal.id} proposal={state.proposal} vm={vm}/>}

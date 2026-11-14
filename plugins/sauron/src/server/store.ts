@@ -680,22 +680,24 @@ export class SauronStore {
       this.reviews.save({...state,enabled:request.enabled});
     });
   }
-  beginReview(kind:ReviewRun['kind']):{run:ReviewRun;started:boolean}{
+  beginReview(kind:ReviewRun['kind'],origin:NonNullable<ReviewRun['origin']>='local_history'):{run:ReviewRun;started:boolean}{
     return this.reviewChange(()=>{
       const state=this.reviews.state(),now=this.now().toISOString(),previous=state.run;
-      if(previous?.status==='running'&&Date.parse(now)-Date.parse(previous.heartbeatAt)<15*60_000)return {run:previous,started:false};
+      const previousOrigin=previous?.origin??(state.capability.runtime==='fixture'?'fixture':'local_history');
+      if(origin==='fixture'&&((previous&&previousOrigin==='local_history'&&previous.status!=='completed')||(state.proposal?.status==='pending'&&(state.proposal.origin??previousOrigin)==='local_history')))throw new StoreError('review_origin','Real-history review is saved. Resume with pnpm sauron:dev:bootstrap, or review its proposal first.');
+      if(previous?.status==='running'&&Date.parse(now)-Date.parse(previous.heartbeatAt)<15*60_000){if(previousOrigin!==origin)throw new StoreError('review_origin','A different review is still running. Wait for it to finish.');return {run:previous,started:false};}
       if(state.proposal?.status==='pending'&&previous?.status==='completed'&&kind!=='probe')return {run:previous,started:false};
-      const resumable=previous&&previous.kind===kind&&previous.status!=='completed';
+      const resumable=previous&&previousOrigin===origin&&previous.kind===kind&&previous.status!=='completed';
       const reviewed=state.proposal?.id===previous?.id&&(state.proposal?.status==='accepted'||state.proposal?.status==='dismissed');
       const pending=resumable?[...previous.pending,...previous.retryChats]:[];
       const refreshDiscovery=resumable&&previous.status==='partial';
-      const run:ReviewRun=resumable?{...previous,...(reviewed?{changes:[],basisRevision:null}:{}),leaseId:randomUUID(),status:'running',heartbeatAt:now,pending,retryChats:[],errors:[],stage:previous.stage==='propose'&&pending.length?'archived':previous.stage,pageComplete:previous.stage==='propose'&&pending.length?true:previous.pageComplete,...(refreshDiscovery?{through:now,stage:'active' as const,cursor:null,pageComplete:false}:{})}:
-        {id:randomUUID(),leaseId:randomUUID(),kind,status:'running',from:kind==='daily'&&state.lastCompleteThrough?new Date(Date.parse(state.lastCompleteThrough)-60_000).toISOString():new Date(Date.parse(now)-14*24*60*60_000).toISOString(),through:now,startedAt:now,heartbeatAt:now,stage:'active',cursor:null,pageComplete:false,pending:[],seen:{},seenActivity:{},chats:[],changes:[],basisRevision:null,errors:[],retryChats:[]};
+      const run:ReviewRun=resumable?{...previous,origin,...(reviewed?{changes:[],basisRevision:null}:{}),leaseId:randomUUID(),status:'running',heartbeatAt:now,pending,retryChats:[],errors:[],stage:previous.stage==='propose'&&pending.length?'archived':previous.stage,pageComplete:previous.stage==='propose'&&pending.length?true:previous.pageComplete,...(refreshDiscovery?{through:now,stage:'active' as const,cursor:null,pageComplete:false}:{})}:
+        {id:randomUUID(),origin,leaseId:randomUUID(),kind,status:'running',from:kind==='daily'&&state.lastCompleteThrough?new Date(Date.parse(state.lastCompleteThrough)-60_000).toISOString():new Date(Date.parse(now)-14*24*60*60_000).toISOString(),through:now,startedAt:now,heartbeatAt:now,stage:'active',cursor:null,pageComplete:false,pending:[],seen:{},seenActivity:{},chats:[],changes:[],basisRevision:null,errors:[],retryChats:[]};
       this.reviews.save({...state,run});return {run,started:true};
     });
   }
   checkpointReview(runId:string,leaseId:string,patch:Partial<ReviewRun>){
-    this.reviewChange(()=>{const run=this.reviews.requireLease(runId,leaseId);this.reviews.save({...this.reviews.state(),run:{...run,...patch,id:runId,leaseId,heartbeatAt:this.now().toISOString()}});});
+    this.reviewChange(()=>{const run=this.reviews.requireLease(runId,leaseId);this.reviews.save({...this.reviews.state(),run:{...run,...patch,id:runId,leaseId,origin:run.origin,heartbeatAt:this.now().toISOString()}});});
   }
   reviewCapability(runId:string,leaseId:string,capability:ReviewState['capability']){
     this.reviewChange(()=>{this.reviews.requireLease(runId,leaseId);this.reviews.save({...this.reviews.state(),capability});});
@@ -749,7 +751,7 @@ export class SauronStore {
       for(const change of changes)if(change.kind==='close')closureScopes[change.key]=[change.taskRef,...tree.descendants(change.taskRef).filter(task=>!closedTask(task)).map(task=>task.id)].sort();
       const complete=!run.errors.length;
       this.reviews.save({...state,nextAttemptAt:complete?null:new Date(this.now().getTime()+15*60_000).toISOString(),run:{...run,status:complete?'completed':'partial'},
-        ...(run.kind!=='probe'?{proposal:changes.length?{id:run.id,revision:(state.proposal?.id===run.id?state.proposal.revision+1:0),taskViewRevision:run.basisRevision??this.organisation.revision(),changes,closureScopes,coverage:['Local Codex history only; remote hosts and ChatGPT history are not covered.',...run.errors],status:'pending'}:null}:{}),
+        ...(run.kind!=='probe'?{proposal:changes.length?{origin:run.origin,id:run.id,revision:(state.proposal?.id===run.id?state.proposal.revision+1:0),taskViewRevision:run.basisRevision??this.organisation.revision(),changes,closureScopes,coverage:['Local Codex history only; remote hosts and ChatGPT history are not covered.',...run.errors],status:'pending'}:null}:{}),
         ...(complete&&run.kind!=='probe'?{lastCompleteThrough:run.through,lastDailyDate:reviewDate(new Date(run.through))}:{})});
     });
   }

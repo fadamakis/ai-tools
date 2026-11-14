@@ -4,6 +4,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {createInterface} from 'node:readline/promises';
+import {replaceDevDatabase} from './dev-archive.mjs';
 import {prepareLocalPlugin} from './prepare-local-plugin.mjs';
 import {devPaths,assertLocalPath,acquireDevLock,currentBuild,lockStatus,runtimeStatuses} from './dev-state.mjs';
 
@@ -119,23 +120,7 @@ export async function resetDevelopment(root=projectRoot){
     if(!existsSync(paths.database))throw Error('Dev database is missing. Run pnpm sauron:dev:setup.');
     const current=currentBuild(root);
     const {seedDevStore}=await import(pathToFileURL(join(current.build,'server/dev-fixtures.js')).href);
-    const staged=join(paths.root,`seed-${randomUUID()}.sqlite`);
-    seedDevStore(staged);
-    const archive=join(paths.root,'archives',randomUUID());
-    mkdirSync(archive,{recursive:true,mode:0o700});
-    const moved=[];
-    try{
-      for(const suffix of ['','-wal','-shm']){
-        const from=paths.database+suffix;
-        if(existsSync(from)){
-          assertLocalPath(root,from);
-          const to=join(archive,'attention.sqlite'+suffix);
-          renameSync(from,to);moved.push({from,to});
-        }
-      }
-      renameSync(staged,paths.database);
-    }catch(error){for(const {from,to} of moved.reverse())renameSync(to,from);throw error;}
-    return archive;
+    return replaceDevDatabase(root,path=>seedDevStore(path));
   }finally{release();}
 }
 
