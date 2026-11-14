@@ -1,6 +1,6 @@
 import {reviewTriggerSchema,configureReviewSchema,acceptProposalSchema} from '../shared/review-contracts.js';
 import {organiseTaskToolSchema} from '../shared/organisation.js';
-import { McpServer } from '@modelcontextprotocol/server';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
@@ -20,13 +20,17 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
   const icon={src:'data:image/svg+xml;base64,'+readFileSync(runtimeFile('assets/sidebar-icon.svg')).toString('base64'), mimeType:'image/svg+xml',sizes:['any']};
   const server = new McpServer({name:options.buildId?'sauron-dev':'sauron-local-prototype', version:JSON.parse(readFileSync(runtimeFile('plugin.json'),'utf8')).version, icons:[icon]});
   new OpenAIExtensions(server);
+  const resourceMetadata={title:options.buildId?'Sauron Dev':'Sauron', mimeType:'text/html;profile=mcp-app'};
+  const readView=async(uri:string)=>({contents:[{
+    uri, mimeType:'text/html;profile=mcp-app', text:readFileSync(htmlPath,'utf8'),
+    _meta:{ui:{csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{
+      preferredDisplayMode:'fullscreen',availableDisplayModes:['fullscreen'],
+    }},
+  }]});
   for(const uri of new Set([uiUri,UI_URI,'ui://attention/list-v0.6.6','ui://attention/list-v0.6.5','ui://attention/list-v0.6.4','ui://attention/list-v0.6.3','ui://attention/list-v0.6.2','ui://attention/list-v0.6.1','ui://attention/list-v0.6.0','ui://attention/list-v0.5.0','ui://attention/list-v0.4.2','ui://attention/list-v0.4.1','ui://attention/list-v0.4.0','ui://attention/list-v0.3.1']))server.registerResource('attention-view-'+uri, uri,
-    {title:options.buildId?'Sauron Dev':'Sauron', mimeType:'text/html;profile=mcp-app'}, async () => ({contents:[{
-      uri, mimeType:'text/html;profile=mcp-app', text:readFileSync(htmlPath, 'utf8'),
-      _meta:{ui:{csp:{connectDomains:[], resourceDomains:[]}}, 'openai/ui':{
-        preferredDisplayMode:'fullscreen', availableDisplayModes:['fullscreen'],
-      }},
-    }]}));
+    resourceMetadata,async()=>readView(uri));
+  if(options.buildId)server.registerResource('attention-dev-view',new ResourceTemplate(`${UI_URI}/dev/{buildId}`,{list:undefined}),
+    resourceMetadata,async uri=>readView(uri.href));
   const readOnly = {readOnlyHint:true, destructiveHint:false, openWorldHint:false};
   const definitions = [
     {name:'open_attention', title:options.buildId?'Sauron Dev':'Sauron', description:'Open your saved tasks, latest five-source Dot sync and independent manual check status.',

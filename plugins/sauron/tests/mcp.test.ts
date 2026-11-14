@@ -39,6 +39,7 @@ test('MCP discovery, {} global opening, app resource, replay and real process re
     }
     const legacy=await client.readResource({uri:'ui://attention/list-v1'});
     assert.deepEqual(legacy.contents.map(item=>'text' in item?item.text:null),resource.contents.map(item=>'text' in item?item.text:null));
+    await assert.rejects(client.readResource({uri:'ui://attention/list-v1/dev/previous-fixture'}),/Resource not found/);
     assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');
     assert.ok('text' in resource.contents[0] && resource.contents[0].text.includes('<div id="root">'));
     const before=(await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result;
