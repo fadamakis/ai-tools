@@ -16,7 +16,7 @@ test.beforeEach(async()=>{
   const runtime=join(dir,'runtime.cjs');
   writeFileSync(runtime,`#!/usr/bin/env node\nconst fs=require('node:fs');setTimeout(()=>fs.writeFileSync(process.argv[process.argv.indexOf('--output-last-message')+1],JSON.stringify({sources:{slack:{status:'checked',detail:'Fixture only'},granola:{status:'checked',detail:'Fixture only'}},items:[]})),2200);`,{mode:0o700});
   child=spawn(process.execPath,['dist/server/preview.js'],{env:{...process.env,PORT:String(port),ATTENTION_DB:join(dir,'test.sqlite'),SAURON_CODEX_BIN:runtime},stdio:['ignore','pipe','pipe']});
-  await new Promise<void>((resolve,reject)=>{child.stderr!.on('data',data=>{if(String(data).includes('Sauron preview:'))resolve();});child.once('error',reject);child.once('exit',code=>reject(Error(`Preview exited ${code}`)));});
+  await new Promise<void>((resolve,reject)=>{let stderr='';child.stderr!.on('data',data=>{stderr+=String(data);if(stderr.includes('Sauron preview:'))resolve();});child.once('error',reject);child.once('exit',code=>reject(Error(`Preview exited ${code}: ${stderr}`)));});
 });
 test.afterEach(async()=>{if(child?.exitCode===null){const exited=once(child,'exit');child.kill();await exited;}rmSync(dir,{recursive:true,force:true});});
 async function call(request:APIRequestContext,name:string,args:unknown={}):Promise<Result>{const res=await request.post(origin+'/api/tool',{data:{name,arguments:args}});expect(res.ok()).toBeTruthy();return res.json();}
