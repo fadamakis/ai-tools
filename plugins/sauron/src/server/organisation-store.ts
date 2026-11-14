@@ -10,12 +10,12 @@ export class OrganisationStore{
   private write(key:string,value:unknown){this.db.prepare('INSERT INTO metadata(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify(value));}
   revision(){return this.read('task_view_revision',0);}
   touch(){this.write('task_view_revision',this.revision()+1);}
-  get(task:Task):TaskOrganisation{return this.read('task-organisation:'+task.id,{parentId:null,directTopicIds:[],attention:task.sourceState==='needs_you'&&!task.userDecision,handledEvidence:null,evidence:taskEvidence(task),reopenSuggested:false,sourceClosed:'resolved' in task&&task.resolved});}
+  get(task:Task):TaskOrganisation{return this.read('task-organisation:'+task.id,{parentId:null,directTopicIds:[],attention:task.sourceState==='needs_you'&&!task.userDecision,handledEvidence:null,evidence:taskEvidence(task),reopenSuggested:false,sourceClosed:'resolved' in task&&task.resolved,closedAt:'resolved' in task&&task.resolved?task.updatedAt:null});}
   save(task:Task,value:TaskOrganisation){this.write('task-organisation:'+task.id,value);this.touch();}
   observe(task:Task){
     const previous=this.get(task),evidence=taskEvidence(task);
     if(previous.evidence===evidence)return;
-    this.save(task,{...previous,evidence,sourceClosed:previous.sourceClosed||('resolved' in task&&task.resolved),attention:previous.attention||task.sourceState==='needs_you',
+    this.save(task,{...previous,evidence,closedAt:previous.closedAt??('resolved' in task&&task.resolved?task.updatedAt:null),sourceClosed:previous.sourceClosed||('resolved' in task&&task.resolved),attention:previous.attention||task.sourceState==='needs_you',
       reopenSuggested:previous.reopenSuggested||((previous.sourceClosed||task.userDecision==='complete'||task.userDecision==='dismiss')&&task.sourceState==='needs_you')});
   }
   topics():Topic[]{return this.read('organisation_topics',[]);}

@@ -1,3 +1,4 @@
+import {reviewTriggerSchema,configureReviewSchema} from '../shared/review-contracts.js';
 import {existsSync,openSync,closeSync} from 'node:fs';
 import {SauronStore} from './store.js';
 import {syntheticObservation} from '../shared/contracts.js';
@@ -34,6 +35,8 @@ export function seedDevStore(path:string){
 
 export const invokeFixture:typeof invoke=(store,name,args,context)=>{
   switch(name){
+    case 'configure_organisation_review': {const request=configureReviewSchema.parse(args);if(request.enabled)throw Error('Scheduling is disabled in Sauron Dev.');return store.configureReview(request);}
+    case 'review_organisation': {const request=reviewTriggerSchema.parse(args);if(request.expectedStoreId!==store.storeId)throw Error('Store ID does not match.');const {run,started}=store.beginReview(request.kind);if(started){store.reviewCapability(run.id,run.leaseId,{status:'verified',runtime:'fixture',checkedAt:new Date().toISOString(),detail:'Simulated chat access. Schedules and connected chat reads are disabled.'});if(request.kind!=='probe')store.appendReviewChanges(run.id,run.leaseId,[{kind:'create',key:'fixture-parent',title:'Fixture: group related work',reason:'Simulated organisation proposal. No connected chats were read.',evidenceIds:[]}],[]);store.finishReview(run.id,run.leaseId);}return store.view();}
     case 'refresh_attention': return refreshFixtures(store);
     case 'check_scheduled_attention':
     case 'check_local_attention':
@@ -55,7 +58,7 @@ export const invokeFixture:typeof invoke=(store,name,args,context)=>{
       return {...store.view(),reply:store.replies.byId(reply.id)};
     }
     default: {
-      if(!['organise_attention_task','configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
+      if(!['accept_organisation_proposal','rebase_organisation_proposal','organise_attention_task','configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
       return invoke(store,name,args,context);
     }
   }

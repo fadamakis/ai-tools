@@ -16,3 +16,11 @@ When asked for chats started within a time window, use Codex app `list_threads` 
 Resolve every user-selected reference to one exact Codex chat using the previous list or Codex app read tools. Ask for clarification if a reference matches more than one chat. Never derive a chat ID from a title or assume that a chat contains an action item. Read `list_attention` to get the current Sauron store ID, then call `track_codex_threads` with the selected IDs and their observed titles. Use batches of at most 20. Leave `nextAction` empty unless the user supplied specific notes. One selected chat maps to one Sauron task.
 
 Read each tool result and report created, already tracked and failed chats. If the Codex app tools or Sauron tool are unavailable, report that limitation rather than inventing a chat link or claiming a task was saved.
+
+## Place explicitly selected chats
+
+When the user names a parent, resolve it against `list_attention` and use its exact task ID in each selected thread's `parentId`. Include the observed `taskViewRevision` as `expectedRevision`.
+If the response is lost, read saved state to confirm placement. A stale placement request is rejected rather than replaying over newer organisation.
+If names are ambiguous, ask which parent they mean. Do not infer parentage from titles or create an unrequested parent.
+Explicit placement does not wait for an organisation proposal. Existing tracked tasks keep their identity and discussion links.
+Explain Top 3 removal when moving an existing focus task beneath a parent.

@@ -130,7 +130,7 @@ Removing “Fix routine issues” from Top 3 leaves both branches visible in thi
   Accepting selected closure proposals is an explicit user decision.
 
 Organisation assistance is a Sauron capability. The user need not manage a separate agent or conversation to operate it.
-The background execution mechanism remains a technical design question.
+The implementation uses a read-only local chat adapter, a tool-disabled proposal worker and an opt-in macOS schedule.
 
 ## 5. Acceptance scenarios
 
@@ -174,26 +174,23 @@ Detailed UI design, scheduling mechanisms, database design, and tool signatures 
 ### Delivery status
 
 Release 1 implements manual hierarchy, topics, attention, branch decisions and root-only focus.
-Release 2 adds bootstrap and daily organisation proposals. Native activation remains a separate acceptance gate.
+Release 2 implements bootstrap and daily organisation proposals for local Codex history. Remote hosts and ChatGPT history remain outside discovery coverage. Native activation remains a separate acceptance gate.
 No release adds parking: deprioritising means removing Top 3 or changing task order while retaining visibility and attention.
 
-### Technical investigations
+### Technical decisions and remaining verification
 
-- **I-01:** Establish chat discovery coverage, pagination, activity timestamps, resumed-chat detection, and stable identity for avoiding duplicate tracking.
-- **I-02:** Verify background access to the same chat evidence and capabilities available during an interactive review.
-  Define how missing access or partial coverage is reported before choosing a scheduler.
-- **I-03:** Determine whether unread and partial-read signals exist. Identify which attention evidence is reliable and which requires explicit user input.
-- **I-04:** Map the requirements onto existing Inbox, Ready, In progress, Waiting, completed, and dismissed behaviour.
-  Define prioritisation and summary semantics without overwriting existing decisions or confusing evidence with planning state.
-- **I-05:** Establish persistence and upgrade requirements for hierarchy, topics, attention decisions, and proposals.
-  Compare existing saved data before replacing any build, preserve readability, and document any required migration.
+- **I-01:** The local app-server adapter lists active and archived Codex history by update time, with pagination and stable chat IDs. Turn evidence identifies resumed work.
+- **I-02:** Capability checks verify background listing and content reads. Local MCP servers are disabled for both the reader and the proposal worker. Missing access and partial coverage remain explicit.
+- **I-03:** Attention uses saved source evidence, explicit decisions and new assistant responses. It does not claim reliable unread or partial-read detection.
+- **I-04:** Hierarchy and attention remain separate from Inbox, Ready, In progress, Waiting, completion, dismissal and timed Snooze. Deprioritisation uses Top 3 and ordering.
+- **I-05:** Schema 4 adds organisation metadata and preserves task identities and saved decisions. Disposable saved-data copies pass repeated reopening. Native activation and loaded build ID remain a separate verification gate.
 
 Current capability and compatibility references:
 
 - [AI Tools](../../../PRODUCT.md)
 - [Sauron](../README.md)
+- [Architecture](architecture.md)
 - [Sauron compatibility](compatibility.md)
 
-The existing product supports selected-chat tracking and saved discussion links.
-That does not establish automatic two-week discovery, daily background chat access, or reliable read-state detection.
-
+Implementation covers local Codex history only. Remote hosts and ChatGPT history are outside current discovery coverage.
+Installation and opening Sauron do not enable reviews or schedules.

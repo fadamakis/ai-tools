@@ -44,7 +44,8 @@ export const summaryLabel=(summary:BranchSummary)=>[
 export type TreeRow={task:Task;depth:number;context:boolean};
 export function visibleTaskRows(tasks:readonly Task[],matches:ReadonlySet<string>,expanded:ReadonlySet<string>,showClosed:ReadonlySet<string>,filtered=false):TreeRow[]{
   const tree=taskTree(tasks),included=new Set(matches);
-  for(const id of showClosed)for(const task of tree.descendants(id).filter(closedTask))included.add(task.id);
+  for(const id of matches)for(const task of tree.ancestors(id))included.add(task.id);
+  if(!filtered)for(const id of showClosed)if(included.has(id))for(const task of tree.descendants(id).filter(closedTask))included.add(task.id);
   for(const id of [...included])for(const task of tree.ancestors(id))included.add(task.id);
   const sort=(items:Task[],root=false)=>[...items].sort((a,b)=>root?
     (a.focusOrder??99)-(b.focusOrder??99)||(a.state==='in_progress'?0:1)-(b.state==='in_progress'?0:1)||(a.order??999999)-(b.order??999999)||a.id.localeCompare(b.id):

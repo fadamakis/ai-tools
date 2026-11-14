@@ -87,3 +87,21 @@ Direct topics are editable in task details. Descendants inherit topics from thei
 Closing a parent with open descendants requires an explicit branch decision.
 
 Read the [requirements](docs/task-groups.md), [architecture](docs/architecture.md) and [upgrade notes](docs/compatibility.md) before changing this behaviour.
+
+## Organisation assistance
+
+Open Organise tasks to check local chat access, review the last 14 days, or review changed chats.
+Bootstrap includes resumed older chats and indexed archived chats, and considers every saved task.
+Current discovery covers local Codex history. Remote hosts and ChatGPT history are not covered.
+Missing reads, unfinished turns and budget limits remain visible as incomplete coverage.
+
+One editable proposal shows new parents, placements, topics, tracking additions and closures.
+Exclude changes individually, then accept the remainder together. Excluding a required parent blocks dependent changes until corrected.
+Task changes during review require loading the latest proposal. Excluded closures and edited placements survive that refresh.
+New activity in closed work suggests reopening; it never reopens tasks automatically.
+
+Daily review is off until explicitly enabled after a successful chat-access check.
+Enabling installs a macOS user schedule for this store. It checks whether 07:00 Europe/Berlin is due and catches up after downtime.
+Disabling removes the schedule without deleting tasks. Installation, opening the panel and polling saved state do not enable it.
+The schedule uses stable runtime copies beside the database. Toggle daily review off and on after an installed runtime upgrade to refresh those copies.
+Sauron Dev simulates organisation proposals and rejects real schedule enablement.

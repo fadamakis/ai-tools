@@ -4,12 +4,12 @@ import {mkdtemp,writeFile,readFile,rm,chmod} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {resolveCodexCli} from './codex-cli.mjs';
-import {localPolicyArgs,minimalAgentEnv} from './local-policy.js';
+import {localPolicyArgs,minimalAgentEnv,inertServerArgs} from './local-policy.js';
 
 export class AgentError extends Error {
   constructor(readonly code:'timeout'|'runtime'|'output'|'budget'|'policy'){super(code);}
 }
-export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string;providers?:LiveProvider[]}={}) {
+export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string;providers?:LiveProvider[];denyAllLocalServers?:boolean}={}) {
   const dir=await mkdtemp(join(tmpdir(),'sauron-local-'));
   await chmod(dir,0o700);
   try{
@@ -17,12 +17,16 @@ export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli
     await writeFile(schemaPath,JSON.stringify(schema),{mode:0o600});
     await writeFile(resultPath,'',{mode:0o600});
     const cli=options.cli??process.env.SAURON_CODEX_BIN??resolveCodexCli();
-    const policy=localPolicyArgs(options.providers);
-    // CLI inventory is configuration-only. Abort if a newly installed plugin
-    // would add a local server not covered by the explicit deny list.
-    let servers:{enabled?:boolean}[];
+    let policy=localPolicyArgs(options.providers);
+    let servers:{name?:string;enabled?:boolean;transport?:{type?:string}}[];
     try{servers=JSON.parse(execFileSync(cli,['mcp','list','--json',...policy],{encoding:'utf8',timeout:20000,env:minimalAgentEnv(),stdio:['ignore','pipe','ignore'],maxBuffer:1_000_000}));}
     catch{throw new AgentError('policy');}
+    if(!Array.isArray(servers))throw new AgentError('policy');
+    if(options.denyAllLocalServers){
+      try{policy.push(...inertServerArgs(servers));}catch{throw new AgentError('policy');}
+      try{servers=JSON.parse(execFileSync(cli,['mcp','list','--json',...policy],{encoding:'utf8',timeout:20000,env:minimalAgentEnv(),stdio:['ignore','pipe','ignore'],maxBuffer:1_000_000}));}
+      catch{throw new AgentError('policy');}
+    }
     if(!Array.isArray(servers)||servers.some(server=>server.enabled!==false))throw new AgentError('policy');
     const args=['--no-daemon','exec','--ephemeral','--ignore-user-config','--strict-config','--sandbox','read-only','--skip-git-repo-check',
       '--cd',dir,'--json','--output-schema',schemaPath,'--output-last-message',resultPath,
@@ -43,6 +47,7 @@ export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli
           try{
             const event=JSON.parse(line);
             if(event.type==='item.started'&&event.item?.type==='mcp_tool_call'){
+              if(options.denyAllLocalServers){stop();finish(new AgentError('policy'));return;}
               observedTools.push(`${event.item.server}:${event.item.tool}`);
               if(observedTools.length>60){stop();finish(new AgentError('budget'));}
             }

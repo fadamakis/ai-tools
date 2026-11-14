@@ -39,3 +39,14 @@ export function minimalAgentEnv(env:NodeJS.ProcessEnv=process.env):NodeJS.Proces
 }
 
 export const localPolicyDigest=createHash('sha256').update(JSON.stringify(localPolicyArgs())).digest('hex');
+
+export function inertServerArgs(input:unknown):string[]{
+  if(!Array.isArray(input))throw Error('Invalid local server inventory.');
+  const args:string[]=[];
+  for(const server of input){
+    if(typeof server?.name!=='string'||!/^[-a-zA-Z0-9_]+$/.test(server.name)||!['stdio','streamable_http'].includes(server.transport?.type))throw Error('Unsupported local server inventory.');
+    const key='mcp_servers.'+server.name;
+    args.push('-c',key+'.enabled=false','-c',key+(server.transport.type==='stdio'?'.command="/usr/bin/false"':'.url="https://example.invalid"'));
+  }
+  return args;
+}

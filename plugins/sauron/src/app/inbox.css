@@ -124,3 +124,17 @@
 .inbox-organisation input, .inbox-topic-filter select, .inbox-dialog select { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; max-width: 100%; }
 .inbox-toolbar { flex-wrap: wrap; }
 .inbox-task .inbox-meta { flex-wrap: wrap; }
+.inbox-organisation-review { margin-block: 12px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; }
+.inbox-organisation-review > summary { cursor: pointer; font-weight: 500; }
+.inbox-organisation-review p { margin-block: 10px; line-height: 1.5; }
+.inbox-proposal { margin-top: 20px; }
+.inbox-proposal fieldset { min-width: 0; border: 0; border-top: 1px solid var(--line); padding-block: 14px; margin-block: 12px; }
+.inbox-proposal legend { max-width: 100%; overflow-wrap: anywhere; }
+.inbox-proposal label { display: block; }
+.inbox-proposal input:not([type=checkbox]), .inbox-proposal select { display: block; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); padding: 8px; width: 100%; max-width: 100%; margin-top: 6px; }
+.inbox-proposal input[type=checkbox] { margin-inline-end: 8px; accent-color: var(--brand); }
+.inbox-task-menu { padding: 5px; background: var(--surface); color: var(--ink); border-radius: 8px; box-shadow: 0 8px 24px #0003; z-index: 200; max-height: calc(100dvh - 24px); overflow-y: auto; font-size: 13px; }
+.inbox-task-menu-item { cursor: pointer; padding: 7px 10px; border-radius: 4px; outline: none; }
+.inbox-task-menu-item[data-highlighted] { background: var(--brand-soft); }
+.inbox-task-menu-item[data-disabled] { opacity: .5; pointer-events: none; }
+@media(min-width:960px){.inbox-main:has(>.inbox-organisation-review) .inbox-list { min-height: 260px; }}

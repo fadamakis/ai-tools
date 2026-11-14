@@ -1,3 +1,4 @@
+import type {ReviewState} from './review-contracts.js';
 import { z } from 'zod';
 import type {Topic} from './organisation.js';
 import type {BranchSummary} from './task-tree.js';
@@ -183,6 +184,7 @@ export const proposeCodexFollowupsSchema=z.strictObject({
 
 export const trackCodexThreadsSchema = z.strictObject({
   expectedStoreId: z.string().uuid(),
+  expectedRevision:z.number().int().nonnegative().optional(),
   threads: z.array(z.strictObject({
     parentId:z.string().min(1).nullable().optional(),
     threadId: z.string().uuid(),
@@ -243,7 +245,7 @@ export const saveDiscussionSchema=linkDiscussionSchema.extend({url:z.string().ma
   try{return canonicalDiscussionUrl(value.trim());}catch{ctx.addIssue({code:'custom',message:'Paste a ChatGPT or Codex conversation link.'});return z.NEVER;}
 })});
 export type DiscussionLink={taskId:string;url:string;createdAt:string};
-export type View = { taskViewRevision?:number;topics?:Topic[]; items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; sourcePreferences?:SourcePreferences; pendingSourceSync?:boolean;scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
+export type View = { organisationReview?:ReviewState; taskViewRevision?:number;topics?:Topic[]; items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; sourcePreferences?:SourcePreferences; pendingSourceSync?:boolean;scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
 export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[];proposedFollowups?:{id:string;status:'created'|'already_proposed'}[] };
 
 export const syntheticObservation = (version = 1): Observation => ({

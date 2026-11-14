@@ -74,6 +74,7 @@ test('N-01 N-02: roots collapse, attention sorts first, closed children are opt-
   const rows=visibleTaskRows(tasks,matches,new Set([root]),new Set());assert.equal(rows[1].task.id,b);assert.equal(rows.length,3);
   assert.equal(visibleTaskRows(tasks,matches,new Set([root]),new Set([root])).length,4);
   const filtered=visibleTaskRows(tasks,new Set([b]),new Set(),new Set(),true);assert.deepEqual(filtered.map(row=>[row.task.id,row.context]),[[root,true],[b,false]]);
+  assert.deepEqual(visibleTaskRows(tasks,new Set([b]),new Set(),new Set([root]),true).map(row=>row.task.id),[root,b]);
 });
 test('I-05: schema migration preserves task bytes, discussions and store identity; old readers reject schema 4',t=>{
   const f=fixture(t),id=f.add('Saved'),storeId=f.store.storeId;const db=new DatabaseSync(f.path);const before=db.prepare('SELECT data FROM tasks').get()!.data;db.exec('PRAGMA user_version=3');db.close();f.restart();
@@ -82,4 +83,10 @@ test('I-05: schema migration preserves task bytes, discussions and store identit
 test('I-05: task-view revisions prevent delayed views restoring old structure',t=>{
   const f=fixture(t),a=f.add('A'),b=f.add('B'),before=f.store.view();f.organise({action:'move',id:b,parentId:a});const after=f.store.view();
   assert.equal(mergeSavedView(after,before).items.find(task=>task.id===b)?.parentId,a);
+});
+test('O-05 F-03: explicit chat placement checks the current tree revision and stale retries cannot override a later move',t=>{
+  const f=fixture(t),a=f.add('A'),b=f.add('B'),threadId=randomUUID();let revision=f.store.view().taskViewRevision!;
+  const request={expectedStoreId:f.store.storeId,expectedRevision:revision,threads:[{threadId,title:'Tracked work',parentId:a}]};assert.equal(f.store.trackCodexThreads(request).trackedThreads?.[0]?.status,'created');const id='personal:'+threadId;
+  f.organise({action:'move',id,parentId:b});assert.equal(f.store.trackCodexThreads(request).trackedThreads?.[0]?.status,'failed');assert.equal(f.get(id).parentId,b);
+  revision=f.store.view().taskViewRevision!;f.store.trackCodexThreads({...request,expectedRevision:revision,threads:[{threadId,title:'Tracked work',parentId:null}]});assert.equal(f.get(id).parentId,null);
 });

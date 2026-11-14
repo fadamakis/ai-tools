@@ -1,3 +1,5 @@
+import {SauronStore} from '../../src/server/store.js';
+import type {ProposalChange} from '../../src/shared/review-contracts.js';
 import { test,expect, type Page, type APIRequestContext } from '@playwright/test';
 import { build } from 'esbuild';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -573,4 +575,30 @@ test('H-05 A-04: closing a branch is explicit and child attention survives handl
   await page.getByRole('button',{name:'Keep parent open'}).click();expect((await call(request,'list_attention')).items.every(task=>task.state==='ready')).toBe(true);
   await page.getByRole('button',{name:'Complete Attention parent',exact:true}).click();await page.getByRole('button',{name:'Confirm branch closure'}).click();
   await expect(page.getByRole('button',{name:'Complete Attention parent',exact:true})).toHaveCount(0);expect((await call(request,'list_attention')).items.every(task=>task.state==='done')).toBe(true);
+});
+
+function seedProposal(changes:ProposalChange[]){
+  const store=new SauronStore(join(dir,'test.sqlite'));
+  try{const {run}=store.beginReview('bootstrap');store.appendReviewChanges(run.id,run.leaseId,changes,[]);store.finishReview(run.id,run.leaseId);}finally{store.close();}
+}
+test('O-03: editable proposals preserve excluded closures across reload and apply the selected batch together',async({page,request})=>{
+  await page.setViewportSize({width:375,height:1000});await page.emulateMedia({colorScheme:'dark'});
+  await add(request,'Existing work');const view=await add(request,'Keep open');const existing=view.items.find(task=>task.title==='Existing work')!,keep=view.items.find(task=>task.title==='Keep open')!;
+  seedProposal([{kind:'create',key:'group',title:'Suggested group',reason:'Related work.',evidenceIds:[]},{kind:'move',key:'move',taskRef:existing.id,parentRef:'group',reason:'Related.',evidenceIds:[]},{kind:'topics',key:'topics',taskRef:'group',topics:['routines'],reason:'Shared subject.',evidenceIds:[]},{kind:'close',key:'close',taskRef:keep.id,reason:'Review relevance.',evidenceIds:[]}]);
+  await open(page);await page.getByText('Organise tasks · 4 suggestions',{exact:true}).click();
+  const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await page.getByRole('textbox',{name:'Parent name',exact:true}).fill('Chosen group');
+  await page.reload();await page.getByText('Organise tasks · 4 suggestions',{exact:true}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('textbox',{name:'Parent name',exact:true})).toHaveValue('Chosen group');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();mkdirSync(evidence,{recursive:true});await page.screenshot({path:evidence+'/proposal-375.png',fullPage:true});
+  await page.getByRole('button',{name:'Accept 3 selected changes'}).click();await expect(page.getByRole('heading',{name:'Chosen group',exact:true})).toBeVisible();
+  const saved=await call(request,'list_attention'),parent=saved.items.find(task=>task.title==='Chosen group')!;expect(saved.items.find(task=>task.id===existing.id)?.parentId).toBe(parent.id);expect(saved.items.find(task=>task.id===keep.id)?.state).toBe('ready');expect(parent.directTopicIds).toHaveLength(1);
+});
+test('O-03: excluded dependencies block acceptance and a lost committed response retries without duplicate parents',async({page,request})=>{
+  const view=await add(request,'Existing work'),existing=view.items[0];seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'move',key:'move',taskRef:existing.id,parentRef:'parent',reason:'Related.',evidenceIds:[]}]);
+  await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).uncheck();await expect(page.getByText('A selected change needs an excluded parent or task. Include it or choose another destination.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).check();
+  let lost=false;await page.route('**/api/tool',async route=>{if(!lost&&route.request().postDataJSON().name==='accept_organisation_proposal'){lost=true;await route.fetch();await route.abort('failed');return;}await route.continue();});
+  await page.getByRole('button',{name:'Accept 2 selected changes'}).click();await expect(page.getByRole('button',{name:'Retry review action'})).toBeVisible();await page.reload();await page.getByText('Organise tasks',{exact:true}).click();await page.getByRole('button',{name:'Retry review action'}).click();await expect(page.getByRole('button',{name:'Retry review action'})).toHaveCount(0);expect((await call(request,'list_attention')).items.filter(task=>task.title==='Suggested parent')).toHaveLength(1);
+});
+test('O-03: refreshing a stale proposal preserves the user’s excluded closure',async({page,request})=>{
+  const view=await add(request,'Keep open'),id=view.items[0].id;seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'close',key:'close',taskRef:id,reason:'Review relevance.',evidenceIds:[]}]);
+  await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await add(request,'Concurrent work');await page.reload();await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('button',{name:'Load latest proposal'}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeEnabled();
 });

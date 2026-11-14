@@ -1,0 +1,67 @@
+import {useEffect,useState} from 'react';
+import {Button,Checkbox} from '@ai-tools/ui';
+import type {Client} from './client.js';
+import type {Result} from '../shared/contracts.js';
+import type {ProposalChange,ReviewProposal} from '../shared/review-contracts.js';
+import type {SauronController} from './controller.js';
+import {operationId} from './operation.js';
+
+type Pending={tool:string;args:Record<string,unknown>;storeId:string};
+const pendingKey='sauron:review-pending:v1';
+const readPending=():Pending|null=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)??'null');}catch{return null;}};
+export function useOrganisationReview(view:Result|null,client:Client|null,run:(work:()=>Promise<Result>)=>Promise<Result|undefined>,apply:(view:Result)=>void){
+  const [pending,setPending]=useState<Pending|null>(readPending);
+  const remember=(value:Pending|null)=>{setPending(value);try{if(value)sessionStorage.setItem(pendingKey,JSON.stringify(value));else sessionStorage.removeItem(pendingKey);}catch{}};
+  const call=async(tool:string,args:Record<string,unknown>)=>{
+    if(!client||!view)return;remember({tool,args,storeId:view.storeId});
+    const saved=await run(()=>client.call(tool,args));if(saved)remember(null);return saved;
+  };
+  const busy=view?.organisationReview?.run?.status==='running';
+  useEffect(()=>{
+    if(!busy||!client)return;let active=true,loading=false;
+    const timer=window.setInterval(async()=>{if(loading)return;loading=true;try{const saved=await client.call('list_attention');if(active)apply(saved);}catch{}finally{loading=false;}},1500);
+    return()=>{active=false;window.clearInterval(timer);};
+  },[busy,client]);
+  return {pending,busy,call,cancel:()=>remember(null),retry:()=>pending&&view?.storeId===pending.storeId?call(pending.tool,pending.args):undefined};
+}
+export function OrganisationReview({vm}:{vm:SauronController}){
+  const state=vm.view?.organisationReview,review=vm.review;
+  if(!state)return null;
+  const disabled=vm.busy||!!vm.pending||!!vm.organisation.pending||!!review.pending||review.busy;
+  const start=(kind:'probe'|'bootstrap'|'daily')=>void review.call('review_organisation',{expectedStoreId:vm.view!.storeId,kind});
+  return <details className="inbox-organisation-review"><summary>Organise tasks{state.proposal?.status==='pending'?` · ${state.proposal.changes.length} suggestions`:''}</summary>
+    <p>{state.capability.detail}</p>
+    <div className="inbox-detail-actions"><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('probe')}>Check chat access</Button><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('bootstrap')}>Review last 14 days</Button><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>start('daily')}>Review changed chats</Button></div>
+    <p>Daily review: {state.enabled?'on at 07:00 Europe/Berlin':'off'}. Local Codex chats only. Suggestions wait here for your review.</p>
+    <Button color="secondary" size="sm" variant="outline" disabled={disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
+    {state.run&&<p role="status">{review.busy?'Review running. Progress is saved.':state.run.status==='partial'?'Review has incomplete coverage. Resume to retry missing reads.':state.run.status==='failed'?'Review interrupted. Resume from saved progress.':'Review complete.'}</p>}
+    {!!state.run?.errors.length&&<ul>{state.run.errors.map((error,i)=><li key={i}>{error}</li>)}</ul>}
+    {state.proposal?.status==='pending'&&!review.busy&&<ProposalEditor key={state.proposal.id} proposal={state.proposal} vm={vm}/>}
+    {review.pending&&<div role="status"><p>A review action needs checking. Retrying uses its original request.</p><Button color="secondary" size="sm" disabled={vm.busy} onClick={()=>void review.retry()}>Retry review action</Button><Button color="secondary" size="sm" variant="ghost" onClick={review.cancel}>Cancel retry</Button></div>}
+  </details>;
+}
+function ProposalEditor({proposal,vm}:{proposal:ReviewProposal;vm:SauronController}){
+  const draftKey='sauron:proposal-draft:'+proposal.id;
+  const load=()=>{try{const saved=JSON.parse(sessionStorage.getItem(draftKey)??'null');if(saved?.revision===proposal.revision)return saved as {revision:number;changes:ProposalChange[];selected:string[]};}catch{}return {revision:proposal.revision,changes:proposal.changes,selected:proposal.changes.map(change=>change.key)};};
+  const [draft,setDraft]=useState(load);
+  useEffect(()=>{try{sessionStorage.setItem(draftKey,JSON.stringify(draft));}catch{}},[draft]);
+  const selected=new Set(draft.selected),stale=draft.revision!==proposal.revision||proposal.taskViewRevision!==vm.view?.taskViewRevision;
+  const references=new Set([...(vm.view?.items??[]).map(task=>task.id),...draft.changes.filter(change=>selected.has(change.key)&&(change.kind==='create'||change.kind==='track')).map(change=>change.key)]);
+  const dependency=draft.changes.filter(change=>selected.has(change.key)).some(change=>('parentRef' in change&&change.parentRef&&!references.has(change.parentRef))||('taskRef' in change&&!references.has(change.taskRef)));
+  const disabled=vm.busy||!!vm.review.pending||!!vm.pending||!!vm.organisation.pending;
+  const edit=(key:string,patch:Record<string,unknown>)=>setDraft(old=>({...old,changes:old.changes.map(change=>change.key===key?{...change,...patch} as ProposalChange:change)}));
+  const name=(ref:string)=>{const change=draft.changes.find(change=>change.key===ref);return (vm.view?.items??[]).find(task=>task.id===ref)?.title??(change&&'title' in change?change.title:ref);};
+  const accept=()=>void vm.review.call('accept_organisation_proposal',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedRevision:vm.view!.taskViewRevision,proposalId:proposal.id,expectedProposalRevision:proposal.revision,changes:draft.changes.filter(change=>selected.has(change.key))});
+  return <section className="inbox-proposal" aria-label="Organisation proposal"><h3>Review proposed changes</h3><p>Selected changes apply together. Closing work is an explicit decision here.</p>
+    {proposal.coverage.map((detail,i)=><p key={i} className="inbox-muted">{detail}</p>)}
+    {stale&&<div role="alert"><p>Tasks or this proposal changed. Review the latest state before accepting.</p><Button color="secondary" size="sm" disabled={disabled} onClick={()=>void vm.review.call('rebase_organisation_proposal',{operationId:operationId(),expectedStoreId:vm.view!.storeId,proposalId:proposal.id,expectedProposalRevision:proposal.revision}).then(saved=>{const latest=saved?.organisationReview?.proposal;if(latest)setDraft(old=>({revision:latest.revision,changes:latest.changes.map(change=>old.changes.find(previous=>previous.key===change.key)??change),selected:old.selected.filter(key=>latest.changes.some(change=>change.key===key))}));})}>Load latest proposal</Button></div>}
+    {draft.changes.map(change=><fieldset key={change.key} disabled={disabled}><legend><Checkbox disabled={disabled} checked={selected.has(change.key)} onCheckedChange={checked=>setDraft(old=>({...old,selected:checked?[...old.selected,change.key]:old.selected.filter(key=>key!==change.key)}))} label={<>{change.kind==='create'?'Create parent':change.kind==='track'?'Track chat':change.kind==='move'?'Move task':change.kind==='topics'?'Assign topics':'Close branch'}: {'title' in change?change.title:name(change.taskRef)}</>}/></legend><p>{change.reason}</p>{'taskRef' in change&&vm.organisation.tree.byId.has(change.taskRef)&&<p>Current: {vm.organisation.tree.byId.get(change.taskRef)?.state} · {vm.organisation.tree.byId.get(change.taskRef)?.nextAction}</p>}{change.kind==='move'&&change.parentRef&&vm.organisation.tree.byId.get(change.taskRef)?.focusOrder&&<p>This removes its Top 3 slot. The destination’s priority stays unchanged.</p>}
+      {change.kind==='create'&&<label>Parent name<input value={change.title} maxLength={160} onChange={event=>edit(change.key,{title:event.target.value})}/></label>}
+      {(change.kind==='move'||change.kind==='track')&&<label>Destination for {'title' in change?change.title:name(change.taskRef)}<select value={change.parentRef??''} onChange={event=>edit(change.key,{parentRef:event.target.value||null})}><option value="">Top level</option>{(vm.view?.items??[]).filter(task=>task.state!=='done'&&task.state!=='dismissed').map(task=><option key={task.id} value={task.id}>{task.title}</option>)}{draft.changes.filter(item=>item.key!==change.key&&(item.kind==='create'||item.kind==='track')).map(item=><option key={item.key} value={item.key} disabled={!selected.has(item.key)}>{'title' in item?item.title:item.key}</option>)}</select></label>}
+      {change.kind==='topics'&&<label>Topics for {name(change.taskRef)}<input value={change.topics.join(', ')} onChange={event=>edit(change.key,{topics:event.target.value.split(',').map(name=>name.trim()).filter(Boolean)})}/></label>}
+      {change.kind==='close'&&<details><summary>{proposal.closureScopes[change.key]?.length??1} {(proposal.closureScopes[change.key]?.length??1)===1?'task':'tasks'} will close</summary><ul>{(proposal.closureScopes[change.key]??[change.taskRef]).map(id=><li key={id}>{name(id)}</li>)}</ul></details>}
+    </fieldset>)}
+    {dependency&&<p role="alert">A selected change needs an excluded parent or task. Include it or choose another destination.</p>}
+    <Button color="primary" size="sm" disabled={disabled||stale||dependency} onClick={accept}>{selected.size?`Accept ${selected.size} selected ${selected.size===1?'change':'changes'}`:'Dismiss all suggestions'}</Button>
+  </section>;
+}

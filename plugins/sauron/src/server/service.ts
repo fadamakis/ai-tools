@@ -1,3 +1,7 @@
+import {triggerOrganisationReview} from './organisation-trigger.js';
+import {setOrganisationSchedule} from './organisation-scheduler.js';
+import {runtimeFingerprint} from './chat-reader.js';
+import {z as reviewZ} from 'zod';
 import {organiseTaskToolSchema} from '../shared/organisation.js';
 import { SauronStore, StoreError } from './store.js';
 import type { Result } from '../shared/contracts.js';
@@ -32,6 +36,10 @@ export function invoke(store: SauronStore, name: string, args: unknown,context?:
     case 'create_personal_task': return store.createPersonal(args);
     case 'track_codex_threads': return store.trackCodexThreads(args);
     case 'propose_codex_followups': return store.proposeCodexFollowups(args);
+    case 'review_organisation': return triggerOrganisationReview(store,args);
+    case 'configure_organisation_review': return store.configureReview(args,enabled=>{if(enabled&&store.reviews.state().capability.runtime!==runtimeFingerprint())throw Error('The chat runtime changed. Check chat access again before enabling daily reviews.');setOrganisationSchedule(store.path,store.storeId,enabled);});
+    case 'accept_organisation_proposal': return store.acceptProposal(args);
+    case 'rebase_organisation_proposal': return store.rebaseProposal(reviewZ.strictObject({operationId:reviewZ.string().uuid(),expectedStoreId:reviewZ.string().uuid(),proposalId:reviewZ.string().uuid(),expectedProposalRevision:reviewZ.number().int().nonnegative()}).parse(args));
     case 'organise_attention_task': return store.organiseTask(organiseTaskToolSchema.parse(args).request);
     case 'plan_attention_task': return store.planTask(args);
     case 'order_attention_tasks': return store.orderTasks(args);
