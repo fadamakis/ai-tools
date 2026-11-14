@@ -15,6 +15,23 @@ node scripts/validate.mjs dist/release --packaged
 node scripts/smoke-packages.mjs dist/release
 ```
 
+During development, run the affected tests first. Each plugin has a scoped check
+that builds it and runs its unit and browser tests:
+
+```sh
+pnpm verify:shelob
+pnpm verify:workbench
+pnpm verify:sauron
+```
+
+For a focused browser check, use `pnpm test:ui:shelob --grep 'pattern'`,
+`pnpm test:ui:workbench --grep 'pattern'`, or
+`pnpm test:ui:sauron --grep 'pattern'`. These commands build their own product.
+Sauron's browser command creates and removes a separate temporary Dev build;
+it does not select that build for the installed Sauron Dev plugin.
+Scoped checks exclude shared release tests and repository validation. Run
+`pnpm verify` on the completed change before integration.
+
 Tests and previews use disposable data and simulated external actions. Never point them at a real user's store or send real messages for a fixture. Native desktop checks remain separate from browser simulations. Read [compatibility](docs/compatibility.md) before changing a data format, runtime identity, or delivery receipt.
 
 ## Interface audits
