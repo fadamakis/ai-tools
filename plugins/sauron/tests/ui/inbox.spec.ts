@@ -622,3 +622,48 @@ test('O-03: refreshing a stale proposal preserves the user’s excluded closure'
   const view=await add(request,'Keep open'),id=view.items[0].id;seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'close',key:'close',taskRef:id,reason:'Review relevance.',evidenceIds:[]}]);
   await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await add(request,'Concurrent work');await page.reload();await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('button',{name:'Load latest proposal'}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeEnabled();
 });
+
+for(const theme of ['light','dark'] as const)test(`N-01 T-03: workspace polish keeps filters and nested tasks usable in ${theme}`,async({page,request},testInfo)=>{
+  await page.emulateMedia({colorScheme:theme});
+  const title='Review the onboarding proposal',topic='Onboarding and planning with a deliberately long topic name';
+  let view=await add(request,title),parent=view.items.find(task=>task.title===title)!;
+  view=await call(request,'organise_attention_task',{request:{operationId:crypto.randomUUID(),expectedStoreId:view.storeId,expectedRevision:view.taskViewRevision,action:'topics',id:parent.id,topics:[topic]}});
+  let parentId=parent.id;
+  for(let depth=1;depth<=6;depth++){
+    view=await call(request,'create_personal_task',{title:`Child ${depth}: clarify the learner handoff and remaining questions`,nextAction:'Confirm the next step with the team.',sourceState:'needs_you',parentId,operationId:crypto.randomUUID(),expectedStoreId:view.storeId,expectedRevision:view.taskViewRevision});
+    parentId=view.items.find(task=>task.title.startsWith(`Child ${depth}:`))!.id;
+  }
+  await add(request,'Prepare the weekly team update');await open(page);
+  const addTask=page.getByRole('button',{name:'Add task',exact:true});
+  expect(await contrastRatio(addTask)).toBeGreaterThanOrEqual(4.5);
+  await addTask.focus();await expect(addTask).toBeFocused();
+  expect(await addTask.evaluate(el=>getComputedStyle(el).outlineStyle)).not.toBe('none');
+  await addTask.hover();expect(await contrastRatio(addTask)).toBeGreaterThanOrEqual(4.5);
+  await addTask.click();await expect(addTask).toBeDisabled();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  const topicFilter=page.getByRole('button',{name:/^Filter by topic:/});
+  await topicFilter.focus();await page.keyboard.press('Space');await page.getByRole('option',{name:topic,exact:true}).click();
+  await expect(topicFilter).toBeFocused();await topicFilter.press('Space');await page.keyboard.press('Escape');await expect(topicFilter).toBeFocused();
+  for(const width of [320,375,768,960,1440]){
+    await page.setViewportSize({width,height:1000});
+    await expect(page.locator('.inbox-result-count')).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+    const controls=await page.locator('.inbox-search>div,.inbox-filter [aria-haspopup="dialog"],.inbox-attention-filter').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect();return {y:r.y,height:r.height};}));
+    expect(controls).toHaveLength(5);for(const control of controls)expect(control.height).toBe(32);
+    if(width>=960)expect(new Set(controls.map(control=>control.y)).size).toBe(1);else expect(controls[1].y).toBeGreaterThan(controls[0].y);
+    await page.screenshot({path:testInfo.outputPath(`workspace-${theme}-${width}.png`),fullPage:true,animations:'disabled'});
+    await page.getByRole('button',{name:new RegExp('^'+title)}).click();await expect(page.getByRole('heading',{name:`Task details: ${title}`})).toBeVisible();
+    await page.screenshot({path:testInfo.outputPath(`reader-${theme}-${width}.png`),fullPage:true,animations:'disabled'});
+    if(width<960)await page.getByRole('button',{name:'Back to tasks',exact:true}).click();
+  }
+  await topicFilter.click();await page.getByRole('option',{name:'All topics',exact:true}).click();
+  await page.getByRole('button',{name:`Expand ${title}`,exact:true}).click();
+  for(let depth=1;depth<=5;depth++)await page.getByRole('button',{name:`Expand Child ${depth}: clarify the learner handoff and remaining questions`,exact:true}).click();
+  await page.getByRole('button',{name:`Collapse ${title}`,exact:true}).click();await expect(page.locator('.inbox-tasks').getByRole('heading',{name:/^Child/})).toHaveCount(0);
+  await page.getByRole('button',{name:`Expand ${title}`,exact:true}).click();await expect(page.locator('.inbox-tasks').getByRole('heading',{name:/^Child/})).toHaveCount(6);
+  const parentRow=page.locator('.inbox-task').filter({has:page.getByRole('heading',{name:title,exact:true})});
+  const siblingRow=page.locator('.inbox-task').filter({has:page.getByRole('heading',{name:'Prepare the weekly team update',exact:true})});
+  expect((await parentRow.locator('.inbox-task-open').boundingBox())!.x).toBe((await siblingRow.locator('.inbox-task-open').boundingBox())!.x);
+  await page.setViewportSize({width:720,height:500});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+  await page.screenshot({path:testInfo.outputPath(`workspace-${theme}-200-percent-equivalent.png`),fullPage:true,animations:'disabled'});
+  const attention=page.getByRole('button',{name:'Needs attention',exact:true});await attention.click();await expect(attention).toHaveAttribute('aria-pressed','true');await attention.click();await expect(attention).toHaveAttribute('aria-pressed','false');
+});
