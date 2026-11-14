@@ -28,6 +28,7 @@ test('MCP discovery, {} global opening, app resource, replay and real process re
     assert.deepEqual(entry.icons?.[0].sizes,['any']);
     assert.equal(Buffer.from(entry.icons![0].src.split(',')[1],'base64').toString(),readFileSync('assets/sidebar-icon.svg','utf8'));
     assert.deepEqual((tools.find(t=>t.name==='create_personal_task')!._meta?.ui as any).visibility,['app']);
+    assert.deepEqual((tools.find(t=>t.name==='track_codex_threads')!._meta?.ui as any).visibility,['app','model']);
     assert.equal((await client.callTool({name:'open_attention',arguments:{}})).isError,undefined);
     assert.equal((entry._meta?.ui as any).resourceUri,'ui://attention/list-v1');
     const resource=await client.readResource({uri:(entry._meta?.ui as any).resourceUri});
@@ -62,7 +63,7 @@ test('legacy MCP SDK 1 client can discover and open the SDK 2 service',async t=>
   const dir=mkdtempSync(join(tmpdir(),'attention-legacy-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const client=new LegacyClient({name:'legacy-test',version:'1.0.0'});
   try{await client.connect(new LegacyTransport({command:process.execPath,args:[resolve('dist/server/index.js')],env:{ATTENTION_DB:join(dir,'legacy.sqlite')},stderr:'pipe'}));
-    assert.equal((await client.listTools()).tools.length,17);
+    assert.equal((await client.listTools()).tools.length,18);
     assert.equal((await client.callTool({name:'open_attention',arguments:{}})).isError,undefined);
   }finally{await client.close();}
 });
