@@ -15,11 +15,12 @@ import {resolve} from 'node:path';
 // Keep the entrypoint address readable by already-running pre-update servers.
 export const UI_URI = 'ui://attention/list-v1';
 export function createServer(store: SauronStore, htmlPath: string, options:{invoke?:typeof invoke;buildId?:string;runtimeRoot?:string}={}) {
+  const uiUri=options.buildId?`${UI_URI}/dev/${encodeURIComponent(options.buildId)}`:UI_URI;
   const runtimeFile=(name:string)=>options.runtimeRoot?resolve(options.runtimeRoot,name):fileURLToPath(new URL('../../'+name,import.meta.url));
   const icon={src:'data:image/svg+xml;base64,'+readFileSync(runtimeFile('assets/sidebar-icon.svg')).toString('base64'), mimeType:'image/svg+xml',sizes:['any']};
   const server = new McpServer({name:options.buildId?'sauron-dev':'sauron-local-prototype', version:JSON.parse(readFileSync(runtimeFile('plugin.json'),'utf8')).version, icons:[icon]});
   new OpenAIExtensions(server);
-  for(const uri of [UI_URI,'ui://attention/list-v0.6.6','ui://attention/list-v0.6.5','ui://attention/list-v0.6.4','ui://attention/list-v0.6.3','ui://attention/list-v0.6.2','ui://attention/list-v0.6.1','ui://attention/list-v0.6.0','ui://attention/list-v0.5.0','ui://attention/list-v0.4.2','ui://attention/list-v0.4.1','ui://attention/list-v0.4.0','ui://attention/list-v0.3.1'])server.registerResource('attention-view-'+uri, uri,
+  for(const uri of new Set([uiUri,UI_URI,'ui://attention/list-v0.6.6','ui://attention/list-v0.6.5','ui://attention/list-v0.6.4','ui://attention/list-v0.6.3','ui://attention/list-v0.6.2','ui://attention/list-v0.6.1','ui://attention/list-v0.6.0','ui://attention/list-v0.5.0','ui://attention/list-v0.4.2','ui://attention/list-v0.4.1','ui://attention/list-v0.4.0','ui://attention/list-v0.3.1']))server.registerResource('attention-view-'+uri, uri,
     {title:options.buildId?'Sauron Dev':'Sauron', mimeType:'text/html;profile=mcp-app'}, async () => ({contents:[{
       uri, mimeType:'text/html;profile=mcp-app', text:readFileSync(htmlPath, 'utf8'),
       _meta:{ui:{csp:{connectDomains:[], resourceDomains:[]}}, 'openai/ui':{
@@ -31,7 +32,7 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
     {name:'open_attention', title:options.buildId?'Sauron Dev':'Sauron', description:'Open your saved tasks, latest five-source Dot sync and independent manual check status.',
       icons:[icon],
       inputSchema:z.strictObject({}), annotations:readOnly,
-      _meta:{ui:{resourceUri:UI_URI, visibility:['app']}, 'openai/ui':{entrypoints:[{type:'global'}]}}},
+      _meta:{ui:{resourceUri:uiUri, visibility:['app']}, 'openai/ui':{entrypoints:[{type:'global'}]}}},
     {name:'list_attention', title:'Read Sauron', description:'Read saved tasks, manual scan status, and dot sync status including lastSuccessAt. Read before a dot sync and compare storeId.',
       inputSchema:z.strictObject({}), annotations:readOnly, _meta:{ui:{visibility:['app','model']}}},
     {name:'link_attention_discussion',title:'Link this chat to a Sauron item',description:'Save a durable link from a Sauron item to the CURRENT conversation, using per-call host identity metadata. Use at the start of a discussion opened from Sauron. Does not change task decisions, read sources or send messages. Never guess a conversation ID; if this host omits identity, ask the user to paste their chat link through Link a chat on the item.',

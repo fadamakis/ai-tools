@@ -185,6 +185,8 @@ No release adds parking: deprioritising means removing Top 3 or changing task or
 - **I-04:** Hierarchy and attention remain separate from Inbox, Ready, In progress, Waiting, completion, dismissal and timed Snooze. Deprioritisation uses Top 3 and ordering.
 - **I-05:** Schema 4 adds organisation metadata and preserves task identities and saved decisions. Disposable saved-data copies pass repeated reopening. Native activation and loaded build ID remain a separate verification gate.
 
+- **I-06:** Each immutable Dev build advertises its own UI resource address. Stable compatibility aliases remain readable, and existing clients keep their original runtime. The UI rejects responses from a different build.
+
 Current capability and compatibility references:
 
 - [AI Tools](../../../PRODUCT.md)

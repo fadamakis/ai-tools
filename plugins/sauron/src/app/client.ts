@@ -5,7 +5,7 @@ import type { Result, Task } from '../shared/contracts.js';
 import {devBuildId} from '../shared/build-info.js';
 
 function checkedResult(data:Result&{dev?:{buildId:string}}):Result {
-  if(devBuildId&&data.dev?.buildId!==devBuildId)throw Error('Sauron Dev loaded a different server build. Restart the desktop app and reopen Sauron Dev.');
+  if(devBuildId&&data.dev?.buildId!==devBuildId)throw Error(`Sauron Dev UI build ${devBuildId} does not match server build ${data.dev?.buildId??'unknown'}. Close Sauron Dev, restart Codex and reopen it.`);
   return data;
 }
 
