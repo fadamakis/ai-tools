@@ -196,4 +196,3 @@ Current capability and compatibility references:
 
 The existing product supports selected-chat tracking and saved discussion links.
 That does not establish automatic two-week discovery, daily background chat access, or reliable read-state detection.
-
