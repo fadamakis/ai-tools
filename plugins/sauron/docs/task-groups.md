@@ -191,7 +191,7 @@ No release adds parking: deprioritising means removing Top 3 or changing task or
 
 Current capability and compatibility references:
 
-- [AI Tools](../../../PRODUCT.md)
+- [AI Tools](https://github.com/fadamakis/ai-tools/blob/main/PRODUCT.md)
 - [Sauron](../README.md)
 - [Architecture](architecture.md)
 - [Sauron compatibility](compatibility.md)
