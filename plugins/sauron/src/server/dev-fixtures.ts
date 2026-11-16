@@ -8,8 +8,10 @@ const sample={provider:'slack' as const,sourceUrl:'https://example.slack.com/arc
   actionKey:'Fixture review request',title:'Fixture: review a Slack reply',nextAction:'Prepare and send a simulated reply.',sourceState:'needs_you' as const,resolved:false};
 
 function refreshFixtures(store:SauronStore){
+  const preferences=store.sourcePreferences();
+  if(!preferences.enabled.slack&&!preferences.enabled.granola)return store.view();
   const scan=store.beginScan();
-  if(scan.started)store.finishScan(scan.run.id,{sources:{slack:{status:'checked',detail:'Simulated fixtures only; no source read.'},granola:{status:'checked',detail:'Simulated fixtures only; no source read.'}},items:[sample]});
+  if(scan.started)store.finishScan(scan.run.id,{sources:{slack:{status:store.sourcePreferences().enabled.slack?'checked':'skipped',detail:'Simulated fixtures only; no source read.'},granola:{status:store.sourcePreferences().enabled.granola?'checked':'skipped',detail:'Simulated fixtures only; no source read.'}},items:store.sourcePreferences().enabled.slack?[sample]:[]});
   return store.view();
 }
 
@@ -53,7 +55,7 @@ export const invokeFixture:typeof invoke=(store,name,args,context)=>{
       return {...store.view(),reply:store.replies.byId(reply.id)};
     }
     default: {
-      if(!['open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
+      if(!['configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
       return invoke(store,name,args,context);
     }
   }

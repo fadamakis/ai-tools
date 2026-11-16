@@ -1,5 +1,25 @@
 # Sauron
 
+## Input sources
+
+Open the Refresh dropdown to toggle Slack, Jira, GitHub, Calendar or Meetings
+(Granola). Each choice saves immediately and applies to manual and automatic
+pulls. Existing tasks remain visible and editable; use the separate source filter
+to narrow the task list. Personal tasks and explicit actions on saved tasks remain
+available.
+
+Refresh now checks enabled Slack and Meetings sources only. Automatic and
+chat-led updates check all enabled providers. Source settings are locked while
+an update or pending reconciliation is active. Turning everything off pauses
+source work without changing schedules or update ownership. Re-enabling a source
+resumes from its saved checkpoint on the next update.
+
+Preferences use additive local-store metadata. Existing databases default to all
+sources enabled; no task migration is required. Updated workers and chat-led sync
+instructions must be used together to respect disabled sources before connector
+access. Older callers that submit disabled-source observations are rejected.
+
+
 Discussions opened from an item ask the new chat to save its link back to that item. Saved links survive source updates and app restarts; **Continue discussion** reopens the saved conversation. Hosts without current-chat identity support can use **Link a chat** with a copied ChatGPT or Codex conversation URL. Linking never changes the task's decision or source identity.
 
 Keep source-backed Slack, Jira, GitHub, Calendar, and meeting actions together with personal tasks, saved decisions, and reviewed Slack replies.
