@@ -29,6 +29,9 @@ export function invoke(store: SauronStore, name: string, args: unknown,context?:
     case 'upsert_attention_items': return store.upsert(args);
     case 'create_personal_task': return store.createPersonal(args);
     case 'track_codex_threads': return store.trackCodexThreads(args);
+    case 'propose_codex_followups': return store.proposeCodexFollowups(args);
+    case 'plan_attention_task': return store.planTask(args);
+    case 'order_attention_tasks': return store.orderTasks(args);
     case 'decide_attention_item': return store.decide(args);
     case 'get_slack_reply': return getReply(store,args);
     case 'prepare_slack_reply': return prepareReply(store,args);

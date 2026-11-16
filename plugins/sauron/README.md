@@ -4,7 +4,13 @@ Discussions opened from an item ask the new chat to save its link back to that i
 
 Keep source-backed Slack, Jira, GitHub, Calendar, and meeting actions together with personal tasks, saved decisions, and reviewed Slack replies.
 
+Sauron now separates new work from committed work. New source obligations and proposed Codex follow-ups enter Inbox for review. Accepted tasks move to Ready, In progress, or Waiting. Today shows up to three user-chosen focus tasks above the ordered actionable list, with BLEX, PEX, personal, and unassigned filters. Real due dates and dates to review waiting work are separate. Source checks can update evidence without replacing your task plan or order.
+
+Use the daily summary to review Inbox and choose focus work. Weekly review links to Inbox, Waiting, and Today. Sauron suggests focus when an explicit due date is today or past due; it never reorders the list automatically.
+
 To track selected Codex chats, first ask Codex to list and categorize chats started in the last 24 hours. Then select the ones you want with `@Sauron track threads X, Y, and Z`. Sauron creates one personal task per selected chat, saves a link back to it, and reuses that task if you track the same chat again. The listing step does not create tasks. Codex needs access to its chat listing and reading tools to verify the selections.
+
+For several follow-ups from one selected chat, ask Codex to propose those actions in Sauron. `propose_codex_followups` links each distinct proposal to the verified chat and leaves every proposal in Inbox. Repeating the same chat ID and action key reuses the existing proposal, including any review decision.
 
 ## Use
 
@@ -18,7 +24,9 @@ Reply preparation creates a local editable draft. Only the explicit **Send to Sl
 
 The default macOS database is `~/Library/Application Support/Sauron/attention.sqlite`. An explicit `ATTENTION_DB` path takes precedence. Database schema 3, store identity, tasks, decisions, history, receipts, and reply drafts remain readable. Data is outside versioned plugin caches. Unknown newer schemas are rejected.
 
-Existing personal installations must stop Sauron and its scheduled writers before migrating their selected database:
+The productivity update keeps SQLite schema 3. On first open, Sauron saves planning metadata for existing tasks: Needs you becomes Ready, Waiting stays Waiting, and completed or dismissed decisions remain authoritative. Task rows, source identities, receipts, and history are not rewritten by this mapping. Earlier plugin builds ignore the planning metadata; reinstalling the new build restores the accepted plan and order. New source observations and proposed chat follow-ups enter Inbox after the update.
+
+Existing personal installations that need to move their selected database must stop Sauron and its scheduled writers before migrating it:
 
 ```sh
 node scripts/migrate-data.mjs --from /absolute/path/to/existing.sqlite --confirm-writers-stopped
