@@ -22,7 +22,8 @@ async function open(page:Page){await page.goto(origin);await expect(page.getByRo
 async function add(request:APIRequestContext,title='Review launch notes'){return call(request,'create_personal_task',{title,nextAction:'Decide the next step after reviewing the meeting notes.',sourceState:'needs_you',operationId:crypto.randomUUID()});}
 async function actions(page:Page,title:string,action:string){await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).click();await page.getByRole('menuitem',{name:action,exact:true}).click();}
 async function keyboardAction(page:Page,title:string,action:string){
-  await page.getByRole('button',{name:`Actions for ${title}`,exact:true}).focus();await page.keyboard.press('Enter');
+  const trigger=page.getByRole('button',{name:`Actions for ${title}`,exact:true});
+  await expect(trigger).toBeEnabled();await trigger.focus();await expect(trigger).toBeFocused();await page.keyboard.press('Enter');
   await page.getByRole('menuitem',{name:action,exact:true}).focus();await page.keyboard.press('Enter');
 }
 
@@ -94,8 +95,9 @@ test('Top 3 and task order are user-confirmed and keyboard reorder persists',asy
   const fourth=page.getByRole('button',{name:'Actions for Plan week'});await fourth.click();
   await expect(page.getByRole('menuitem',{name:'Add to Top 3'})).toHaveCount(0);
   await page.keyboard.press('Escape');
-  const reorder=page.getByRole('button',{name:'Actions for Check PEX'});await reorder.focus();await page.keyboard.press('Enter');
-  const up=page.getByRole('menuitem',{name:'Move up'});await up.focus();await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem',{name:'Start work'})).toHaveCount(0);
+  await expect(fourth).toBeFocused();
+  await keyboardAction(page,'Check PEX','Move up');
   await expect(page.getByText('Order saved.',{exact:true})).toBeVisible();
   await page.reload();
   const saved=(await call(request,'list_attention')).items;
