@@ -56,3 +56,51 @@ test('legacy scheduled helper only reads in dot mode; explicit manual helper sti
  const result=JSON.parse(manual.stdout);assert.equal(result.mode,'dot_managed');assert.equal(result.checkKind,'source_scan');assert.equal(result.scan.status,'completed');assert.equal(existsSync(marker),true);
  configure(store,'independent');const legacy=spawnSync(process.execPath,[resolve('scripts/check-attention.mjs')],{encoding:'utf8',env,timeout:20000});assert.equal(legacy.status,0,legacy.stderr);assert.equal(JSON.parse(legacy.stdout).checkKind,'source_scan');
 });
+
+function reportingFixture(t:TestContext){
+ const fixture=setup(t),runtime=join(fixture.dir,'runtime.cjs'),payload=join(fixture.dir,'scan.json'),marker=join(fixture.dir,'scanner-started');
+ writeFileSync(runtime,`#!/usr/bin/env node\nconst fs=require('node:fs');fs.writeFileSync(${JSON.stringify(marker)},'yes');fs.copyFileSync(${JSON.stringify(payload)},process.argv[process.argv.indexOf('--output-last-message')+1]);`,{mode:0o700});
+ const output=(items:unknown[]=[])=>writeFileSync(payload,JSON.stringify({sources:{slack:{status:'checked',detail:'Synthetic fixture'},granola:{status:'checked',detail:'Synthetic fixture'}},items}));
+ const report=(manual=false)=>{
+  const result=spawnSync(process.execPath,[resolve('scripts/check-attention.mjs'),...(manual?['--manual-scan']:[])],{encoding:'utf8',env:{...process.env,ATTENTION_DB:fixture.path,SAURON_CODEX_BIN:runtime},timeout:20_000});
+  assert.equal(result.status,0,result.stderr);return JSON.parse(result.stdout);
+ };
+ const get=(id:string)=>fixture.store.view().items.find(task=>task.id===id)!;
+ const organise=(request:Record<string,unknown>)=>invoke(fixture.store,'organise_attention_task',{request:{operationId:randomUUID(),expectedStoreId:fixture.store.storeId,expectedRevision:fixture.store.view().taskViewRevision,...request}});
+ output();return {...fixture,output,report,get,organise,marker};
+}
+test('A-02 A-04: helper counts own active attention across workflow states without descendant duplication',t=>{
+ const f=reportingFixture(t),store=f.store;
+ const add=(title:string)=>{const operationId=randomUUID();store.createPersonal({operationId,title});return 'personal:'+operationId;};
+ add('Ready');
+ for(const workflowState of ['in_progress','waiting'] as const){const id=add(workflowState);store.planTask({id,expectedVersion:f.get(id).version,operationId:randomUUID(),workflowState});}
+ const parent=add('Handled parent'),child=add('Child'),handled=add('Handled ready');
+ f.organise({action:'move',id:child,parentId:parent});
+ for(const id of [parent,handled])f.organise({action:'attention',id,needsAttention:false});
+ for(const action of ['snooze','complete','dismiss'] as const){const id=add(action);store.decide({id,expectedVersion:f.get(id).version,operationId:randomUUID(),action,...(action==='snooze'?{snoozedUntil:'2099-01-01T00:00:00Z'}:{})});}
+ store.upsert({batchId:'inbox',items:[{...syntheticObservation(),lastCheckedAt:'2026-10-19T12:00:00Z'}]});
+ assert.equal(f.get(parent).descendantSummary?.attention,1);
+ assert.equal(f.get(parent).ownNeedsAttention,false);
+ configure(store);
+ const before=counts(f.path),managed=f.report();
+ assert.equal(managed.checkKind,'sync_freshness');assert.equal(managed.needsYou,5);assert.deepEqual(managed.changes,[]);
+ assert.equal(managed.sourceScanStarted,false);assert.equal(existsSync(f.marker),false);assert.deepEqual(counts(f.path),before);
+ const manual=f.report(true);assert.equal(manual.checkKind,'source_scan');assert.equal(manual.needsYou,5);assert.deepEqual(manual.changes,[]);assert.equal(existsSync(f.marker),true);
+ configure(store,'independent');const independent=f.report();assert.equal(independent.needsYou,5);assert.deepEqual(independent.changes,[]);
+});
+for(const manual of [false,true])test(`A-02 A-04: ${manual?'manual':'independent'} helper reports new and returning attention without polling noise`,t=>{
+ const f=reportingFixture(t);if(manual)configure(f.store);
+ const sample={provider:'slack',sourceUrl:'https://example.slack.com/archives/C123/p1792313076000000',actionKey:'Review fixture',title:'Review fixture',nextAction:'Read the fixture and decide.',sourceState:'needs_you',resolved:false};
+ f.output([sample]);let report=f.report(manual);
+ const id=f.store.view().items[0].id;
+ assert.equal(f.get(id).state,'inbox');assert.equal(report.needsYou,1);assert.deepEqual(report.changes,[{id,title:sample.title,nextAction:sample.nextAction,sourceUrl:sample.sourceUrl}]);
+ report=f.report(manual);assert.equal(report.needsYou,1);assert.deepEqual(report.changes,[]);
+ f.organise({action:'attention',id,needsAttention:false});
+ report=f.report(manual);assert.equal(report.needsYou,0);assert.deepEqual(report.changes,[]);
+ const updated={...sample,nextAction:'Read the substantive new request.'};f.output([updated]);
+ report=f.report(manual);assert.equal(report.needsYou,1);assert.equal(report.changes[0]?.nextAction,updated.nextAction);assert.equal(report.changes.length,1);
+ const renamed={...updated,title:'Review changed fixture'};f.output([renamed]);
+ report=f.report(manual);assert.equal(report.changes.length,1);assert.equal(report.changes[0]?.title,renamed.title);
+ f.output([{...renamed,nextAction:'Read the final updated action.'}]);
+ report=f.report(manual);assert.equal(report.changes.length,1);assert.equal(report.changes[0]?.nextAction,'Read the final updated action.');
+});

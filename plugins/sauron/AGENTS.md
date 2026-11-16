@@ -10,6 +10,7 @@ Keep their requirement IDs in regression test names. Update requirements, tests 
 | Mutations, migration, concurrency | `src/server/store.ts`, `src/server/organisation-store.ts` | `pnpm test` |
 | Reader, filtering, organisation controls | `src/app/TaskList.tsx`, `src/app/useTaskOrganisation.ts`, `src/app/OrganisationControls.tsx` | `pnpm build && pnpm test:ui` |
 | MCP and explicit chat tracking | `src/server/service.ts`, `src/server/mcp.ts` | `node --import tsx --test tests/mcp.test.ts tests/productivity.test.ts tests/task-groups.test.ts` |
+| Scheduled attention reports | `scripts/check-attention.mjs` | `node --import tsx --test tests/coordination.test.ts tests/sources.test.ts` |
 
 Source observations must not overwrite organisation or planning decisions. Use the existing store transaction for branch actions.
 Do not write relationships directly from UI, workers or proposal generators. Call the validated task actions.

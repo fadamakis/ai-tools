@@ -13,7 +13,7 @@ export function TaskActions({task,vm,label=`Actions for ${task.title}`}:{task:Ta
   const position=ids.indexOf(task.id);
   const canMove=(delta:number)=>{
     const neighbor=actionable[position+delta];
-    return position>=0&&!vm.hasFilters&&!!neighbor&&(!!task.focusOrder!==!!neighbor.focusOrder||task.state===neighbor.state);
+    return position>=0&&!vm.hasFilters&&!!neighbor&&(!!task.focusOrder||!!neighbor.focusOrder||task.state===neighbor.state);
   };
   const move=(delta:number)=>{
     const neighbor=actionable[position+delta],next=[...ids];

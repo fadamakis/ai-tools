@@ -108,7 +108,27 @@ test('Top 3 and task order are user-confirmed and keyboard reorder persists',asy
   const rest=saved.filter(task=>task.state==='ready').sort((a,b)=>(a.order??0)-(b.order??0)).map(task=>task.title);
   expect(rest.indexOf('Check PEX')).toBeLessThan(rest.indexOf('Review BLEX'));
 });
-test('keyboard moves swap Top 3 membership but stop at the In progress and Ready boundary',async({page,request})=>{
+for(const width of [375,1280])test(`F-04: mixed-state Top 3 keyboard ordering persists at ${width}px`,async({page,request})=>{
+  await page.setViewportSize({width,height:900});
+  for(const title of ['Mixed ready','Mixed progress','Mixed third'])await add(request,title);
+  await open(page);
+  for(const title of ['Mixed ready','Mixed progress','Mixed third'])await actions(page,title,'Add to Top 3');
+  await actions(page,'Mixed progress','Start work');
+  await keyboardAction(page,'Mixed progress','Move up');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Mixed progress','Mixed ready','Mixed third']);
+  await page.reload();
+  let saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Mixed progress','Mixed ready','Mixed third']);
+  expect(saved.find(task=>task.title==='Mixed progress')?.state).toBe('in_progress');
+  await keyboardAction(page,'Mixed progress','Move down');
+  await expect(page.locator('.inbox-task-open h2')).toHaveText(['Mixed ready','Mixed progress','Mixed third']);
+  await page.reload();saved=(await call(request,'list_attention')).items;
+  expect(saved.filter(task=>task.focusOrder).sort((a,b)=>a.focusOrder!-b.focusOrder!).map(task=>task.title)).toEqual(['Mixed ready','Mixed progress','Mixed third']);
+  await page.getByLabel('Search tasks').fill('Mixed');
+  await page.getByRole('button',{name:'Actions for Mixed progress',exact:true}).click();
+  await expect(page.getByRole('menuitem',{name:/^Move (up|down)$/})).toHaveCount(0);
+});
+test('keyboard moves swap Top 3 membership but stop at the unfocused In progress and Ready boundary',async({page,request})=>{
   for(const title of ['Review BLEX','Check PEX','Write feedback','Plan week'])await add(request,title);
   await open(page);
   for(const title of ['Review BLEX','Check PEX','Write feedback'])await actions(page,title,'Add to Top 3');
