@@ -23,8 +23,15 @@ Install `workbench@ai-tools` using [getting started](https://github.com/fadamaki
 From the board, choose the chat and run mode, then select **Continue in chat**.
 Workbench opens one new editable draft. Select the repository and Local/Worktree
 mode in the native composer, review the request, and press **Send**. That chat runs
-the task directly; no launcher conversation creates a second worker. **Resume**
-opens the saved worker without sending a message. Task details expose **Open chat**
+the task directly; no launcher conversation creates a second worker. **Open chat**
+opens the saved worker without sending a message. Cards offer **Recheck blocker**,
+**Confirm delivery**, **Check and continue**, or **Recover and resume** according to
+their saved state. These prepare an editable recovery request in the current chat:
+review and Send to check current sources, reconcile completed work, and resume the
+original worker once if needed. A running worker is left running; missing access,
+real blockers and uncertain receipts stay explicit. No new worker is created.
+Completed cards offer **Archive task** and archived cards **Restore to Done**.
+Task details expose **Open chat**
 and **Open ticket** when their saved references are available. Choose **Start new
 chat** in task details only when a separate continuation is wanted. This uses the host's editable-draft API;
 app-generated automatic messages cannot establish human authorization. Autopilot

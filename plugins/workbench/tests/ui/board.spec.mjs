@@ -375,7 +375,7 @@ test('initial discovery offers existing notes for explicit one-click import', as
   expect(await page.evaluate(() => window.__workbenchPreview.requests.filter(request => request.params?.name === 'workbench.repository_add').length)).toBe(0);
   await app.getByRole('button', { name: 'Import 1 task from project', exact: true }).click();
   await expect(app.locator('.task-card').filter({ hasText: 'EX-123' })).toBeVisible();
-  await expect(app.locator('.column[data-stage=pr] .task-card').filter({ hasText: 'EX-123' })).toContainText('Unverified');
+  await expect(app.locator('.column[data-stage=pr] .task-card').filter({ hasText: 'EX-123' })).toContainText('Merged · confirm delivery');
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 existing task imported read-only');
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('1 linked PR checked against GitHub');
 });
@@ -400,12 +400,12 @@ test('compact board keeps every stage reachable and Done archive inline beside t
   expect(sizes.scroll).toBeLessThanOrEqual(sizes.viewport); expect(errors).toEqual([]);
 });
 
-test('card Resume opens the exact chat without another draft or launch request', async ({ page }) => {
+test('card Open chat opens the exact chat without another draft or launch request', async ({ page }) => {
   const { app } = await open(page);
   const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const worker = board.tasks.find(task => task.key === 'WEB-104');
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104');
-  await app.getByRole('button', { name: 'Resume original chat · Clarify the first-run setup', exact: true }).click();
+  await app.getByRole('button', { name: 'Open chat · Clarify the first-run setup', exact: true }).click();
   await expect(app.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toEqual([`codex://threads/${worker.threadId}`]);
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);

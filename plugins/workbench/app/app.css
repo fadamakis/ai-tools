@@ -96,9 +96,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; color: var(--muted); font-size: var(--font-text-xs-size, 12px); }
 .task-key { font-size: var(--font-text-xs-size, 12px); font-family: var(--font-mono, ui-monospace, monospace); color: var(--muted); overflow-wrap: anywhere; }
 .repository-name { overflow-wrap: anywhere; }
-.card-next { font-size: var(--font-text-sm-size, 14px); color: var(--muted); line-height: 1.5; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card-next { font-size: var(--font-text-sm-size, 14px); color: var(--muted); line-height: 1.5; margin-top: 8px; overflow-wrap: anywhere; }
 .card-next.needs-attention { color: var(--warning); }
-.card-actions { display: flex; justify-content: flex-end; padding: 0 12px 8px; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 16px 12px; }
+.card-actions > button { max-width: 100%; white-space: normal; height: auto; min-height: 32px; text-align: left; }
 .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
 .archive-grid .task-card { max-width: 480px; }
 .empty-results { min-height: 280px; padding: 48px 24px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-xl); }
