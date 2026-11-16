@@ -8,8 +8,10 @@ const sample={provider:'slack' as const,sourceUrl:'https://example.slack.com/arc
   actionKey:'Fixture review request',title:'Fixture: review a Slack reply',nextAction:'Prepare and send a simulated reply.',sourceState:'needs_you' as const,resolved:false};
 
 function refreshFixtures(store:SauronStore){
+  const preferences=store.sourcePreferences();
+  if(!preferences.enabled.slack&&!preferences.enabled.granola)return store.view();
   const scan=store.beginScan();
-  if(scan.started)store.finishScan(scan.run.id,{sources:{slack:{status:'checked',detail:'Simulated fixtures only; no source read.'},granola:{status:'checked',detail:'Simulated fixtures only; no source read.'}},items:[sample]});
+  if(scan.started)store.finishScan(scan.run.id,{sources:{slack:{status:store.sourcePreferences().enabled.slack?'checked':'skipped',detail:'Simulated fixtures only; no source read.'},granola:{status:store.sourcePreferences().enabled.granola?'checked':'skipped',detail:'Simulated fixtures only; no source read.'}},items:store.sourcePreferences().enabled.slack?[sample]:[]});
   return store.view();
 }
 
@@ -20,6 +22,8 @@ export function seedDevStore(path:string){
   try{
     store.upsert({batchId:'sauron-dev-fixture-v1',items:[syntheticObservation()]});
     refreshFixtures(store);
+    const replyTask=store.view().items.find(item=>item.sourceUrl===sample.sourceUrl)!;
+    store.planTask({id:replyTask.id,expectedVersion:replyTask.version,operationId:'1a35e5ae-7ed7-48b7-b8bd-f6dc40a99df1',workflowState:'ready'});
     store.createPersonal({operationId:'9c21488a-e52b-4b60-aae7-3d10691fb2dd',title:'Fixture: try a personal task',nextAction:'Complete, snooze, or dismiss this task.',sourceState:'needs_you'});
     const result=store.createPersonal({operationId:'5216c96b-c501-4b3a-b767-132a8cb979e7',title:'Fixture: a completed task',nextAction:'Find this in History.',sourceState:'waiting'});
     const completed=result.items.find(item=>item.id==='personal:5216c96b-c501-4b3a-b767-132a8cb979e7')!;
@@ -51,7 +55,7 @@ export const invokeFixture:typeof invoke=(store,name,args,context)=>{
       return {...store.view(),reply:store.replies.byId(reply.id)};
     }
     default: {
-      if(!['open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
+      if(!['configure_attention_sources','open_attention','list_attention','link_attention_discussion','save_attention_discussion_link','get_attention_sync_receipt','upsert_attention_items','create_personal_task','track_codex_threads','propose_codex_followups','plan_attention_task','order_attention_tasks','decide_attention_item','get_slack_reply','save_slack_reply'].includes(name))throw Error('This tool is not available in fixture mode.');
       return invoke(store,name,args,context);
     }
   }

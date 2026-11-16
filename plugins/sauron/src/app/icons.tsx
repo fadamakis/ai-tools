@@ -14,6 +14,7 @@ export function sourceOf(task:Task):SourceKind {
 }
 export function Icon({name,...props}:{name:string}&React.SVGProps<SVGSVGElement>){
   const paths:Record<string,React.ReactNode>={
+    chevron:<path d="m6 9 6 6 6-6"/>,
     back:<path d="m14 6-6 6 6 6"/>,
     forward:<path d="m10 6 6 6-6 6"/>,
     reading:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 4v16m4-11h3m-3 4h3"/></>,

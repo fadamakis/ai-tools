@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { upsertSchema, decisionSchema, personalTaskSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
+import { configureSourcesSchema, upsertSchema, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, proposeCodexFollowupsSchema, planTaskSchema, orderTasksSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
 import { SauronStore } from './store.js';
 import { invoke } from './service.js';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +36,9 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:linkDiscussionSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'save_attention_discussion_link',title:'Save a pasted conversation link',description:'Save the ChatGPT or Codex conversation URL the user pasted on this Sauron item. Changes only its saved discussion links.',
       inputSchema:saveDiscussionSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app']}}},
-    {name:'refresh_attention', title:'Check what needs attention', description:'Start a live read-only Slack and Granola attention check using the user’s existing desktop connections. Returns immediately with scan status; poll list_attention until scan.status is completed, partial or failed. Concurrent calls join the active check. Writes only the local attention list and preserves user decisions.',
+    {name:'configure_attention_sources',title:'Set Sauron input sources',description:'Save one input-source toggle for manual and automatic pulls. Requires matching store ID, preference revision and stable operation ID. Existing tasks stay saved. Refuses changes during active updates or pending reconciliation.',
+      inputSchema:configureSourcesSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'refresh_attention', title:'Check what needs attention', description:'Start a live read-only check of enabled Slack and Granola sources using the user’s existing desktop connections. Returns immediately with scan status; poll list_attention until scan.status is completed, partial or failed. Concurrent calls join the active check. Writes only the local attention list and preserves user decisions.',
       inputSchema:z.strictObject({}),annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'check_scheduled_attention',title:'Run scheduled Sauron check',description:'Respect the persistent automatic-update mode. In dot-managed mode only read saved dot sync freshness; never initiate an independent source scan. In independent mode start or join the legacy Slack/Granola scan. Manual refresh_attention is unchanged.',
       inputSchema:z.strictObject({}),annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:true},_meta:{ui:{visibility:['app','model']}}},
@@ -46,7 +48,7 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:configureSyncSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'get_attention_sync_receipt',title:'Read verified source-sync receipt',description:'Read a committed run digest, result and checkpoint receipt without starting a source scan. Requires the expected store ID.',
       inputSchema:z.strictObject({expectedStoreId:z.string().uuid(),runId:z.string().uuid()}),annotations:readOnly,_meta:{ui:{visibility:['app','model']}}},
-    {name:'sync_attention', title:'Sync dot observations', description:'Start, finish, or fail a source-backed dot sync in this local store. Requires matching expectedStoreId and one stable runId. Finish takes actual source coverage and evidence for Slack, Granola, Jira, GitHub and Google Calendar. Derives stable task identities and preserves all user decisions. Does not read sources or start a scanner. Report partial/error honestly; no source absence deletes tasks.',
+    {name:'sync_attention', title:'Sync dot observations', description:'Start, finish, or fail a source-backed dot sync in this local store. Requires matching expectedStoreId and one stable runId. Read sourcePreferences before any connector reads. Do not read disabled sources; report them as skipped. Finish takes actual source coverage and evidence for Slack, Granola, Jira, GitHub and Google Calendar. Derives stable task identities and preserves all user decisions. Does not read sources or start a scanner. Report partial/error honestly; no source absence deletes tasks.',
       inputSchema:syncSchema, annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'upsert_attention_items', title:'Record attention items', description:'Record explicit source-backed Slack/Granola/Jira/GitHub/Calendar observations or synthetic samples. Prefer sync_attention for dot-fed updates with coverage and server-derived identities. Preserves all user decisions. Stable batch IDs deduplicate retries.',
       inputSchema:upsertSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app','model']}}},
@@ -54,6 +56,14 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:decisionSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app']}}},
     {name:'create_personal_task', title:'Add personal task', description:'Save a user-entered task in this local list. A stable operation ID deduplicates retries. No source checks or external writes.',
       inputSchema:personalTaskSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app']}}},
+    {name:'track_codex_threads', title:'Track selected Codex chats', description:'Create one personal task per explicitly selected Codex chat and save its chat link atomically. First use Codex app tools to verify each selected chat ID and title; never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Report created, already_tracked and failed entries.',
+      inputSchema:trackCodexThreadsSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app','model']}}},
+    {name:'propose_codex_followups',title:'Propose Codex chat follow-ups',description:'After the user selects a verified Codex chat, propose distinct concrete follow-ups for review in Sauron Inbox. Use an exact stable actionKey from each chat action; reuse it on retries. Never infer a chat ID or auto-accept a proposal. The user must accept or dismiss each proposal in Sauron.',
+      inputSchema:proposeCodexFollowupsSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'plan_attention_task',title:'Edit Sauron task plan',description:'Accept an Inbox item or edit its user-owned workflow state, area, next action, and real due or review dates. Source facts remain unchanged. Requires a displayed task version and stable operation ID.',
+      inputSchema:planTaskSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'order_attention_tasks',title:'Set Sauron task order',description:'Save the user-confirmed order of all actionable tasks and up to three focus tasks. Refresh and retry after a version conflict; source refresh never chooses the order.',
+      inputSchema:orderTasksSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app']}}},
     {name:'get_slack_reply',title:'Read reply draft',description:'Read a saved local Slack reply and preparation or delivery status.',
       inputSchema:replyTaskSchema,annotations:readOnly,_meta:{ui:{visibility:['app']}}},
     {name:'prepare_slack_reply',title:'Prepare Slack reply',description:'Read the original Slack discussion and prepare an editable local draft. Does not send or create an external Slack draft. Poll get_slack_reply while preparing.',
