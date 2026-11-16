@@ -8,7 +8,7 @@ Older schema-3 Sauron builds reject the upgraded database before normal writes; 
 Unknown future schemas remain rejected.
 
 The default macOS store stays outside plugin caches. `ATTENTION_DB` retains precedence.
-Use the root [compatibility guide](../../../docs/compatibility.md) for backup and migration.
+Use the root [compatibility guide](https://github.com/fadamakis/ai-tools/blob/main/docs/compatibility.md) for backup and migration.
 Before replacing an installed build, use a disposable SQLite backup, verify migration and reopen it twice with the candidate.
 Retain the original backup for rollback. Never test migration against the only copy of user data.
 
