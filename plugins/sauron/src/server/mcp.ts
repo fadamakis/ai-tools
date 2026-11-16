@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { upsertSchema, decisionSchema, personalTaskSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
+import { upsertSchema, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, syncSchema, configureSyncSchema,localTriggerSchema,linkDiscussionSchema,saveDiscussionSchema } from '../shared/contracts.js';
 import { SauronStore } from './store.js';
 import { invoke } from './service.js';
 import { fileURLToPath } from 'node:url';
@@ -54,6 +54,8 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:decisionSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app']}}},
     {name:'create_personal_task', title:'Add personal task', description:'Save a user-entered task in this local list. A stable operation ID deduplicates retries. No source checks or external writes.',
       inputSchema:personalTaskSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app']}}},
+    {name:'track_codex_threads', title:'Track selected Codex chats', description:'Create one personal task per explicitly selected Codex chat and save its chat link atomically. First use Codex app tools to verify each selected chat ID and title; never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Report created, already_tracked and failed entries.',
+      inputSchema:trackCodexThreadsSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app','model']}}},
     {name:'get_slack_reply',title:'Read reply draft',description:'Read a saved local Slack reply and preparation or delivery status.',
       inputSchema:replyTaskSchema,annotations:readOnly,_meta:{ui:{visibility:['app']}}},
     {name:'prepare_slack_reply',title:'Prepare Slack reply',description:'Read the original Slack discussion and prepare an editable local draft. Does not send or create an external Slack draft. Poll get_slack_reply while preparing.',

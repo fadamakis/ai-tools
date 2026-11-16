@@ -4,6 +4,8 @@ Discussions opened from an item ask the new chat to save its link back to that i
 
 Keep source-backed Slack, Jira, GitHub, Calendar, and meeting actions together with personal tasks, saved decisions, and reviewed Slack replies.
 
+To track selected Codex chats, first ask Codex to list and categorize chats started in the last 24 hours. Then select the ones you want with `@Sauron track threads X, Y, and Z`. Sauron creates one personal task per selected chat, saves a link back to it, and reuses that task if you track the same chat again. The listing step does not create tasks. Codex needs access to its chat listing and reading tools to verify the selections.
+
 ## Use
 
 Install Sauron from the workspace plugin directory and open its Codex sidebar. The initial team release supports macOS with Node 22.13 or newer. The UI and MCP server dependencies are bundled; no source checkout or npm installation is needed.
