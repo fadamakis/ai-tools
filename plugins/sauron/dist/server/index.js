@@ -34875,6 +34875,14 @@ var personalTaskSchema = external_exports.strictObject({
   nextAction: external_exports.string().trim().max(400).default(""),
   sourceState: external_exports.enum(["needs_you", "waiting"]).default("needs_you")
 });
+var trackCodexThreadsSchema = external_exports.strictObject({
+  expectedStoreId: external_exports.string().uuid(),
+  threads: external_exports.array(external_exports.strictObject({
+    threadId: external_exports.string().uuid(),
+    title: external_exports.string().trim().min(1).max(160),
+    nextAction: external_exports.string().trim().max(400).default("")
+  })).min(1).max(20)
+});
 function canonicalDiscussionUrl(value) {
   const url2 = new URL(value), id = url2.pathname.split("/").at(-1);
   if (url2.username || url2.password || url2.port || !external_exports.uuid().safeParse(id).success) throw Error("Paste a ChatGPT or Codex conversation link.");
@@ -35396,6 +35404,65 @@ var SauronStore = class {
         task.operationId
       );
     });
+  }
+  trackCodexThreads(input2) {
+    const request = trackCodexThreadsSchema.parse(input2);
+    if (request.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+    const ids = request.threads.map((thread) => thread.threadId.toLowerCase());
+    if (new Set(ids).size !== ids.length) throw new StoreError("duplicate_thread", "A batch must contain distinct Codex chats.");
+    const trackedThreads = [];
+    for (const thread of request.threads) {
+      const threadId = thread.threadId.toLowerCase(), url2 = `codex://threads/${threadId}`;
+      let begun = false;
+      try {
+        this.db.exec("BEGIN IMMEDIATE");
+        begun = true;
+        const links = this.discussions().filter((link) => link.url === url2);
+        const matches = new Set(links.map((link) => link.taskId));
+        if (matches.size > 1) throw new StoreError("ambiguous_chat", "Several Sauron items already link to this chat.");
+        const linkedId = [...matches][0];
+        let result;
+        if (linkedId) {
+          if (!this.get(linkedId)) throw new StoreError("missing_task", "The linked Sauron item no longer exists.");
+          result = { threadId, taskId: linkedId, url: url2, status: "already_tracked" };
+        } else {
+          const id = `personal:${threadId}`;
+          if (this.get(id)) throw new StoreError("task_collision", "A personal task already uses this chat ID.");
+          const time4 = this.now().toISOString();
+          this.save(
+            {
+              id,
+              obligationKey: id,
+              sourceVersion: 1,
+              provider: "personal",
+              title: thread.title,
+              nextAction: thread.nextAction,
+              sourceState: "needs_you",
+              sourceUrl: null,
+              lastCheckedAt: null,
+              version: 1,
+              userDecision: null,
+              decidedAt: null,
+              snoozedUntil: null,
+              updatedAt: time4,
+              createdAt: time4,
+              state: "needs_you"
+            },
+            "personal",
+            threadId
+          );
+          this.setMetadata("discussion-link:" + hash2([id, url2]), { taskId: id, url: url2, createdAt: time4 });
+          result = { threadId, taskId: id, url: url2, status: "created" };
+        }
+        this.db.exec("COMMIT");
+        begun = false;
+        trackedThreads.push(result);
+      } catch (error62) {
+        if (begun) this.db.exec("ROLLBACK");
+        trackedThreads.push({ threadId, taskId: null, url: url2, status: "failed", error: error62 instanceof Error ? error62.message : "Could not track this chat." });
+      }
+    }
+    return { ...this.view(), trackedThreads };
   }
   decide(input2) {
     const operation = decisionSchema.parse(input2);
@@ -37094,6 +37161,8 @@ function invoke(store2, name, args, context) {
       return store2.upsert(args);
     case "create_personal_task":
       return store2.createPersonal(args);
+    case "track_codex_threads":
+      return store2.trackCodexThreads(args);
     case "decide_attention_item":
       return store2.decide(args);
     case "get_slack_reply":
@@ -37263,6 +37332,14 @@ function createServer(store2, htmlPath, options = {}) {
       inputSchema: personalTaskSchema,
       annotations: { ...readOnly, readOnlyHint: false, idempotentHint: true },
       _meta: { ui: { visibility: ["app"] } }
+    },
+    {
+      name: "track_codex_threads",
+      title: "Track selected Codex chats",
+      description: "Create one personal task per explicitly selected Codex chat and save its chat link atomically. First use Codex app tools to verify each selected chat ID and title; never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Report created, already_tracked and failed entries.",
+      inputSchema: trackCodexThreadsSchema,
+      annotations: { ...readOnly, readOnlyHint: false, idempotentHint: true },
+      _meta: { ui: { visibility: ["app", "model"] } }
     },
     {
       name: "get_slack_reply",
