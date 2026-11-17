@@ -1,3 +1,6 @@
+import {OrganisationStore} from './organisation-store.js';
+import {organiseTaskSchema} from '../shared/organisation.js';
+import {taskTree,closedTask,focusEligible} from '../shared/task-tree.js';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync,chmodSync,existsSync } from 'node:fs';
@@ -16,39 +19,49 @@ type TaskPlan={workflowState:WorkflowState;area:WorkArea;userTitle:string|null;p
 
 export class SauronStore {
   private db: DatabaseSync;
+  private inTransaction=false;
   readonly storeId: string;
   readonly replies: ReplyStore;
+  readonly organisation:OrganisationStore;
   constructor(readonly path: string, private now: () => Date = () => new Date(), readonly timeZone: string = process.env.ATTENTION_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone) {
     new Intl.DateTimeFormat('en',{timeZone}).format(new Date(0));
     mkdirSync(dirname(path), {recursive: true,mode:0o700});
     this.db = new DatabaseSync(path);
-    if (Number(this.db.prepare('PRAGMA user_version').get()!.user_version) > 3) { this.db.close(); throw new StoreError('unsupported_schema', 'This database needs a newer Sauron version.'); }
+    if (Number(this.db.prepare('PRAGMA user_version').get()!.user_version) > 4) { this.db.close(); throw new StoreError('unsupported_schema', 'This database needs a newer Sauron version.'); }
     // Source-backed tasks remain private to the local account, including WAL sidecars.
     for(const file of [path,path+'-wal',path+'-shm'])if(existsSync(file))chmodSync(file,0o600);
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
+    this.execute(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS receipts (id TEXT PRIMARY KEY, hash TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS history (
         seq INTEGER PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL,
         operation_id TEXT NOT NULL, at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      PRAGMA user_version=3;`);
+      `);
     this.db.prepare('INSERT OR IGNORE INTO metadata(key,value) VALUES (?,?)').run('store_id',randomUUID());
     this.storeId = this.db.prepare('SELECT value FROM metadata WHERE key=?').get('store_id')!.value as string;
     this.replies = new ReplyStore(this.db,this.now);
+    this.organisation=new OrganisationStore(this.db);
+    if(Number(this.db.prepare('PRAGMA user_version').get()!.user_version)<4){
+      this.execute('BEGIN IMMEDIATE');
+      try{
+        for(const task of this.all())this.organisation.save(task,this.organisation.get(task));
+        this.execute('PRAGMA user_version=4; COMMIT');
+      }catch(error){this.execute('ROLLBACK');throw error;}
+    }
     // Retire the presentation preference without changing tasks or decisions.
     this.db.prepare("DELETE FROM metadata WHERE key='ui_layout'").run();
     if(!this.metadata('planning_initialized_v1',false)){
-      this.db.exec('BEGIN IMMEDIATE');
+      this.execute('BEGIN IMMEDIATE');
       try{
         for(const task of this.all())this.setMetadata('task-plan:'+task.id,this.defaultPlan(task,true));
         this.setMetadata('planning_initialized_v1',true);
-        this.db.exec('COMMIT');
-      }catch(error){this.db.exec('ROLLBACK');throw error;}
+        this.execute('COMMIT');
+      }catch(error){this.execute('ROLLBACK');throw error;}
     }
     const staleFocus=this.all().filter(task=>{const plan=this.plan(task);return plan.focusOrder!==null&&!this.actionable(task,plan);});
     if(staleFocus.length){
-      this.db.exec('BEGIN IMMEDIATE');
+      this.execute('BEGIN IMMEDIATE');
       try{
         for(const stale of staleFocus){
           const task=this.get(stale.id);
@@ -56,9 +69,14 @@ export class SauronStore {
           const plan=this.plan(task);
           if(plan.focusOrder!==null&&!this.actionable(task,plan))this.savePlan(task,{...plan,focusOrder:null});
         }
-        this.db.exec('COMMIT');
-      }catch(error){this.db.exec('ROLLBACK');throw error;}
+        this.execute('COMMIT');
+      }catch(error){this.execute('ROLLBACK');throw error;}
     }
+  }
+  private execute(sql:string){
+    this.db.exec(sql);
+    if(/\bBEGIN\b/.test(sql))this.inTransaction=true;
+    if(/\b(COMMIT|ROLLBACK)\b/.test(sql))this.inTransaction=false;
   }
   close() { this.db.close(); }
   private all(): Task[] {
@@ -81,6 +99,9 @@ export class SauronStore {
     return aliases[0]?.id??key;
   }
   private save(task: Task, kind: string, operation: string) {
+    if(!this.get(task.id))this.organisation.save(task,this.organisation.get(task));
+    this.organisation.observe(task);
+    this.organisation.touch();
     this.db.prepare('INSERT INTO tasks VALUES (?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data')
       .run(task.id, JSON.stringify(task));
     this.db.prepare('INSERT INTO history(task_id,kind,operation_id,at) VALUES (?,?,?,?)')
@@ -94,7 +115,7 @@ export class SauronStore {
     const row=this.db.prepare('SELECT value FROM metadata WHERE key=?').get('task-plan:'+task.id);
     return row?JSON.parse(row.value as string) as TaskPlan:this.defaultPlan(task,true);
   }
-  private savePlan(task:Task,plan:TaskPlan){this.setMetadata('task-plan:'+task.id,plan);}
+  private savePlan(task:Task,plan:TaskPlan){this.organisation.touch();this.setMetadata('task-plan:'+task.id,plan);}
   private nextOrder():number {
     const plans=this.db.prepare("SELECT value FROM metadata WHERE key LIKE 'task-plan:%'").all().map(row=>JSON.parse(row.value as string) as TaskPlan);
     return Math.max(0,...plans.map(plan=>plan.order??0))+1;
@@ -102,22 +123,35 @@ export class SauronStore {
   private taskState(task:Task,plan:TaskPlan,now=this.now()):TaskState {
     return task.userDecision==='complete'?'done':task.userDecision==='dismiss'?'dismissed':
       task.userDecision==='snooze'&&task.snoozedUntil!>now.toISOString()?'snoozed':
-      'resolved' in task&&task.resolved?'done':plan.workflowState;
+      (this.organisation.get(task).sourceClosed||('resolved' in task&&task.resolved))&&!this.all().some(child=>this.organisation.get(child).parentId===task.id)?'done':plan.workflowState;
   }
   private actionable(task:Task,plan:TaskPlan):boolean {
     const state=this.taskState(task,plan);
-    return state==='ready'||state==='in_progress';
+    return !this.organisation.get(task).parentId&&(state==='ready'||state==='in_progress');
   }
-  view(): View {
+  view():View{
+    const owned=!this.inTransaction;
+    if(owned)this.execute('BEGIN');
+    try{const result=this.readView();if(owned)this.execute('COMMIT');return result;}
+    catch(error){if(owned)this.execute('ROLLBACK');throw error;}
+  }
+  private readView(): View {
     const now = this.now();
     const tasks=this.all();
     const today=new Intl.DateTimeFormat('sv-SE',{timeZone:planningTimeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
-    return {items: tasks.map(task => {const plan=this.plan(task),state=this.taskState(task,plan,now);
+    const items=tasks.map(task => {const plan=this.plan(task),state=this.taskState(task,plan,now);
       const priorityReason=['done','dismissed','snoozed'].includes(state)?null:plan.dueDate&&plan.dueDate<=today?(plan.dueDate<today?'Past due':'Due today'):
         plan.workflowState==='waiting'&&plan.reviewDate&&plan.reviewDate<=today?'Review waiting item':
         task.provider!=='personal'&&task.sourceState==='needs_you'?'Source asks for action':null;
-      return {...task,...plan,sourceTitle:task.title,sourceNextAction:task.nextAction,title:plan.userTitle??task.title,nextAction:plan.plannedAction??task.nextAction,
-        priorityReason,suggestedFocus:!!plan.dueDate&&plan.dueDate<=today&&(state==='ready'||state==='in_progress'),state};}), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, sourcePreferences:this.sourcePreferences(),pendingSourceSync:!!this.pendingLocalSync(),scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
+      const org=this.organisation.get(task);
+      return {...task,...plan,parentId:org.parentId,directTopicIds:org.directTopicIds,ownNeedsAttention:org.attention&&!['done','dismissed','snoozed'].includes(state),sourceTitle:task.title,sourceNextAction:task.nextAction,title:plan.userTitle??task.title,nextAction:plan.plannedAction??task.nextAction,
+        priorityReason,suggestedFocus:!!plan.dueDate&&plan.dueDate<=today&&(state==='ready'||state==='in_progress'),state};});
+    const tree=taskTree(items);
+    return {taskViewRevision:this.organisation.revision(),topics:this.organisation.topics(),items:items.map(task=>{
+      const org=this.organisation.get(task);
+      return {...task,topicIds:tree.topics(task.id),descendantSummary:tree.summary(task.id),
+        reopenSuggestion:org.reopenSuggested?[task.id,...tree.ancestors(task.id).filter(closedTask).map(parent=>parent.id)]:[]};
+    }), readAt: now.toISOString(), syntheticOnly: tasks.every(t=>t.provider==='manual'), storeId: this.storeId, sourcePreferences:this.sourcePreferences(),pendingSourceSync:!!this.pendingLocalSync(),scan:this.scan(),sync:this.sync(),coordination:this.coordination(),local:this.localState(),discussions:this.discussions()};
   }
   private discussions():DiscussionLink[] {
     return this.db.prepare("SELECT value FROM metadata WHERE key LIKE 'discussion-link:%'").all()
@@ -135,7 +169,7 @@ export class SauronStore {
     return {...result,discussion};
   }
   private transaction(id: string, payload: unknown, change: () => void): Result {
-    this.db.exec('BEGIN IMMEDIATE');
+    this.execute('BEGIN IMMEDIATE');
     try {
       const receipt = this.db.prepare('SELECT hash FROM receipts WHERE id=?').get(id);
       if (receipt && receipt.hash !== hash(payload)) throw new StoreError('id_reuse', 'Operation ID was already used for different input.');
@@ -144,9 +178,9 @@ export class SauronStore {
         this.db.prepare('INSERT INTO receipts VALUES (?,?)').run(id, hash(payload));
       }
       const view = this.view();
-      this.db.exec('COMMIT');
+      this.execute('COMMIT');
       return {...view, receipt:{id, duplicate:!!receipt}};
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    } catch (error) { this.execute('ROLLBACK'); throw error; }
   }
   upsert(input: unknown): Result {
     const batch = upsertSchema.parse(input);
@@ -346,9 +380,9 @@ export class SauronStore {
   }
   localState():LocalState {return this.metadata<LocalState>('local_state',{});}
   updateLocalState(patch:Partial<LocalState>) {
-    this.db.exec('BEGIN IMMEDIATE');
-    try{this.setMetadata('local_state',{...this.localState(),...patch});this.db.exec('COMMIT');}
-    catch(error){this.db.exec('ROLLBACK');throw error;}
+    this.execute('BEGIN IMMEDIATE');
+    try{this.setMetadata('local_state',{...this.localState(),...patch});this.execute('COMMIT');}
+    catch(error){this.execute('ROLLBACK');throw error;}
   }
   recordLocalRuntimeVerification(proof:{providers:Record<string,boolean>;observedTools:string[];cliVersion:string}) {
     const tools=proof.observedTools.join(' ').toLowerCase();
@@ -408,12 +442,12 @@ export class SauronStore {
   }
   discardExpiredLocalSync() {
     const pending=this.pendingLocalSync();if(!pending)return;
-    this.db.exec('BEGIN IMMEDIATE');
+    this.execute('BEGIN IMMEDIATE');
     try{
       const run=this.sync();
       if(run?.id===pending.request.runId&&run.status==='running')throw new StoreError('sync_running','A pending sync is still active.');
-      this.db.prepare("DELETE FROM metadata WHERE key='local_pending_sync'").run();this.db.exec('COMMIT');
-    }catch(error){this.db.exec('ROLLBACK');throw error;}
+      this.db.prepare("DELETE FROM metadata WHERE key='local_pending_sync'").run();this.execute('COMMIT');
+    }catch(error){this.execute('ROLLBACK');throw error;}
   }
   scan(): ScanRun|null {
     const row=this.db.prepare("SELECT value FROM metadata WHERE key='scan_run'").get();
@@ -431,18 +465,18 @@ export class SauronStore {
     this.db.prepare("INSERT INTO metadata VALUES ('scan_run',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(run));
   }
   beginScan(automatic=false): {run:ScanRun;started:boolean} {
-    this.db.exec('BEGIN IMMEDIATE');
+    this.execute('BEGIN IMMEDIATE');
     try {
       if(automatic&&this.coordination().mode!=='independent')throw new StoreError('dot_managed','Automatic source scanning is disabled in dot-managed mode.');
       if(this.coordination().mode==='local_managed'&&this.sync()?.status==='running')throw new StoreError('sync_busy','A local source sync is already running.');
       const existing=this.scan();
-      if(existing?.status==='running'){this.db.exec('COMMIT');return {run:existing,started:false};}
+      if(existing?.status==='running'){this.execute('COMMIT');return {run:existing,started:false};}
       const sourceVersions=Object.fromEntries(this.all().filter(task=>task.provider==='slack'||task.provider==='granola').map(task=>[task.id,task.sourceVersion]));
       const providers=enabledSources(this.sourcePreferences()).filter(provider=>provider==='slack'||provider==='granola');
       if(!providers.length)throw new StoreError('sources_paused','Manual source checks are paused. Enable Slack or Meetings to refresh.');
       const run:ScanRun={enabledProviders:providers,sourceRevision:this.sourcePreferences().revision,id:randomUUID(),status:'running',startedAt:this.now().toISOString(),finishedAt:null,sources:null,error:null,itemCount:0,sourceVersions};
-      this.saveScan(run);this.db.exec('COMMIT');return {run,started:true};
-    }catch(error){this.db.exec('ROLLBACK');throw error;}
+      this.saveScan(run);this.execute('COMMIT');return {run,started:true};
+    }catch(error){this.execute('ROLLBACK');throw error;}
   }
   finishScan(id:string,input:unknown):Result {
     const output=scanOutputSchema.parse(input);
@@ -478,16 +512,18 @@ export class SauronStore {
     });
   }
   failScan(id:string,message:string):void {
-    this.db.exec('BEGIN IMMEDIATE');
+    this.execute('BEGIN IMMEDIATE');
     try {
       const run=this.scan();
       if(run?.id===id&&run.status==='running')this.saveScan({...run,status:'failed',finishedAt:this.now().toISOString(),error:message});
-      this.db.exec('COMMIT');
-    }catch(error){this.db.exec('ROLLBACK');throw error;}
+      this.execute('COMMIT');
+    }catch(error){this.execute('ROLLBACK');throw error;}
   }
   createPersonal(input: unknown): Result {
     const task = personalTaskSchema.parse(input);
+    if(task.parentId&&(!task.expectedStoreId||task.expectedRevision===undefined))throw new StoreError('confirmation_required','Read the current store before creating a child.');
     return this.transaction('personal:'+task.operationId, task, () => {
+      if(task.parentId){this.assertOrganisation(task.expectedStoreId!,task.expectedRevision!);this.assertParent(task.parentId);}
       const id = 'personal:'+task.operationId;
       const time = this.now().toISOString();
       this.save({id, obligationKey:id, sourceVersion:1, provider:'personal',
@@ -496,6 +532,7 @@ export class SauronStore {
         decidedAt:null, snoozedUntil:null, updatedAt:time, createdAt:time, state:task.sourceState},
       'personal',task.operationId);
       this.savePlan(this.get(id)!,this.defaultPlan(this.get(id)!,true));
+      if(task.parentId)this.organisation.save(this.get(id)!,{...this.organisation.get(this.get(id)!),parentId:task.parentId});
     });
   }
   trackCodexThreads(input:unknown):Result {
@@ -508,8 +545,9 @@ export class SauronStore {
       const threadId=thread.threadId.toLowerCase(),url=`codex://threads/${threadId}`;
       let begun=false;
       try{
-        this.db.exec('BEGIN IMMEDIATE');
+        this.execute('BEGIN IMMEDIATE');
         begun=true;
+        if(thread.parentId)this.assertParent(thread.parentId);
         const links=this.discussions().filter(link=>link.url===url);
         const matches=new Set(links.filter(link=>!this.db.prepare("SELECT 1 FROM history WHERE task_id=? AND kind='proposal' LIMIT 1").get(link.taskId)).map(link=>link.taskId));
         if(matches.size>1)throw new StoreError('ambiguous_chat','Several Sauron items already link to this chat.');
@@ -531,11 +569,17 @@ export class SauronStore {
           this.setMetadata('discussion-link:'+hash([id,url]),{taskId:id,url,createdAt:time});
           result={threadId,taskId:id,url,status:'created'};
         }
-        this.db.exec('COMMIT');
+        if(thread.parentId&&result.taskId){
+          const tracked=this.get(result.taskId)!;taskTree(this.view().items).validateMove(tracked.id,thread.parentId);
+          this.organisation.save(tracked,{...this.organisation.get(tracked),parentId:thread.parentId});
+          this.savePlan(tracked,{...this.plan(tracked),focusOrder:null});
+          this.save({...tracked,version:tracked.version+1},'move',randomUUID());
+        }
+        this.execute('COMMIT');
         begun=false;
         trackedThreads.push(result);
       }catch(error){
-        if(begun)this.db.exec('ROLLBACK');
+        if(begun)this.execute('ROLLBACK');
         trackedThreads.push({threadId,taskId:null,url,status:'failed',error:error instanceof Error?error.message:'Could not track this chat.'});
       }
     }
@@ -547,7 +591,7 @@ export class SauronStore {
     if(new Set(request.proposals.map(item=>item.actionKey)).size!==request.proposals.length)throw new StoreError('duplicate_action','Use a distinct action key for each follow-up.');
     const threadId=request.threadId.toLowerCase(),url=`codex://threads/${threadId}`;
     const proposedFollowups:{id:string;status:'created'|'already_proposed'}[]=[];
-    this.db.exec('BEGIN IMMEDIATE');
+    this.execute('BEGIN IMMEDIATE');
     try{
       for(const proposal of request.proposals){
         const digest=hash([threadId,proposal.actionKey]);
@@ -562,8 +606,8 @@ export class SauronStore {
         this.setMetadata('discussion-link:'+hash([id,url]),{taskId:id,url,createdAt:time});
         proposedFollowups.push({id,status:'created'});
       }
-      const view=this.view();this.db.exec('COMMIT');return {...view,proposedFollowups};
-    }catch(error){this.db.exec('ROLLBACK');throw error;}
+      const view=this.view();this.execute('COMMIT');return {...view,proposedFollowups};
+    }catch(error){this.execute('ROLLBACK');throw error;}
   }
   planTask(input:unknown):Result {
     const request=planTaskSchema.parse(input);
@@ -596,7 +640,7 @@ export class SauronStore {
     if(new Set(request.orderedIds).size!==request.orderedIds.length||new Set(request.focusIds).size!==request.focusIds.length||
       request.focusIds.some(id=>!request.orderedIds.includes(id)))throw new StoreError('invalid_order','Order and focus must contain distinct actionable tasks.');
     return this.transaction('order:'+request.operationId,request,()=>{
-      const actionable=this.view().items.filter(task=>task.state==='ready'||task.state==='in_progress');
+      const actionable=this.view().items.filter(focusEligible);
       const actual=actionable.map(task=>task.id).sort(),expected=[...request.orderedIds].sort();
       if(JSON.stringify(actual)!==JSON.stringify(expected))throw new StoreError('conflict','The task list changed. Refresh before reordering.');
       const versions=new Map(request.expectedVersions.map(item=>[item.id,item.version]));
@@ -610,24 +654,59 @@ export class SauronStore {
       }
     });
   }
+  private assertOrganisation(storeId:string,revision:number){
+    if(storeId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+    if(revision!==this.organisation.revision())throw new StoreError('conflict','Tasks changed. Refresh and review the change again.');
+  }
+  private assertParent(parentId:string){
+    const parent=this.view().items.find(task=>task.id===parentId);
+    if(!parent||closedTask(parent))throw new StoreError('invalid_parent','Choose an existing open parent.');
+  }
+  organiseTask(input:unknown):Result{
+    const request=organiseTaskSchema.parse(input);
+    return this.transaction('organise:'+request.operationId,request,()=>{
+      this.assertOrganisation(request.expectedStoreId,request.expectedRevision);
+      this.applyOrganisation(request);
+    });
+  }
+  private applyOrganisation(request:ReturnType<typeof organiseTaskSchema.parse>){
+    const task=this.get(request.id);
+    if(!task)throw new StoreError('not_found','Task no longer exists. Refresh the list.');
+    const org=this.organisation.get(task);
+    if(request.action==='move'){
+      taskTree(this.view().items).validateMove(task.id,request.parentId);
+      this.organisation.save(task,{...org,parentId:request.parentId});
+      if(request.parentId)this.savePlan(task,{...this.plan(task),focusOrder:null});
+    }else if(request.action==='topics')this.organisation.save(task,{...org,directTopicIds:this.organisation.assignTopics(request.topics)});
+    else this.organisation.save(task,{...org,attention:request.needsAttention,handledEvidence:request.needsAttention?null:org.evidence,reopenSuggested:false});
+    this.save({...task,version:task.version+1,updatedAt:this.now().toISOString()},'organisation',request.operationId);
+  }
   decide(input: unknown): Result {
     const operation = decisionSchema.parse(input);
     return this.transaction('decision:'+operation.operationId, operation, () => {
-      const old = this.get(operation.id);
+      const tree=taskTree(this.view().items),old=tree.byId.get(operation.id);
       if (!old) throw new StoreError('not_found', 'Task no longer exists. Refresh the list.');
-      if (old.version !== operation.expectedVersion)
-        throw new StoreError('conflict', 'Task changed in another view. Refresh before choosing again.');
-      if (operation.snoozedUntil && Date.parse(operation.snoozedUntil) <= this.now().getTime())
-        throw new StoreError('invalid_snooze', 'Choose a future snooze time.');
-      if (operation.action !== 'reopen' && (old.userDecision === 'complete' || old.userDecision === 'dismiss'))
-        throw new StoreError('terminal', 'This task already has a final decision.');
-      const updated={...old, userDecision:operation.action === 'reopen' ? null : operation.action,
-        decidedAt:operation.action === 'reopen' ? null : this.now().toISOString(),
-        snoozedUntil:operation.snoozedUntil ?? null, updatedAt:this.now().toISOString(),
-        version:old.version+1};
-      this.save(updated, operation.action, operation.operationId);
-      const plan=this.plan(updated);
-      if(plan.focusOrder!==null&&!this.actionable(updated,plan))this.savePlan(updated,{...plan,focusOrder:null});
+      if (old.version !== operation.expectedVersion)throw new StoreError('conflict', 'Task changed in another view. Refresh before choosing again.');
+      if(operation.expectedStoreId&&operation.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+      const branch=tree.descendants(old.id),open=branch.filter(task=>!closedTask(task));
+      const path=operation.action==='reopen'?tree.ancestors(old.id).filter(closedTask):[];
+      if(((operation.action==='complete'||operation.action==='dismiss')&&open.length)||path.length){
+        if(!operation.branch||operation.expectedRevision===undefined||!operation.expectedStoreId)throw new StoreError('confirmation_required','Confirm this branch decision after reviewing affected tasks.');
+        this.assertOrganisation(operation.expectedStoreId,operation.expectedRevision);
+      }
+      if (operation.snoozedUntil && Date.parse(operation.snoozedUntil) <= this.now().getTime())throw new StoreError('invalid_snooze', 'Choose a future snooze time.');
+      if (operation.action !== 'reopen' && (old.userDecision === 'complete' || old.userDecision === 'dismiss'))throw new StoreError('terminal', 'This task already has a final decision.');
+      const affected=operation.action==='reopen'?[old,...path]:operation.branch&&(operation.action==='complete'||operation.action==='dismiss')?[old,...open]:[old];
+      for(const item of affected){
+        const task=this.get(item.id)!;
+        const updated={...task,userDecision:operation.action==='reopen'?null:operation.action,
+          decidedAt:operation.action==='reopen'?null:this.now().toISOString(),snoozedUntil:operation.snoozedUntil??null,
+          version:task.version+1,updatedAt:this.now().toISOString()};
+        this.save(updated,operation.action,operation.operationId);
+        if(operation.action!=='snooze')this.organisation.save(updated,{...this.organisation.get(updated),attention:operation.action==='reopen',reopenSuggested:false,sourceClosed:operation.action==='reopen'?false:this.organisation.get(updated).sourceClosed});
+        const plan=this.plan(updated);
+        if(plan.focusOrder!==null&&!this.actionable(updated,plan))this.savePlan(updated,{...plan,focusOrder:null});
+      }
     });
   }
 }

@@ -547,3 +547,30 @@ for(const recovered of [false,true])test(`personal creation clears filters after
   await expect(page.getByRole('button',{name:'Filter by area: All areas'})).toBeVisible();
   expect((await call(request,'list_attention')).items.filter(task=>task.title==='New visible task')).toHaveLength(1);
 });
+
+test('H-03 F-03 N-01: confirmed moves remove child focus and preserve collapsed branch navigation',async({page,request})=>{
+  await add(request,'Group parent');let view=await add(request,'Group child');
+  const parent=view.items.find(task=>task.title==='Group parent')!,child=view.items.find(task=>task.title==='Group child')!;
+  await call(request,'order_attention_tasks',{operationId:crypto.randomUUID(),expectedStoreId:view.storeId,orderedIds:[parent.id,child.id],focusIds:[child.id],expectedVersions:view.items.map(task=>({id:task.id,version:task.version}))});
+  await open(page);await actions(page,'Group child','Move task');
+  await page.getByRole('combobox',{name:'Parent task'}).selectOption(parent.id);
+  await expect(page.getByText('This removes its Top 3 slot. The destination’s priority stays unchanged.')).toBeVisible();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();expect((await call(request,'list_attention')).items.find(task=>task.id===child.id)?.parentId).toBeNull();
+  await actions(page,'Group child','Move task');await page.getByRole('combobox',{name:'Parent task'}).selectOption(parent.id);await page.getByRole('button',{name:'Confirm move'}).click();
+  await expect(page.getByRole('button',{name:'Collapse Group parent'})).toBeVisible();
+  await page.getByRole('button',{name:'Collapse Group parent'}).click();await expect(page.getByRole('heading',{name:'Group child',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Expand Group parent'}).click();await expect(page.getByRole('heading',{name:'Group child',exact:true})).toBeVisible();
+  await actions(page,'Group child','Mark handled');
+  view=await call(request,'list_attention');expect(view.items.find(task=>task.id===child.id)?.focusOrder).toBeNull();
+  expect(view.items.find(task=>task.id===parent.id)?.ownNeedsAttention).toBe(true);
+});
+test('H-05 A-04: closing a branch is explicit and child attention survives handling the parent',async({page,request})=>{
+  await add(request,'Attention parent');let view=await add(request,'Attention child');const parent=view.items.find(task=>task.title==='Attention parent')!,child=view.items.find(task=>task.title==='Attention child')!;
+  await call(request,'organise_attention_task',{request:{operationId:crypto.randomUUID(),expectedStoreId:view.storeId,expectedRevision:view.taskViewRevision,action:'move',id:child.id,parentId:parent.id}});
+  await open(page);await actions(page,'Attention parent','Mark handled');
+  await expect(page.getByText('1 open (1 need attention) · 0 closed',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Complete Attention parent',exact:true}).click();await expect(page.getByRole('heading',{name:'Close the whole branch?'})).toBeVisible();
+  await page.getByRole('button',{name:'Keep parent open'}).click();expect((await call(request,'list_attention')).items.every(task=>task.state==='ready')).toBe(true);
+  await page.getByRole('button',{name:'Complete Attention parent',exact:true}).click();await page.getByRole('button',{name:'Confirm branch closure'}).click();
+  await expect(page.getByRole('button',{name:'Complete Attention parent',exact:true})).toHaveCount(0);expect((await call(request,'list_attention')).items.every(task=>task.state==='done')).toBe(true);
+});

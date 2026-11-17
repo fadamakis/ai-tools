@@ -26,7 +26,7 @@ test('schema 3 tasks map to Ready and Waiting without rewriting source records o
   assert.deepEqual(states,{'synthetic:ready':'ready','synthetic:waiting':'waiting','synthetic:done':'done'});
   store.close();const after=new DatabaseSync(path);
   assert.deepEqual(after.prepare('SELECT id,data FROM tasks ORDER BY id').all(),before);
-  assert.equal(after.prepare('PRAGMA user_version').get()?.user_version,3);
+  assert.equal(after.prepare('PRAGMA user_version').get()?.user_version,4);
   after.close();
 });
 test('new source work waits in Inbox and accepted planning survives later source observations',t=>{
@@ -139,7 +139,10 @@ test('source resolution and reopening old saved data cannot retain inactive focu
   const resolved=store.upsert({batchId:'source-resolved',items:[{...source,resolved:true,sourceVersion:2,lastCheckedAt:'2026-11-02T09:30:00Z'}]}).items.find(task=>task.id===obligationKey)!;
   assert.equal(resolved.state,'done');assert.equal(resolved.focusOrder,null);
   const reopenedSource=store.upsert({batchId:'source-reopened',items:[{...source,sourceVersion:3,lastCheckedAt:'2026-11-02T09:45:00Z'}]}).items.find(task=>task.id===obligationKey)!;
-  assert.equal(reopenedSource.state,'ready');assert.equal(reopenedSource.focusOrder,null);
+  assert.equal(reopenedSource.state,'done');assert.equal(reopenedSource.focusOrder,null);
+  assert.deepEqual(reopenedSource.reopenSuggestion,[reopenedSource.id]);
+  const explicitlyReopened=store.decide({operationId:randomUUID(),id:reopenedSource.id,expectedVersion:reopenedSource.version,action:'reopen'}).items.find(task=>task.id===reopenedSource.id)!;
+  assert.equal(explicitlyReopened.state,'ready');assert.equal(explicitlyReopened.focusOrder,null);
   const waiting=store.createPersonal({operationId:randomUUID(),title:'Old waiting task',sourceState:'waiting'}).items.find(task=>task.title==='Old waiting task')!;
   const db=new DatabaseSync(f.path);
   const key='task-plan:'+waiting.id,plan=JSON.parse(db.prepare('SELECT value FROM metadata WHERE key=?').get(key)!.value as string);

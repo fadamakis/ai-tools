@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type {Topic} from './organisation.js';
+import type {BranchSummary} from './task-tree.js';
 import type { ReplyDraft } from './replies.js';
 
 export const sourceKinds = ['manual', 'slack', 'jira', 'github', 'calendar', 'meeting'] as const;
@@ -139,6 +141,9 @@ export const decisionSchema = z.strictObject({
   operationId: z.string().min(1).max(120),
   id: taskIdSchema,
   expectedVersion: z.number().int().nonnegative(),
+  expectedStoreId:z.string().uuid().optional(),
+  expectedRevision:z.number().int().nonnegative().optional(),
+  branch:z.boolean().optional(),
   action: z.enum(['complete', 'snooze', 'dismiss', 'reopen']),
   snoozedUntil: z.string().datetime().transform(v => new Date(v).toISOString()).optional(),
 }).superRefine((v, ctx) => {
@@ -148,6 +153,9 @@ export const decisionSchema = z.strictObject({
 
 export const personalTaskSchema = z.strictObject({
   operationId: z.string().uuid(),
+  parentId:z.string().min(1).nullable().optional(),
+  expectedStoreId:z.string().uuid().optional(),
+  expectedRevision:z.number().int().nonnegative().optional(),
   title: z.string().trim().min(1).max(160),
   nextAction: z.string().trim().max(400).default(''),
   sourceState: z.enum(['needs_you', 'waiting']).default('needs_you'),
@@ -176,6 +184,7 @@ export const proposeCodexFollowupsSchema=z.strictObject({
 export const trackCodexThreadsSchema = z.strictObject({
   expectedStoreId: z.string().uuid(),
   threads: z.array(z.strictObject({
+    parentId:z.string().min(1).nullable().optional(),
     threadId: z.string().uuid(),
     title: z.string().trim().min(1).max(160),
     nextAction: z.string().trim().max(400).default(''),
@@ -215,6 +224,12 @@ export type Task = (Observation | PersonalTask) & {
   sourceNextAction?: string;
   priorityReason?: string | null;
   suggestedFocus?: boolean;
+  parentId?:string|null;
+  directTopicIds?:string[];
+  topicIds?:string[];
+  ownNeedsAttention?:boolean;
+  descendantSummary?:BranchSummary;
+  reopenSuggestion?:string[];
 };
 export function canonicalDiscussionUrl(value:string):string {
   const url=new URL(value),id=url.pathname.split('/').at(-1)!;
@@ -228,7 +243,7 @@ export const saveDiscussionSchema=linkDiscussionSchema.extend({url:z.string().ma
   try{return canonicalDiscussionUrl(value.trim());}catch{ctx.addIssue({code:'custom',message:'Paste a ChatGPT or Codex conversation link.'});return z.NEVER;}
 })});
 export type DiscussionLink={taskId:string;url:string;createdAt:string};
-export type View = { items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; sourcePreferences?:SourcePreferences; pendingSourceSync?:boolean;scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
+export type View = { taskViewRevision?:number;topics?:Topic[]; items: Task[]; readAt: string; syntheticOnly: boolean; storeId: string; sourcePreferences?:SourcePreferences; pendingSourceSync?:boolean;scan?:ScanRun|null; sync?:SyncRun|null; coordination?:SyncCoordination; local?:LocalState;discussions?:DiscussionLink[] };
 export type Result = View & { receipt?: { id: string; duplicate: boolean }; error?: string; reply?: ReplyDraft|null;syncReceipt?:SyncReceipt|null;discussion?:DiscussionLink;trackedThreads?:TrackedCodexThread[];proposedFollowups?:{id:string;status:'created'|'already_proposed'}[] };
 
 export const syntheticObservation = (version = 1): Observation => ({

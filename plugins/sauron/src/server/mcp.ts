@@ -1,3 +1,4 @@
+import {organiseTaskToolSchema} from '../shared/organisation.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import { OpenAIExtensions } from '@openai/mcp-extensions/server';
 import { readFileSync } from 'node:fs';
@@ -60,6 +61,7 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:trackCodexThreadsSchema, annotations:{...readOnly, readOnlyHint:false, idempotentHint:true}, _meta:{ui:{visibility:['app','model']}}},
     {name:'propose_codex_followups',title:'Propose Codex chat follow-ups',description:'After the user selects a verified Codex chat, propose distinct concrete follow-ups for review in Sauron Inbox. Use an exact stable actionKey from each chat action; reuse it on retries. Never infer a chat ID or auto-accept a proposal. The user must accept or dismiss each proposal in Sauron.',
       inputSchema:proposeCodexFollowupsSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
+    {name:'organise_attention_task',title:'Organise a Sauron task',description:'Move a task branch, assign direct topics, or explicitly mark its attention handled or outstanding. Read list_attention first. A move is a user-confirmed action and removes any nested Top 3 slot. Requires the current task-view revision and store identity.',inputSchema:organiseTaskToolSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'plan_attention_task',title:'Edit Sauron task plan',description:'Accept an Inbox item or edit its user-owned workflow state, area, next action, and real due or review dates. Source facts remain unchanged. Requires a displayed task version and stable operation ID.',
       inputSchema:planTaskSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'order_attention_tasks',title:'Set Sauron task order',description:'Save the user-confirmed order of all actionable tasks and up to three focus tasks. Refresh and retry after a version conflict; source refresh never chooses the order.',

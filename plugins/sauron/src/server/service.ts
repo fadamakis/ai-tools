@@ -1,3 +1,4 @@
+import {organiseTaskToolSchema} from '../shared/organisation.js';
 import { SauronStore, StoreError } from './store.js';
 import type { Result } from '../shared/contracts.js';
 import { refreshAttention } from './scan.js';
@@ -31,6 +32,7 @@ export function invoke(store: SauronStore, name: string, args: unknown,context?:
     case 'create_personal_task': return store.createPersonal(args);
     case 'track_codex_threads': return store.trackCodexThreads(args);
     case 'propose_codex_followups': return store.proposeCodexFollowups(args);
+    case 'organise_attention_task': return store.organiseTask(organiseTaskToolSchema.parse(args).request);
     case 'plan_attention_task': return store.planTask(args);
     case 'order_attention_tasks': return store.orderTasks(args);
     case 'decide_attention_item': return store.decide(args);

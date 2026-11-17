@@ -2,6 +2,10 @@ import { planningTimeZone, type Result, type TaskState } from '../shared/contrac
 
 export function mergeSavedView(previous:Result|null,next:Result):Result {
   if(!previous||previous.storeId!==next.storeId)return next;
+  if(previous.taskViewRevision!==undefined&&next.taskViewRevision!==undefined){
+    const saved=previous.taskViewRevision>next.taskViewRevision||(previous.taskViewRevision===next.taskViewRevision&&previous.readAt>next.readAt)?previous:next;
+    return {...(previous.readAt>next.readAt?previous:next),items:saved.items,topics:saved.topics,taskViewRevision:saved.taskViewRevision};
+  }
   const latest=previous.readAt>next.readAt?previous:next;
   const earlier=latest===next?previous:next;
   const items=new Map(earlier.items.map(task=>[task.id,task]));
