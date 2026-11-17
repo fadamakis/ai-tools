@@ -8,6 +8,6 @@ export const organiseTaskSchema=z.discriminatedUnion('action',[
 ]);
 export type OrganiseTaskInput=z.infer<typeof organiseTaskSchema>;
 export type Topic={id:string;name:string};
-export type TaskOrganisation={parentId:string|null;directTopicIds:string[];attention:boolean;handledEvidence:string|null;evidence:string;reopenSuggested:boolean;sourceClosed:boolean};
+export type TaskOrganisation={parentId:string|null;directTopicIds:string[];attention:boolean;handledEvidence:string|null;evidence:string;reopenSuggested:boolean;sourceClosed:boolean;chatEvidence?:string|null;handledAt?:string|null;closedAt?:string|null};
 
 export const organiseTaskToolSchema=z.strictObject({request:organiseTaskSchema});

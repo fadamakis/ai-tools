@@ -115,14 +115,18 @@ test('fixture refresh and reply use local store methods and never start a source
   assert.equal(spawn.mock.callCount(),0);
 });
 
-test('build publishes a new generation while existing native clients keep their build and saved decisions',async t=>{
+test('I-06: Dev generations advertise distinct UI resources while existing clients keep their build and saved decisions',async t=>{
   const root=fixtureRoot(t),paths=devPaths(root);
   const initial=await buildDevelopment({root,setup:true,build:fixtureBuild});
   const marketplace=marketplaceSnapshot(root);
   const clients=[];
   try{
     const first=await connectFixture(root),second=await connectFixture(root);clients.push(first,second);
-    assert.equal((await first.listTools()).tools.find(tool=>tool.name==='open_attention').title,'Sauron Dev');
+    const entry=(await first.listTools()).tools.find(tool=>tool.name==='open_attention');
+    assert.equal(entry.title,'Sauron Dev');
+    const initialUri=entry._meta.ui.resourceUri;
+    assert.equal(initialUri,`ui://attention/list-v1/dev/${initial.buildId}`);
+    assert.match((await first.readResource({uri:initialUri})).contents[0].text,new RegExp(initial.buildId));
     const before=await readFixture(first),task=before.items.find(item=>item.provider==='personal'&&!item.userDecision);
     await first.callTool({name:'decide_attention_item',arguments:{id:task.id,expectedVersion:task.version,action:'complete',operationId:'complete-before-build'}});
     const saved=await readFixture(second);
@@ -138,6 +142,11 @@ test('build publishes a new generation while existing native clients keep their 
     assert.equal(blocked.isError,true);
     await second.close();clients.pop();
     const reconnected=await connectFixture(root);clients.push(reconnected);
+    const updatedUri=(await reconnected.listTools()).tools.find(tool=>tool.name==='open_attention')._meta.ui.resourceUri;
+    assert.equal(updatedUri,`ui://attention/list-v1/dev/${latest.buildId}`);
+    assert.notEqual(updatedUri,initialUri);
+    assert.match((await reconnected.readResource({uri:updatedUri})).contents[0].text,new RegExp(latest.buildId));
+    assert.equal((await first.listTools()).tools.find(tool=>tool.name==='open_attention')._meta.ui.resourceUri,initialUri);
     const updated=await readFixture(reconnected);
     assert.equal(updated.dev.buildId,latest.buildId);assert.equal(updated.storeId,saved.storeId);assert.deepEqual(updated.items,saved.items);
     assert.match((await reconnected.readResource({uri:'ui://attention/list-v1'})).contents[0].text,new RegExp(latest.buildId));

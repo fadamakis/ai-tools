@@ -1,3 +1,4 @@
+import {useOrganisationReview} from './OrganisationReview.js';
 import {useTaskOrganisation} from './useTaskOrganisation.js';
 import {taskTree,visibleTaskRows,focusEligible} from '../shared/task-tree.js';
 import { useEffect, useRef, useState } from 'react';
@@ -56,6 +57,7 @@ export function useSauronController(){
     finally{gate.current=false;setBusy(false);}
   }
   const organisation=useTaskOrganisation(view,client,run);
+  const review=useOrganisationReview(view,client,run,apply);
   const [branchDecision,setBranchDecision]=useState<{task:Task;action:DecisionInput['action'];revision:number}|null>(null);
   const addChild=(task:Task)=>{setDraft({...emptyDraft,parentId:task.id});setAdding(true);if(!organisation.expanded.has(task.id))organisation.toggle(task.id);};
   const readSaved=()=>{if(c.current)void run(()=>c.current!.call('list_attention'));};
@@ -227,6 +229,6 @@ export function useSauronController(){
   };
   function dismissNotice(){setNotice('');setReopenId(null);}
   function cancelPending(){remember(null);setPending(null);setRecovering(false);if(pending?.kind==='create')cancelDraft();}
-  return {organisation,rows,matchedCount,addChild,branchDecision,setBranchDecision,sourceSaving,sourceError,saveSource,retrySource,view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
+  return {review,organisation,rows,matchedCount,addChild,branchDecision,setBranchDecision,sourceSaving,sourceError,saveSource,retrySource,view,client,filter,source,area,weeklyReview,busy,error,query,pending,recovering,adding,draft,dismiss,notice,reopenTask,diagnostics,theme,scanning,history,hasFilters,items,showTools,count,emptyTitles,emptyDescriptions,setSource,setArea,setWeeklyReview,setQuery,setAdding,setDismiss,setDiagnostics,setTheme,setError,setPending,setConnectionAttempt,readSaved,refresh,selectState,returnToTasks,save,decide,plan,order,seed,replay,c,changeDraft,cancelDraft,cancelPending,dismissNotice,apply};
 }
 export type SauronController=ReturnType<typeof useSauronController>;

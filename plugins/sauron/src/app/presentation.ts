@@ -4,7 +4,7 @@ export function mergeSavedView(previous:Result|null,next:Result):Result {
   if(!previous||previous.storeId!==next.storeId)return next;
   if(previous.taskViewRevision!==undefined&&next.taskViewRevision!==undefined){
     const saved=previous.taskViewRevision>next.taskViewRevision||(previous.taskViewRevision===next.taskViewRevision&&previous.readAt>next.readAt)?previous:next;
-    return {...(previous.readAt>next.readAt?previous:next),items:saved.items,topics:saved.topics,taskViewRevision:saved.taskViewRevision};
+    return {...(previous.readAt>next.readAt?previous:next),organisationReview:(previous.organisationReview?.revision??0)>(next.organisationReview?.revision??0)?previous.organisationReview:next.organisationReview,items:saved.items,topics:saved.topics,taskViewRevision:saved.taskViewRevision};
   }
   const latest=previous.readAt>next.readAt?previous:next;
   const earlier=latest===next?previous:next;

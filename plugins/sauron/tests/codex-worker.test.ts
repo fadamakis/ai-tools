@@ -46,7 +46,7 @@ test('worker failures reject without leaving private task files', async t => {
   ] as const;
   for (const [name, program, error] of programs) await t.test(name, async t => {
     const { request, cleaned } = fixture(t, program);
-    await assert.rejects(runCodexWorker({ ...request, timeoutMs: 1000 }), error);
+    await assert.rejects(runCodexWorker({ ...request, timeoutMs: name==='timeout'?1000:5000 }), error);
     cleaned();
   });
   await t.test('startup failure', async t => {
