@@ -87,6 +87,7 @@ Removing “Fix routine issues” from Top 3 leaves both branches visible in thi
 - **F-03:** Nesting a Top 3 task removes its slot. The move confirmation states this consequence.
   The destination parent's existing priority remains unchanged.
 - **F-04:** Deprioritising removes a branch from Top 3 or lowers its order. It preserves visibility, attention flags and individual states. No Park state or section is added.
+  Focused tasks can reorder across Ready and In progress. Unfocused ordering retains its workflow-state boundaries; filtered views do not expose reorder actions.
 
 ### Attention and state
 
@@ -98,6 +99,7 @@ Removing “Fix routine issues” from Top 3 leaves both branches visible in thi
   A descendant needing input flags its ancestors. Deprioritisation does not suppress that signal.
 - **A-04:** A parent's own attention state is distinct from its descendant summary.
   Handling its own chat does not clear children's flags or the remaining aggregate signal.
+  Scheduled helper reports count each task's own attention once, including flagged Waiting tasks and excluding snoozed or closed work. New attention and changed displayed titles or next actions are reported as changes; unchanged polling and handled work are not.
 - **A-05:** Child summaries do not replace explicit parent status decisions.
   Open, closed, and needs attention describe the product behaviour here; they do not define a replacement planning-state system.
 

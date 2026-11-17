@@ -11,6 +11,7 @@ if(process.argv.slice(2).some(arg=>arg!=='--manual-scan'))throw Error('Use no ar
 const location=dirname(fileURLToPath(import.meta.url));
 const root=resolve(location,basename(location)==='server'?'../..':'..');
 const client=new Client({name:'sauron-background-check',version:'0.6.6'});
+const needsAttention=task=>task.ownNeedsAttention===true&&!['snoozed','done','dismissed'].includes(task.state);
 const transport=new StdioClientTransport({command:process.execPath,
   args:[resolve(root,'dist/server/index.js')],cwd:root,
   env:{...process.env,ATTENTION_DB:dataPath()},stderr:'pipe'});
@@ -34,7 +35,7 @@ try {
     const failed=freshness.businessHoursActive&&['never','stale','partial','failed'].includes(freshness.status);
     console.log(JSON.stringify({storeId:view.storeId,mode:view.coordination.mode,automaticWriter:view.coordination.mode==='local_managed'?'local':'dot',checkKind:'sync_freshness',
       sourceScanStarted:false,sourcesChecked:false,coordination:view.coordination,sync:view.sync,scan:view.scan,
-      needsYou:view.items.filter(task=>task.state==='needs_you').length,changes:[],notifyFailure:failed,
+      needsYou:view.items.filter(needsAttention).length,changes:[],notifyFailure:failed,
       message:'Read saved managed sync freshness only. No independent source scan was started; source coverage is available in sync.sources.'},null,2));
   } else {
   const id=view.scan.id,deadline=Date.now()+13*60_000;
@@ -47,10 +48,10 @@ try {
   const prior=new Map(before.items.map(task=>[task.id,task]));
   const changes=view.items.filter(task=>{
     const old=prior.get(task.id);
-    return task.state==='needs_you'&&(!old||old.state!=='needs_you'||old.title!==task.title||old.nextAction!==task.nextAction);
+    return needsAttention(task)&&(!old||!needsAttention(old)||old.title!==task.title||old.nextAction!==task.nextAction);
   }).map(({id,title,nextAction,sourceUrl})=>({id,title,nextAction,sourceUrl}));
   const failed=view.scan.status==='partial'||view.scan.status==='failed';
-  console.log(JSON.stringify({storeId:view.storeId,mode:view.coordination?.mode??'independent',automaticWriter:view.coordination?.mode!=='independent'?'dot':'legacy_scanner',checkKind:'source_scan',sourceScanStarted:before.scan?.id!==view.scan?.id,scan:view.scan,needsYou:view.items.filter(task=>task.state==='needs_you').length,
+  console.log(JSON.stringify({storeId:view.storeId,mode:view.coordination?.mode??'independent',automaticWriter:view.coordination?.mode!=='independent'?'dot':'legacy_scanner',checkKind:'source_scan',sourceScanStarted:before.scan?.id!==view.scan?.id,scan:view.scan,needsYou:view.items.filter(needsAttention).length,
     changes,notifyFailure:failed&&(before.scan?.status!==view.scan.status||before.scan?.error!==view.scan.error)},null,2));
   }
 }finally{await client.close();}

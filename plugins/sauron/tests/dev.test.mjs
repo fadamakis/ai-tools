@@ -145,6 +145,12 @@ test('I-06: Dev generations advertise distinct UI resources while existing clien
     const updatedUri=(await reconnected.listTools()).tools.find(tool=>tool.name==='open_attention')._meta.ui.resourceUri;
     assert.equal(updatedUri,`ui://attention/list-v1/dev/${latest.buildId}`);
     assert.notEqual(updatedUri,initialUri);
+    const restored=await reconnected.readResource({uri:initialUri});
+    assert.equal(restored.contents[0].uri,initialUri);
+    assert.match(restored.contents[0].text,new RegExp(latest.buildId));
+    assert.doesNotMatch(restored.contents[0].text,new RegExp(initial.buildId));
+    assert.match((await first.readResource({uri:updatedUri})).contents[0].text,new RegExp(initial.buildId));
+
     assert.match((await reconnected.readResource({uri:updatedUri})).contents[0].text,new RegExp(latest.buildId));
     assert.equal((await first.listTools()).tools.find(tool=>tool.name==='open_attention')._meta.ui.resourceUri,initialUri);
     const updated=await readFixture(reconnected);
