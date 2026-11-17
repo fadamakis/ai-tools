@@ -1,7 +1,7 @@
 # AI Tools release
 
-Source commit: d05d370af1cbc33edaf2983a96c9a951ed0404b8
+Source commit: cd220a53288ed95d6f5029ffc679df1919a3cb68
 
 - shelob: 0.11.15
-- sauron: 0.6.23
+- sauron: 0.6.24
 - workbench: 0.4.5
