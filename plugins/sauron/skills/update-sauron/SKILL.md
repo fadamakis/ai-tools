@@ -16,11 +16,19 @@ part of a sync. Do not bypass denied source reads.
    `storeId`, `scan` (independent manual Refresh), and `sync` (dot-fed status).
    Compare `storeId` with the intended app's Diagnostics. Use the current user's
    observed store ID for this run; never reuse an example or another person's ID.
-   Stop on a mismatch.
+   Stop on a mismatch. Read `sourcePreferences.enabled` before any connector reads.
+   A missing preference record means all five sources are enabled. Never read or
+   recheck disabled providers, including identity/profile reads or saved obligations.
+   If every source is off, return the saved list with source updates paused; do not
+   start a sync or access connectors.
 2. Generate one UUID `runId`. Call `sync_attention` with
    `{"request":{"phase":"start","runId":"<UUID>","expectedStoreId":"<store UUID>"}}`.
    A concurrent run is rejected. Read its status instead of starting another.
-3. Read authorized Slack, Jira, GitHub, Google Calendar and Granola sources using
+   Before reading connectors, confirm the returned `sync.id` equals this run ID
+   and `sync.status` is `running`. Otherwise reread preferences and stop this run.
+   Use the returned `sync.enabledProviders` for this run, and read no other providers.
+   Older servers without that field use the enabled preferences read in step 1.
+3. Read only enabled Slack, Jira, GitHub, Google Calendar and Granola sources using
    this caller's real connected tools. Resolve the connected user's identity and
    verify personal ownership in the original source: a direct request, explicit
    assignment or commitment by that user. A team review request, nearby mention,
@@ -38,11 +46,12 @@ part of a sync. Do not bypass denied source reads.
    `checkedAt` as an ISO UTC datetime, all five `sources` entries, and `items`.
    Each source is `{status:"checked"|"failed"|"skipped",detail:"what was checked or why not"}`.
    Never mark an unavailable, denied or unqueried source as checked. Items may
-   come only from checked sources. An empty items array is supported; it never
-   deletes saved obligations. At most 100 items fit one sync; do not truncate
+   come only from checked sources. Report disabled providers as
+   `{status:"skipped",detail:"Off"}` and return no observations for them.
+   An empty items array is supported; it never deletes saved obligations. At most 100 items fit one sync; do not truncate
    silently or claim a full check when coverage is incomplete.
 5. Read the returned `sync.status`, `sources` and `lastSuccessAt`. Completed means
-   all five sources were checked. Partial means some were checked. Failed means
+   all enabled sources were checked. Partial means some were checked. Failed means
    none were checked or the caller reported an error. `lastSuccessAt` retains
    the last completed full sync across partial/error attempts. Only claim what
    the response establishes. If work fails after start, call the same tool with

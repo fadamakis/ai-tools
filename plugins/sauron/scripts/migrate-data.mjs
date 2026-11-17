@@ -19,7 +19,7 @@ export function migrateData({from, to = dataPath(), writersStopped = false}) {
   const temporary = `${target}.${randomUUID()}.tmp`;
   const source = new DatabaseSync(sourcePath, {readOnly:true});
   try {
-    if (source.prepare('PRAGMA user_version').get().user_version > 3) throw Error('Unsupported newer database schema; migration stopped.');
+    if (source.prepare('PRAGMA user_version').get().user_version > 4) throw Error('Unsupported newer database schema; migration stopped.');
     const before = fingerprint(source);
     // SQLite creates a consistent backup including committed WAL contents.
     source.prepare('VACUUM INTO ?').run(temporary);
