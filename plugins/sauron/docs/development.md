@@ -56,11 +56,11 @@ pnpm sauron:dev:build
 
 After the build succeeds, restart Codex and reopen Sauron Dev to load it.
 There is no need to disable or uninstall the plugin. Existing processes and
-panels keep their current build until their connection restarts. The footer
-and Diagnostics show the loaded fixture build ID. Each Dev build advertises
-a distinct UI resource address so cached panels cannot share the next build’s
-entrypoint. Stable resource aliases remain readable. Compare the loaded ID with the expected
-ID from:
+panels keep their current build until their connection restarts. Each Dev build
+advertises a distinct UI resource address. When Codex retains another build's
+address, the serving runtime resolves it to its own matching UI. Stable resource
+aliases remain readable. The footer and Diagnostics show the loaded fixture
+build ID. Compare it with the expected ID from:
 
 ```sh
 pnpm sauron:dev:doctor

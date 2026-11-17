@@ -22751,6 +22751,7 @@ if (process.argv.slice(2).some((arg) => arg !== "--manual-scan")) throw Error("U
 var location = dirname(fileURLToPath(import.meta.url));
 var root = resolve(location, basename(location) === "server" ? "../.." : "..");
 var client = new Client({ name: "sauron-background-check", version: "0.6.6" });
+var needsAttention = (task) => task.ownNeedsAttention === true && !["snoozed", "done", "dismissed"].includes(task.state);
 var transport = new StdioClientTransport({
   command: process.execPath,
   args: [resolve(root, "dist/server/index.js")],
@@ -22786,7 +22787,7 @@ try {
       coordination: view.coordination,
       sync: view.sync,
       scan: view.scan,
-      needsYou: view.items.filter((task) => task.state === "needs_you").length,
+      needsYou: view.items.filter(needsAttention).length,
       changes: [],
       notifyFailure: failed,
       message: "Read saved managed sync freshness only. No independent source scan was started; source coverage is available in sync.sources."
@@ -22802,7 +22803,7 @@ try {
     const prior = new Map(before.items.map((task) => [task.id, task]));
     const changes = view.items.filter((task) => {
       const old = prior.get(task.id);
-      return task.state === "needs_you" && (!old || old.state !== "needs_you" || old.title !== task.title || old.nextAction !== task.nextAction);
+      return needsAttention(task) && (!old || !needsAttention(old) || old.title !== task.title || old.nextAction !== task.nextAction);
     }).map(({ id: id2, title, nextAction, sourceUrl }) => ({ id: id2, title, nextAction, sourceUrl }));
     const failed = view.scan.status === "partial" || view.scan.status === "failed";
     console.log(JSON.stringify({
@@ -22812,7 +22813,7 @@ try {
       checkKind: "source_scan",
       sourceScanStarted: before.scan?.id !== view.scan?.id,
       scan: view.scan,
-      needsYou: view.items.filter((task) => task.state === "needs_you").length,
+      needsYou: view.items.filter(needsAttention).length,
       changes,
       notifyFailure: failed && (before.scan?.status !== view.scan.status || before.scan?.error !== view.scan.error)
     }, null, 2));

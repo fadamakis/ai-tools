@@ -25366,6 +25366,208 @@ function validateAndWarnToolName(name) {
   issueToolNameWarning(name, result.warnings);
   return result.isValid;
 }
+var MAX_TEMPLATE_LENGTH = 1e6;
+var MAX_VARIABLE_LENGTH = 1e6;
+var MAX_TEMPLATE_EXPRESSIONS = 1e4;
+var MAX_REGEX_LENGTH = 1e6;
+var UriTemplate = class UriTemplate2 {
+  /**
+  * Returns true if the given string contains any URI template expressions.
+  * A template expression is a sequence of characters enclosed in curly braces,
+  * like `{foo}` or `{?bar}`.
+  */
+  static isTemplate(str) {
+    return /\{[^}\s]+\}/.test(str);
+  }
+  static validateLength(str, max, context) {
+    if (str.length > max) throw new Error(`${context} exceeds maximum length of ${max} characters (got ${str.length})`);
+  }
+  template;
+  parts;
+  get variableNames() {
+    return this.parts.flatMap((part) => typeof part === "string" ? [] : part.names);
+  }
+  constructor(template) {
+    UriTemplate2.validateLength(template, MAX_TEMPLATE_LENGTH, "Template");
+    this.template = template;
+    this.parts = this.parse(template);
+  }
+  toString() {
+    return this.template;
+  }
+  parse(template) {
+    const parts = [];
+    let currentText = "";
+    let i = 0;
+    let expressionCount = 0;
+    while (i < template.length) if (template[i] === "{") {
+      if (currentText) {
+        parts.push(currentText);
+        currentText = "";
+      }
+      const end = template.indexOf("}", i);
+      if (end === -1) throw new Error("Unclosed template expression");
+      expressionCount++;
+      if (expressionCount > MAX_TEMPLATE_EXPRESSIONS) throw new Error(`Template contains too many expressions (max ${MAX_TEMPLATE_EXPRESSIONS})`);
+      const expr = template.slice(i + 1, end);
+      const operator = this.getOperator(expr);
+      const exploded = expr.includes("*");
+      const names = this.getNames(expr);
+      const name = names[0];
+      for (const name$1 of names) UriTemplate2.validateLength(name$1, MAX_VARIABLE_LENGTH, "Variable name");
+      parts.push({
+        name,
+        operator,
+        names,
+        exploded
+      });
+      i = end + 1;
+    } else {
+      currentText += template[i];
+      i++;
+    }
+    if (currentText) parts.push(currentText);
+    return parts;
+  }
+  getOperator(expr) {
+    return [
+      "+",
+      "#",
+      ".",
+      "/",
+      "?",
+      "&"
+    ].find((op) => expr.startsWith(op)) || "";
+  }
+  getNames(expr) {
+    const operator = this.getOperator(expr);
+    return expr.slice(operator.length).split(",").map((name) => name.replace("*", "").trim()).filter((name) => name.length > 0);
+  }
+  encodeValue(value, operator) {
+    UriTemplate2.validateLength(value, MAX_VARIABLE_LENGTH, "Variable value");
+    if (operator === "+" || operator === "#") return encodeURI(value);
+    return encodeURIComponent(value);
+  }
+  expandPart(part, variables) {
+    if (part.operator === "?" || part.operator === "&") {
+      const pairs = part.names.map((name) => {
+        const value$1 = variables[name];
+        if (value$1 === void 0) return "";
+        return `${name}=${Array.isArray(value$1) ? value$1.map((v) => this.encodeValue(v, part.operator)).join(",") : this.encodeValue(value$1.toString(), part.operator)}`;
+      }).filter((pair) => pair.length > 0);
+      if (pairs.length === 0) return "";
+      return (part.operator === "?" ? "?" : "&") + pairs.join("&");
+    }
+    if (part.names.length > 1) {
+      const values = part.names.map((name) => variables[name]).filter((v) => v !== void 0);
+      if (values.length === 0) return "";
+      return values.map((v) => Array.isArray(v) ? v[0] : v).join(",");
+    }
+    const value = variables[part.name];
+    if (value === void 0) return "";
+    const encoded = (Array.isArray(value) ? value : [value]).map((v) => this.encodeValue(v, part.operator));
+    switch (part.operator) {
+      case "":
+        return encoded.join(",");
+      case "+":
+        return encoded.join(",");
+      case "#":
+        return "#" + encoded.join(",");
+      case ".":
+        return "." + encoded.join(".");
+      case "/":
+        return "/" + encoded.join("/");
+      default:
+        return encoded.join(",");
+    }
+  }
+  expand(variables) {
+    let result = "";
+    let hasQueryParam = false;
+    for (const part of this.parts) {
+      if (typeof part === "string") {
+        result += part;
+        continue;
+      }
+      const expanded = this.expandPart(part, variables);
+      if (!expanded) continue;
+      result += (part.operator === "?" || part.operator === "&") && hasQueryParam ? expanded.replace("?", "&") : expanded;
+      if (part.operator === "?" || part.operator === "&") hasQueryParam = true;
+    }
+    return result;
+  }
+  escapeRegExp(str) {
+    return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  }
+  partToRegExp(part) {
+    const patterns = [];
+    for (const name$1 of part.names) UriTemplate2.validateLength(name$1, MAX_VARIABLE_LENGTH, "Variable name");
+    if (part.operator === "?" || part.operator === "&") {
+      for (let i = 0; i < part.names.length; i++) {
+        const name$1 = part.names[i];
+        const prefix = i === 0 ? "\\" + part.operator : "&";
+        patterns.push({
+          pattern: prefix + this.escapeRegExp(name$1) + "=([^&]+)",
+          name: name$1
+        });
+      }
+      return patterns;
+    }
+    let pattern;
+    const name = part.name;
+    switch (part.operator) {
+      case "":
+        pattern = part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)";
+        break;
+      case "+":
+      case "#":
+        pattern = "(.+)";
+        break;
+      case ".":
+        pattern = String.raw`\.([^/,]+)`;
+        break;
+      case "/":
+        pattern = "/" + (part.exploded ? "([^/,]+(?:,[^/,]+)*)" : "([^/,]+)");
+        break;
+      default:
+        pattern = "([^/]+)";
+    }
+    patterns.push({
+      pattern,
+      name
+    });
+    return patterns;
+  }
+  match(uri2) {
+    UriTemplate2.validateLength(uri2, MAX_TEMPLATE_LENGTH, "URI");
+    let pattern = "^";
+    const names = [];
+    for (const part of this.parts) if (typeof part === "string") pattern += this.escapeRegExp(part);
+    else {
+      const patterns = this.partToRegExp(part);
+      for (const { pattern: partPattern2, name } of patterns) {
+        pattern += partPattern2;
+        names.push({
+          name,
+          exploded: part.exploded
+        });
+      }
+    }
+    pattern += "$";
+    UriTemplate2.validateLength(pattern, MAX_REGEX_LENGTH, "Generated regex pattern");
+    const regex2 = new RegExp(pattern);
+    const match = uri2.match(regex2);
+    if (!match) return null;
+    const result = {};
+    for (const [i, name_] of names.entries()) {
+      const { name, exploded } = name_;
+      const value = match[i + 1];
+      const cleanName = name.replace("*", "");
+      result[cleanName] = exploded && value.includes(",") ? value.split(",") : value;
+    }
+    return result;
+  }
+};
 function isZodV4Schema(v) {
   return typeof v === "object" && v !== null && "_zod" in v;
 }
@@ -33934,6 +34136,31 @@ var McpServer = class {
     if (this.isConnected()) this.server.sendPromptListChanged();
   }
 };
+var ResourceTemplate = class {
+  _uriTemplate;
+  constructor(uriTemplate, _callbacks) {
+    this._callbacks = _callbacks;
+    this._uriTemplate = typeof uriTemplate === "string" ? new UriTemplate(uriTemplate) : uriTemplate;
+  }
+  /**
+  * Gets the URI template pattern.
+  */
+  get uriTemplate() {
+    return this._uriTemplate;
+  }
+  /**
+  * Gets the list callback, if one was provided.
+  */
+  get listCallback() {
+    return this._callbacks.list;
+  }
+  /**
+  * Gets the callback for completing a specific URI template variable, if one was provided.
+  */
+  completeCallback(variable) {
+    return this._callbacks.complete?.[variable];
+  }
+};
 function createToolExecutor(inputSchema, handler) {
   if (inputSchema) {
     const callback$1 = handler;
@@ -38079,19 +38306,27 @@ function createServer(store2, htmlPath, options = {}) {
   const icon = { src: "data:image/svg+xml;base64," + readFileSync2(runtimeFile("assets/sidebar-icon.svg")).toString("base64"), mimeType: "image/svg+xml", sizes: ["any"] };
   const server = new McpServer({ name: options.buildId ? "sauron-dev" : "sauron-local-prototype", version: JSON.parse(readFileSync2(runtimeFile("plugin.json"), "utf8")).version, icons: [icon] });
   new OpenAIExtensions(server);
+  const resourceMetadata = { title: options.buildId ? "Sauron Dev" : "Sauron", mimeType: "text/html;profile=mcp-app" };
+  const readView = async (uri2) => ({ contents: [{
+    uri: uri2,
+    mimeType: "text/html;profile=mcp-app",
+    text: readFileSync2(htmlPath, "utf8"),
+    _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": {
+      preferredDisplayMode: "fullscreen",
+      availableDisplayModes: ["fullscreen"]
+    } }
+  }] });
   for (const uri2 of /* @__PURE__ */ new Set([uiUri, UI_URI, "ui://attention/list-v0.6.6", "ui://attention/list-v0.6.5", "ui://attention/list-v0.6.4", "ui://attention/list-v0.6.3", "ui://attention/list-v0.6.2", "ui://attention/list-v0.6.1", "ui://attention/list-v0.6.0", "ui://attention/list-v0.5.0", "ui://attention/list-v0.4.2", "ui://attention/list-v0.4.1", "ui://attention/list-v0.4.0", "ui://attention/list-v0.3.1"])) server.registerResource(
     "attention-view-" + uri2,
     uri2,
-    { title: options.buildId ? "Sauron Dev" : "Sauron", mimeType: "text/html;profile=mcp-app" },
-    async () => ({ contents: [{
-      uri: uri2,
-      mimeType: "text/html;profile=mcp-app",
-      text: readFileSync2(htmlPath, "utf8"),
-      _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": {
-        preferredDisplayMode: "fullscreen",
-        availableDisplayModes: ["fullscreen"]
-      } }
-    }] })
+    resourceMetadata,
+    async () => readView(uri2)
+  );
+  if (options.buildId) server.registerResource(
+    "attention-dev-view",
+    new ResourceTemplate(`${UI_URI}/dev/{buildId}`, { list: void 0 }),
+    resourceMetadata,
+    async (uri2) => readView(uri2.href)
   );
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const definitions = [
