@@ -6,6 +6,7 @@ import {mkdtempSync,rmSync,existsSync} from 'node:fs';
 import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {seedDevStore} from '../../src/server/dev-fixtures.js';
+import {SauronStore} from '../../src/server/store.js';
 import type {Result} from '../../src/shared/contracts.js';
 
 const devBuild=process.env.SAURON_DEV_UI_BUILD;
@@ -66,5 +67,21 @@ test('Sauron Dev shows its build, simulates refresh and replies, and routes disc
     await app.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
     await expect.poll(async()=>((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result).scan?.id).not.toBe((beforeSources.structuredContent as Result).scan?.id);
     await expect(app.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
+    const store=new SauronStore(database);
+    try{
+      const {run}=store.beginReview('bootstrap','local_history');
+      store.appendReviewChanges(run.id,run.leaseId,[{kind:'create',key:'real-group',title:'Synthetic imported group',reason:'Synthetic real-history proposal test.',evidenceIds:[]}],[]);
+      store.finishReview(run.id,run.leaseId);
+    }finally{store.close();}
+    await app.getByRole('button',{name:'Refresh',exact:true}).click();await app.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
+    await app.locator('summary').filter({hasText:'Organise tasks'}).click();
+    await expect(app.getByText('Real local-history review.',{exact:true})).toBeVisible();
+    await expect(app.getByRole('button',{name:'Review last 14 days',exact:true})).toBeDisabled();
+    await expect(app.getByRole('button',{name:'Check chat access',exact:true})).toBeDisabled();
+    await expect(app.getByRole('button',{name:'Enable daily review at 07:00',exact:true})).toBeDisabled();
+    await app.getByRole('button',{name:'Load latest proposal',exact:true}).click();
+    await expect(app.getByRole('button',{name:'Accept 1 selected change',exact:true})).toBeEnabled();
+    await app.getByRole('button',{name:'Accept 1 selected change',exact:true}).click();
+    await expect.poll(async()=>((await client.callTool({name:'list_attention',arguments:{}})).structuredContent as Result).items.filter(task=>task.title==='Synthetic imported group').length).toBe(1);
   }finally{await client.close();rmSync(dir,{recursive:true,force:true});}
 });

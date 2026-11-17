@@ -86,6 +86,33 @@ completely, run setup or reset from an external terminal, then reopen Codex.
 Closing only the panel may leave its runtime alive. File watching and automatic
 reload are not provided.
 
+## Real-chat bootstrap
+
+**D-01:** From the repository root, run `pnpm sauron:dev:bootstrap` to review local
+Codex chats active during the last 14×24 hours, including resumed older chats and
+archived chats. Load the current Dev build first; older connected runtimes are
+refused. The command preserves existing Dev tasks, considers each during review,
+and resumes saved real-review checkpoints. Review or dismiss any pending proposal
+before starting or resuming. Panel review buttons remain simulated.
+
+Chat excerpts go to the configured Codex model to generate proposals. Real-history
+reviews are labelled in the panel; tracking, grouping, topics and closures wait
+for acceptance. Evidence can update attention on already linked Dev tasks.
+Production data, connected-source refreshes, replies and schedules are untouched.
+
+**D-02:** To start empty, quit Codex completely, then run
+`pnpm sauron:dev:bootstrap --fresh` from an external terminal. This archives the
+whole Dev store and clears tasks, proposals, history, drafts, receipts, checkpoints
+and preferences. It creates a new store identity, with no sample tasks and daily
+review off. Reopen Sauron Dev after the command finishes to review its proposal.
+
+Progress and incomplete coverage are printed without chat text. Resume interruptions
+with `pnpm sauron:dev:bootstrap`; repeating `--fresh` starts over. The command prints
+the archive location. To recover it, quit Codex, retain the current store separately,
+then restore the archived `attention.sqlite` and any matching `-wal`/`-shm` files
+together. A failed replacement restores the original; a failed review retains its
+new store and checkpoints alongside the archive.
+
 ## Fixtures and reset
 
 The fixture database contains a synthetic source task, personal tasks, and a

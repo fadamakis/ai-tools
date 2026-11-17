@@ -7,9 +7,10 @@ import {resolveCodexCli} from './codex-cli.mjs';
 import {localPolicyArgs,minimalAgentEnv,inertServerArgs} from './local-policy.js';
 
 export class AgentError extends Error {
-  constructor(readonly code:'timeout'|'runtime'|'output'|'budget'|'policy'){super(code);}
+  constructor(readonly code:'timeout'|'runtime'|'output'|'budget'|'policy'|'cancelled'){super(code);}
 }
-export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string;providers?:LiveProvider[];denyAllLocalServers?:boolean}={}) {
+export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli?:string;timeoutMs?:number;model?:string;providers?:LiveProvider[];denyAllLocalServers?:boolean;signal?:AbortSignal}={}) {
+  options.signal?.throwIfAborted();
   const dir=await mkdtemp(join(tmpdir(),'sauron-local-'));
   await chmod(dir,0o700);
   try{
@@ -36,8 +37,11 @@ export async function runReadOnlyAgent(prompt:string,schema:unknown,options:{cli
       const child=spawn(cli,args,{detached:true,stdio:['pipe','pipe','pipe'],env:minimalAgentEnv()});
       let settled=false,buffer='';
       const stop=()=>{try{process.kill(-child.pid!,'SIGTERM');}catch{child.kill('SIGTERM');}};
-      const finish=(error?:AgentError)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve();};
+      const finish=(error?:AgentError)=>{if(settled)return;settled=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);error?reject(error):resolve();};
       const timer=setTimeout(()=>{stop();finish(new AgentError('timeout'));},options.timeoutMs??10*60_000);
+      const abort=()=>{stop();finish(new AgentError('cancelled'));};
+      options.signal?.addEventListener('abort',abort,{once:true});
+      if(options.signal?.aborted)abort();
       child.stdout.on('data',chunk=>{
         buffer+=chunk.toString();
         if(buffer.length>1_000_000){stop();finish(new AgentError('output'));return;}

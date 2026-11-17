@@ -39,23 +39,24 @@ export function runtimeStatuses(projectRoot){
   });
 }
 
-export function acquireDevRuntimeLock(projectRoot){
+export function acquireDevRuntimeLock(projectRoot,{buildId}={}){
   const {root,lock,runtimeLocks}=devPaths(projectRoot);
   assertLocalPath(projectRoot,runtimeLocks);
   mkdirSync(root,{recursive:true,mode:0o700});
   mkdirSync(runtimeLocks,{recursive:true,mode:0o700});
   const token=randomUUID(),path=join(runtimeLocks,`runtime-${token}.lock`);
   mkdirSync(path,{mode:0o700});
-  writeFileSync(join(path,'owner.json'),JSON.stringify({pid:process.pid,purpose:'native runtime',token}),{mode:0o600});
+  writeFileSync(join(path,'owner.json'),JSON.stringify({pid:process.pid,purpose:'native runtime',token,...(buildId?{buildId}:{})}),{mode:0o600});
   const release=()=>{unlinkSync(join(path,'owner.json'));rmdirSync(path);};
   try{
     const owner=lockStatus(lock);
-    if(owner?.alive&&owner.purpose!=='native runtime'&&owner.purpose!=='build')throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Retry when it finishes.`);
+    if(owner?.alive&&owner.purpose==='bootstrap'&&(!buildId||currentBuild(projectRoot).buildId!==buildId))throw Error('Load the selected Dev build before connecting during a real bootstrap.');
+    if(owner?.alive&&owner.purpose!=='native runtime'&&owner.purpose!=='build'&&owner.purpose!=='bootstrap')throw Error(`Sauron Dev is busy (${owner.purpose}, PID ${owner.pid}). Retry when it finishes.`);
   }catch(error){release();throw error;}
   return release;
 }
 
-export function acquireDevLock(projectRoot,purpose){
+export function acquireDevLock(projectRoot,purpose,{allowRuntimes=purpose==='build'}={}){
   const {root,lock}=devPaths(projectRoot);
   assertLocalPath(projectRoot,lock);
   mkdirSync(root,{recursive:true,mode:0o700});
@@ -69,7 +70,7 @@ export function acquireDevLock(projectRoot,purpose){
         if(owner.token!==token)throw Error('Dev lock ownership changed.');
         unlinkSync(join(lock,'owner.json'));rmdirSync(lock);
       };
-      const runtimes=purpose==='build'?[]:runtimeStatuses(projectRoot).filter(owner=>owner.alive);
+      const runtimes=allowRuntimes?[]:runtimeStatuses(projectRoot).filter(owner=>owner.alive);
       if(runtimes.length){release();throw Error(`Sauron Dev is busy (${runtimes.length} native runtime${runtimes.length===1?'':'s'}). Quit Codex to stop its Sauron Dev runtimes, then retry.`);}
       return release;
     }catch(error){
