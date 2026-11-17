@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "1d217cefe9df6070204337227d4e6af17f815fc2",
+  "sourceCommit": "71d9aa8a8f9ff9459ee1c36276e2c174f9629e07",
   "products": {
     "shelob": {
       "version": "0.11.15",
@@ -7,9 +7,9 @@
       "packageDigest": "b0cbf2d1ef262f4014b46ea34574f6404e223f7bf518593062cd96249c70d4f8"
     },
     "sauron": {
-      "version": "0.6.21",
-      "inputDigest": "cfb1f6354ad0c23d3dcc264fd488377b8b01dbde1e8a0a02b284eeec57e41006",
-      "packageDigest": "91619a6a3c8c93ea439651f3e4bf287e319edee8633824476468da254fe6bd4b"
+      "version": "0.6.22",
+      "inputDigest": "e38ac6993bbbec6315cfdc9bd79c955765ea40852311e72e993079fda3d8979f",
+      "packageDigest": "c114d8236a9ed06428bc501319aa454bc17b3b8594e848acef553ba893505bfc"
     },
     "workbench": {
       "version": "0.4.5",
@@ -18,8 +18,6 @@
     }
   },
   "changed": [
-    "shelob",
-    "sauron",
-    "workbench"
+    "sauron"
   ]
 }

@@ -35,3 +35,26 @@ The reader constructs expandable rows from the shared tree projection and retain
 - I-05: source refreshes preserve organisation and migration preserves task identities and saved decisions.
 
 See `tests/task-groups.test.ts` for executable contracts and `AGENTS.md` for targeted checks.
+
+## Organisation assistance
+
+The read-only chat adapter owns app-server discovery and pagination. It cannot start, resume or modify chats.
+The review worker checkpoints active and archived discovery separately, then sends bounded evidence to a proposal model.
+The model receives no mutation tools. Its MCP inventory is disabled for that invocation and checked again before execution.
+The source scanner retains its existing provider policy.
+
+Review state, checkpoints, rejected evidence fingerprints and corrections live in separate metadata records through `ReviewStore`.
+`SauronStore` owns their transaction boundary and validates accepted proposals using the existing task actions.
+Models cannot bypass cycle prevention, focus eligibility or branch closure confirmation.
+Each generated batch checks the task revision from before model execution. Concurrent edits require a fresh review.
+
+A proposal records dependencies, its task baseline and the exact descendants included in proposed closures.
+Accepting selected changes commits one receipt and one transaction. Missing dependencies or changed closure scopes roll back the whole batch.
+Rejected changes stay hidden until relevant evidence changes. Title and check-time changes do not alter task evidence fingerprints.
+UI drafts and original save requests survive panel reloads.
+
+Daily scheduling is opt-in and independent of source scanning. A macOS user schedule ticks once per minute.
+The store decides whether 07:00 Europe/Berlin is due, including catch-up and daylight-saving changes.
+The scheduler uses stable runtime copies beside the database, an expected store ID and a leased worker.
+Incomplete reviews retain their watermark and checkpoints, with a 15-minute automatic retry delay.
+Remote Codex hosts and ChatGPT history are explicitly outside current discovery coverage.

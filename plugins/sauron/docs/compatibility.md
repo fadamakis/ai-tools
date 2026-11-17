@@ -15,3 +15,8 @@ Retain the original backup for rollback. Never test migration against the only c
 Tests use isolated synthetic databases and fake source runtimes.
 Browser evidence does not establish native-host activation or another user's connector access.
 Installation and UI polling do not enable source or organisation schedules.
+
+Organisation assistance retains schema 4. Its review, proposal and checkpoint records are additive metadata.
+Release-one writers preserve those records but cannot operate organisation assistance.
+Stop older running Sauron processes before upgrading from schema 3. Constructor checks prevent old builds reopening an upgraded store, but cannot revoke an already open connection.
+Daily schedules remain off unless enabled explicitly. No verification test installs a real schedule.

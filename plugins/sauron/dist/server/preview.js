@@ -15,64 +15,11 @@ function dataPath(env = process.env, home = os.homedir(), platform = process.pla
 
 // src/server/preview.ts
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
-import { fileURLToPath as fileURLToPath4 } from "node:url";
+import { readFileSync as readFileSync2 } from "node:fs";
+import { fileURLToPath as fileURLToPath6 } from "node:url";
 
-// src/server/organisation-store.ts
-import { createHash, randomUUID } from "node:crypto";
-var taskEvidence = (task) => createHash("sha256").update(JSON.stringify([task.sourceTitle ?? task.title, task.sourceNextAction ?? task.nextAction, task.sourceState, "resolved" in task ? task.resolved : false])).digest("hex");
-var OrganisationStore = class {
-  constructor(db) {
-    this.db = db;
-  }
-  read(key, fallback) {
-    const row = this.db.prepare("SELECT value FROM metadata WHERE key=?").get(key);
-    return row ? JSON.parse(row.value) : fallback;
-  }
-  write(key, value) {
-    this.db.prepare("INSERT INTO metadata(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(value));
-  }
-  revision() {
-    return this.read("task_view_revision", 0);
-  }
-  touch() {
-    this.write("task_view_revision", this.revision() + 1);
-  }
-  get(task) {
-    return this.read("task-organisation:" + task.id, { parentId: null, directTopicIds: [], attention: task.sourceState === "needs_you" && !task.userDecision, handledEvidence: null, evidence: taskEvidence(task), reopenSuggested: false, sourceClosed: "resolved" in task && task.resolved });
-  }
-  save(task, value) {
-    this.write("task-organisation:" + task.id, value);
-    this.touch();
-  }
-  observe(task) {
-    const previous = this.get(task), evidence = taskEvidence(task);
-    if (previous.evidence === evidence) return;
-    this.save(task, {
-      ...previous,
-      evidence,
-      sourceClosed: previous.sourceClosed || "resolved" in task && task.resolved,
-      attention: previous.attention || task.sourceState === "needs_you",
-      reopenSuggested: previous.reopenSuggested || (previous.sourceClosed || task.userDecision === "complete" || task.userDecision === "dismiss") && task.sourceState === "needs_you"
-    });
-  }
-  topics() {
-    return this.read("organisation_topics", []);
-  }
-  assignTopics(names) {
-    const topics = this.topics(), ids = [];
-    for (const name of names) {
-      let topic = topics.find((item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-      if (!topic) {
-        topic = { id: randomUUID(), name };
-        topics.push(topic);
-      }
-      if (!ids.includes(topic.id)) ids.push(topic.id);
-    }
-    this.write("organisation_topics", topics);
-    return ids;
-  }
-};
+// src/server/review-store.ts
+import { createHash } from "node:crypto";
 
 // ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -891,10 +838,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path2) {
-  if (!path2)
+function getElementAtPath(obj, path3) {
+  if (!path3)
     return obj;
-  return path2.reduce((acc, key) => acc?.[key], obj);
+  return path3.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -1234,11 +1181,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path2, issues) {
+function prefixIssues(path3, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path2);
+    iss.path.unshift(path3);
     return iss;
   });
 }
@@ -1700,16 +1647,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -1748,17 +1695,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path2 = []) => {
+  const processError = (error63, path3 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -1797,8 +1744,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path2 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path2) {
+  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path3) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -3209,10 +3156,10 @@ function isValidJWT(token, algorithm = null) {
     const tokensParts = token.split(".");
     if (tokensParts.length !== 3)
       return false;
-    const [header] = tokensParts;
-    if (!header)
+    const [header2] = tokensParts;
+    if (!header2)
       return false;
-    const parsedHeader = JSON.parse(atob(header));
+    const parsedHeader = JSON.parse(atob(header2));
     if ("typ" in parsedHeader && parsedHeader?.typ !== "JWT")
       return false;
     if (!parsedHeader.alg)
@@ -18936,13 +18883,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path2 = ref.slice(1).split("/").filter(Boolean);
-  if (path2.length === 0) {
+  const path3 = ref.slice(1).split("/").filter(Boolean);
+  if (path3.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path2[0] === defsKey) {
-    const key = path2[1] === void 0 ? void 0 : decodeJSONPointerSegment(path2[1]);
+  if (path3[0] === defsKey) {
+    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -19791,14 +19738,73 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// src/shared/organisation.ts
-var identity = { operationId: external_exports.string().uuid(), expectedStoreId: external_exports.string().uuid(), expectedRevision: external_exports.number().int().nonnegative() };
-var organiseTaskSchema = external_exports.discriminatedUnion("action", [
-  external_exports.strictObject({ ...identity, action: external_exports.literal("move"), id: external_exports.string().min(1), parentId: external_exports.string().min(1).nullable() }),
-  external_exports.strictObject({ ...identity, action: external_exports.literal("topics"), id: external_exports.string().min(1), topics: external_exports.array(external_exports.string().trim().min(1).max(60)).max(30) }),
-  external_exports.strictObject({ ...identity, action: external_exports.literal("attention"), id: external_exports.string().min(1), needsAttention: external_exports.boolean() })
+// src/shared/review-contracts.ts
+var proposalChangeSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.strictObject({ kind: external_exports.literal("create"), key: external_exports.string().min(1).max(100), title: external_exports.string().trim().min(1).max(160), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) }),
+  external_exports.strictObject({ kind: external_exports.literal("track"), key: external_exports.string().min(1).max(100), threadId: external_exports.string().uuid(), title: external_exports.string().trim().min(1).max(160), parentRef: external_exports.string().nullable(), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) }),
+  external_exports.strictObject({ kind: external_exports.literal("move"), key: external_exports.string().min(1).max(100), taskRef: external_exports.string(), parentRef: external_exports.string().nullable(), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) }),
+  external_exports.strictObject({ kind: external_exports.literal("topics"), key: external_exports.string().min(1).max(100), taskRef: external_exports.string(), topics: external_exports.array(external_exports.string().trim().min(1).max(60)).max(30), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) }),
+  external_exports.strictObject({ kind: external_exports.literal("close"), key: external_exports.string().min(1).max(100), taskRef: external_exports.string(), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) })
 ]);
-var organiseTaskToolSchema = external_exports.strictObject({ request: organiseTaskSchema });
+var proposalOutputSchema = external_exports.strictObject({ changes: external_exports.array(proposalChangeSchema).max(100) });
+var defaultReviewState = () => ({ revision: 0, enabled: false, capability: { status: "unknown", checkedAt: null, detail: "Check local chat access before enabling organisation assistance.", runtime: null }, lastCompleteThrough: null, lastDailyDate: null, nextAttemptAt: null, run: null, proposal: null });
+var reviewTriggerSchema = external_exports.strictObject({ expectedStoreId: external_exports.string().uuid(), kind: external_exports.enum(["probe", "bootstrap", "daily"]), reason: external_exports.enum(["manual", "timer"]).default("manual") });
+var configureReviewSchema = external_exports.strictObject({ operationId: external_exports.string().uuid(), expectedStoreId: external_exports.string().uuid(), expectedReviewRevision: external_exports.number().int().nonnegative(), enabled: external_exports.boolean() });
+var acceptProposalSchema = external_exports.strictObject({ operationId: external_exports.string().uuid(), expectedStoreId: external_exports.string().uuid(), proposalId: external_exports.string().uuid(), expectedProposalRevision: external_exports.number().int().nonnegative(), expectedRevision: external_exports.number().int().nonnegative(), changes: external_exports.array(proposalChangeSchema).max(100) });
+var reviewDate = (now) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+function dailyReviewDue(state, now) {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(now));
+  return state.enabled && hour >= 7 && state.lastDailyDate !== reviewDate(now);
+}
+
+// src/server/review-store.ts
+var organisationTaskEvidence = (task) => "task-evidence:" + task.id + ":" + createHash("sha256").update(JSON.stringify([task.sourceNextAction ?? task.nextAction, task.plannedAction ?? null, task.sourceState, "resolved" in task ? task.resolved : false, task.userDecision, task.workflowState, task.parentId, [...task.directTopicIds ?? []].sort(), task.descendantSummary])).digest("hex");
+var changeIdentity = (change) => {
+  const subject = change.kind === "create" ? change.title.toLocaleLowerCase() : change.kind === "track" ? change.threadId : change.taskRef;
+  const target = change.kind === "track" || change.kind === "move" ? change.parentRef : change.kind === "topics" ? [...change.topics].map((topic) => topic.toLocaleLowerCase()).sort() : null;
+  return createHash("sha256").update(JSON.stringify([change.kind, subject, target])).digest("hex");
+};
+var ReviewStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  read(key, fallback) {
+    const row = this.db.prepare("SELECT value FROM metadata WHERE key=?").get(key);
+    return row ? JSON.parse(row.value) : fallback;
+  }
+  write(key, value) {
+    this.db.prepare("INSERT INTO metadata(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(value));
+  }
+  state() {
+    return this.read("organisation_review", defaultReviewState());
+  }
+  save(state) {
+    this.write("organisation_review", { ...state, revision: this.state().revision + 1 });
+  }
+  requireLease(runId, leaseId) {
+    const run = this.state().run;
+    if (!run || run.id !== runId || run.leaseId !== leaseId || run.status !== "running") throw Error("Organisation review lease expired.");
+    return run;
+  }
+  dismissals() {
+    return this.read("organisation_dismissals", {});
+  }
+  allowed(change) {
+    const previous = this.dismissals()[changeIdentity(change)];
+    return !previous || change.evidenceIds.some((id) => !previous.includes(id));
+  }
+  dismiss(change) {
+    const dismissals = this.dismissals();
+    dismissals[changeIdentity(change)] = change.evidenceIds;
+    this.write("organisation_dismissals", dismissals);
+  }
+  corrections() {
+    return this.read("organisation_corrections", []);
+  }
+  correction(value) {
+    this.write("organisation_corrections", [...this.corrections().slice(-99), value]);
+  }
+};
 
 // src/shared/task-tree.ts
 var closedTask = (task) => task.state === "done" || task.state === "dismissed";
@@ -19848,11 +19854,40 @@ function taskTree(tasks) {
   return { byId, children, ancestors, descendants, summary, topics, validateMove };
 }
 
-// src/server/store.ts
-import { DatabaseSync } from "node:sqlite";
-import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
-import { mkdirSync, chmodSync, existsSync } from "node:fs";
-import { dirname } from "node:path";
+// src/server/chat-reader.ts
+import { createHash as createHash3 } from "node:crypto";
+import { statSync, realpathSync } from "node:fs";
+
+// src/server/codex-cli.mjs
+import fs from "node:fs";
+import os2 from "node:os";
+import path2 from "node:path";
+var executable = (filename) => {
+  try {
+    fs.accessSync(filename, fs.constants.X_OK);
+    return fs.statSync(filename).isFile() ? fs.realpathSync(filename) : null;
+  } catch {
+    return null;
+  }
+};
+function resolveCodexCli({
+  env = process.env,
+  platform = process.platform,
+  home = os2.homedir(),
+  applicationDirectories = ["/Applications", path2.join(home, "Applications")]
+} = {}) {
+  const fromPath = (name) => (env.PATH || "").split(path2.delimiter).filter(Boolean).map((directory) => executable(path2.join(directory, name))).find(Boolean);
+  if (env.CODEX_CLI_PATH) return executable(env.CODEX_CLI_PATH) || !/[/\\]/.test(env.CODEX_CLI_PATH) && fromPath(env.CODEX_CLI_PATH) || env.CODEX_CLI_PATH;
+  if (platform === "darwin") {
+    for (const directory of applicationDirectories) {
+      for (const relative of ["ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex", "Codex.app/Contents/Resources/codex"]) {
+        const bundled = executable(path2.join(directory, relative));
+        if (bundled) return bundled;
+      }
+    }
+  }
+  return fromPath(platform === "win32" ? "codex.exe" : "codex") || "codex";
+}
 
 // src/shared/contracts.ts
 var sourceKinds = ["manual", "slack", "jira", "github", "calendar", "meeting"];
@@ -20032,6 +20067,7 @@ var proposeCodexFollowupsSchema = external_exports.strictObject({
 });
 var trackCodexThreadsSchema = external_exports.strictObject({
   expectedStoreId: external_exports.string().uuid(),
+  expectedRevision: external_exports.number().int().nonnegative().optional(),
   threads: external_exports.array(external_exports.strictObject({
     parentId: external_exports.string().min(1).nullable().optional(),
     threadId: external_exports.string().uuid(),
@@ -20097,6 +20133,98 @@ function localPolicyArgs(providers = liveProviders) {
   return Object.entries(values).flatMap(([key, value]) => ["-c", `${key}=${JSON.stringify(value)}`]);
 }
 var localPolicyDigest = createHash2("sha256").update(JSON.stringify(localPolicyArgs())).digest("hex");
+
+// src/server/chat-reader.ts
+var header = external_exports.object({ id: external_exports.string().uuid(), name: external_exports.string().nullable().optional(), preview: external_exports.string().optional(), updatedAt: external_exports.number(), createdAt: external_exports.number() });
+var page = external_exports.object({ data: external_exports.array(external_exports.unknown()), nextCursor: external_exports.string().nullable() });
+var runtimeFingerprint = (cli = resolveCodexCli()) => {
+  const path3 = realpathSync(cli), stat = statSync(path3);
+  return createHash3("sha256").update(JSON.stringify([path3, stat.size, stat.mtimeMs])).digest("hex");
+};
+
+// src/server/organisation-review.ts
+function validateProposedChanges(changes, chats, store2) {
+  const view = store2.view(), ids = /* @__PURE__ */ new Set([...chats.flatMap((chat) => chat.messages.map((message) => message.id)), ...view.items.map(organisationTaskEvidence)]), known = taskTree(view.items).byId;
+  for (const change of changes) {
+    if (change.evidenceIds.some((id) => !ids.has(id))) throw Error("Proposal cited unavailable evidence.");
+    if (change.kind === "track" && !chats.some((chat) => chat.threadId === change.threadId && chat.title === change.title)) throw Error("Proposal referenced an unverified chat.");
+    if (change.kind === "close" && (!known.has(change.taskRef) || closedTask(known.get(change.taskRef)))) throw Error("Closure proposal requires an existing open task.");
+  }
+  if (new Set(changes.map((change) => change.key)).size !== changes.length) throw Error("Proposal change keys must be unique.");
+  return [...new Map(changes.map((change) => [changeIdentity(change), change])).values()];
+}
+
+// src/server/organisation-store.ts
+import { createHash as createHash4, randomUUID } from "node:crypto";
+var taskEvidence = (task) => createHash4("sha256").update(JSON.stringify([task.sourceTitle ?? task.title, task.sourceNextAction ?? task.nextAction, task.sourceState, "resolved" in task ? task.resolved : false])).digest("hex");
+var OrganisationStore = class {
+  constructor(db) {
+    this.db = db;
+  }
+  read(key, fallback) {
+    const row = this.db.prepare("SELECT value FROM metadata WHERE key=?").get(key);
+    return row ? JSON.parse(row.value) : fallback;
+  }
+  write(key, value) {
+    this.db.prepare("INSERT INTO metadata(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(value));
+  }
+  revision() {
+    return this.read("task_view_revision", 0);
+  }
+  touch() {
+    this.write("task_view_revision", this.revision() + 1);
+  }
+  get(task) {
+    return this.read("task-organisation:" + task.id, { parentId: null, directTopicIds: [], attention: task.sourceState === "needs_you" && !task.userDecision, handledEvidence: null, evidence: taskEvidence(task), reopenSuggested: false, sourceClosed: "resolved" in task && task.resolved, closedAt: "resolved" in task && task.resolved ? task.updatedAt : null });
+  }
+  save(task, value) {
+    this.write("task-organisation:" + task.id, value);
+    this.touch();
+  }
+  observe(task) {
+    const previous = this.get(task), evidence = taskEvidence(task);
+    if (previous.evidence === evidence) return;
+    this.save(task, {
+      ...previous,
+      evidence,
+      closedAt: previous.closedAt ?? ("resolved" in task && task.resolved ? task.updatedAt : null),
+      sourceClosed: previous.sourceClosed || "resolved" in task && task.resolved,
+      attention: previous.attention || task.sourceState === "needs_you",
+      reopenSuggested: previous.reopenSuggested || (previous.sourceClosed || task.userDecision === "complete" || task.userDecision === "dismiss") && task.sourceState === "needs_you"
+    });
+  }
+  topics() {
+    return this.read("organisation_topics", []);
+  }
+  assignTopics(names) {
+    const topics = this.topics(), ids = [];
+    for (const name of names) {
+      let topic = topics.find((item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+      if (!topic) {
+        topic = { id: randomUUID(), name };
+        topics.push(topic);
+      }
+      if (!ids.includes(topic.id)) ids.push(topic.id);
+    }
+    this.write("organisation_topics", topics);
+    return ids;
+  }
+};
+
+// src/shared/organisation.ts
+var identity = { operationId: external_exports.string().uuid(), expectedStoreId: external_exports.string().uuid(), expectedRevision: external_exports.number().int().nonnegative() };
+var organiseTaskSchema = external_exports.discriminatedUnion("action", [
+  external_exports.strictObject({ ...identity, action: external_exports.literal("move"), id: external_exports.string().min(1), parentId: external_exports.string().min(1).nullable() }),
+  external_exports.strictObject({ ...identity, action: external_exports.literal("topics"), id: external_exports.string().min(1), topics: external_exports.array(external_exports.string().trim().min(1).max(60)).max(30) }),
+  external_exports.strictObject({ ...identity, action: external_exports.literal("attention"), id: external_exports.string().min(1), needsAttention: external_exports.boolean() })
+]);
+var organiseTaskToolSchema = external_exports.strictObject({ request: organiseTaskSchema });
+
+// src/server/store.ts
+import { DatabaseSync } from "node:sqlite";
+import { createHash as createHash5, randomUUID as randomUUID2 } from "node:crypto";
+import { mkdirSync, chmodSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
 
 // src/shared/replies.ts
 var taskId = external_exports.string().regex(/^slack:[a-f0-9]{64}$/);
@@ -20294,21 +20422,21 @@ var StoreError = class extends Error {
     this.code = code;
   }
 };
-var hash2 = (v) => createHash3("sha256").update(JSON.stringify(v)).digest("hex");
+var hash2 = (v) => createHash5("sha256").update(JSON.stringify(v)).digest("hex");
 var facts = ({ lastCheckedAt: _, ...rest }) => rest;
 var SauronStore = class {
-  constructor(path2, now = () => /* @__PURE__ */ new Date(), timeZone = process.env.ATTENTION_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone) {
-    this.path = path2;
+  constructor(path3, now = () => /* @__PURE__ */ new Date(), timeZone = process.env.ATTENTION_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone) {
+    this.path = path3;
     this.now = now;
     this.timeZone = timeZone;
     new Intl.DateTimeFormat("en", { timeZone }).format(/* @__PURE__ */ new Date(0));
-    mkdirSync(dirname(path2), { recursive: true, mode: 448 });
-    this.db = new DatabaseSync(path2);
+    mkdirSync(dirname(path3), { recursive: true, mode: 448 });
+    this.db = new DatabaseSync(path3);
     if (Number(this.db.prepare("PRAGMA user_version").get().user_version) > 4) {
       this.db.close();
       throw new StoreError("unsupported_schema", "This database needs a newer Sauron version.");
     }
-    for (const file2 of [path2, path2 + "-wal", path2 + "-shm"]) if (existsSync(file2)) chmodSync(file2, 384);
+    for (const file2 of [path3, path3 + "-wal", path3 + "-shm"]) if (existsSync(file2)) chmodSync(file2, 384);
     this.execute(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS receipts (id TEXT PRIMARY KEY, hash TEXT NOT NULL);
@@ -20321,6 +20449,7 @@ var SauronStore = class {
     this.storeId = this.db.prepare("SELECT value FROM metadata WHERE key=?").get("store_id").value;
     this.replies = new ReplyStore(this.db, this.now);
     this.organisation = new OrganisationStore(this.db);
+    this.reviews = new ReviewStore(this.db);
     if (Number(this.db.prepare("PRAGMA user_version").get().user_version) < 4) {
       this.execute("BEGIN IMMEDIATE");
       try {
@@ -20368,6 +20497,7 @@ var SauronStore = class {
   storeId;
   replies;
   organisation;
+  reviews;
   execute(sql) {
     this.db.exec(sql);
     if (/\bBEGIN\b/.test(sql)) this.inTransaction = true;
@@ -20466,7 +20596,7 @@ var SauronStore = class {
       };
     });
     const tree = taskTree(items);
-    return { taskViewRevision: this.organisation.revision(), topics: this.organisation.topics(), items: items.map((task) => {
+    return { organisationReview: this.reviews.state(), taskViewRevision: this.organisation.revision(), topics: this.organisation.topics(), items: items.map((task) => {
       const org = this.organisation.get(task);
       return {
         ...task,
@@ -20490,7 +20620,8 @@ var SauronStore = class {
     return { ...result, discussion };
   }
   transaction(id, payload, change) {
-    this.execute("BEGIN IMMEDIATE");
+    const owned = !this.inTransaction;
+    if (owned) this.execute("BEGIN IMMEDIATE");
     try {
       const receipt = this.db.prepare("SELECT hash FROM receipts WHERE id=?").get(id);
       if (receipt && receipt.hash !== hash2(payload)) throw new StoreError("id_reuse", "Operation ID was already used for different input.");
@@ -20499,10 +20630,10 @@ var SauronStore = class {
         this.db.prepare("INSERT INTO receipts VALUES (?,?)").run(id, hash2(payload));
       }
       const view = this.view();
-      this.execute("COMMIT");
+      if (owned) this.execute("COMMIT");
       return { ...view, receipt: { id, duplicate: !!receipt } };
     } catch (error62) {
-      this.execute("ROLLBACK");
+      if (owned) this.execute("ROLLBACK");
       throw error62;
     }
   }
@@ -20974,15 +21105,20 @@ var SauronStore = class {
   trackCodexThreads(input2) {
     const request = trackCodexThreadsSchema.parse(input2);
     if (request.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+    const hasPlacement = request.threads.some((thread) => thread.parentId !== void 0);
+    let placementRevision = request.expectedRevision;
+    if (hasPlacement && placementRevision === void 0) throw new StoreError("confirmation_required", "Read the current task-view revision before placing tracked chats.");
     const ids = request.threads.map((thread) => thread.threadId.toLowerCase());
     if (new Set(ids).size !== ids.length) throw new StoreError("duplicate_thread", "A batch must contain distinct Codex chats.");
     const trackedThreads = [];
     for (const thread of request.threads) {
       const threadId = thread.threadId.toLowerCase(), url2 = `codex://threads/${threadId}`;
       let begun = false;
+      const owned = !this.inTransaction;
       try {
-        this.execute("BEGIN IMMEDIATE");
+        if (owned) this.execute("BEGIN IMMEDIATE");
         begun = true;
+        if (hasPlacement) this.assertOrganisation(request.expectedStoreId, placementRevision);
         if (thread.parentId) this.assertParent(thread.parentId);
         const links = this.discussions().filter((link) => link.url === url2);
         const matches = new Set(links.filter((link) => !this.db.prepare("SELECT 1 FROM history WHERE task_id=? AND kind='proposal' LIMIT 1").get(link.taskId)).map((link) => link.taskId));
@@ -21022,18 +21158,20 @@ var SauronStore = class {
           this.setMetadata("discussion-link:" + hash2([id, url2]), { taskId: id, url: url2, createdAt: time3 });
           result = { threadId, taskId: id, url: url2, status: "created" };
         }
-        if (thread.parentId && result.taskId) {
+        if (thread.parentId !== void 0 && result.taskId) {
           const tracked = this.get(result.taskId);
           taskTree(this.view().items).validateMove(tracked.id, thread.parentId);
           this.organisation.save(tracked, { ...this.organisation.get(tracked), parentId: thread.parentId });
-          this.savePlan(tracked, { ...this.plan(tracked), focusOrder: null });
+          this.savePlan(tracked, { ...this.plan(tracked), focusOrder: thread.parentId ? null : this.plan(tracked).focusOrder });
           this.save({ ...tracked, version: tracked.version + 1 }, "move", randomUUID2());
         }
-        this.execute("COMMIT");
+        if (hasPlacement) placementRevision = this.organisation.revision();
+        if (owned) this.execute("COMMIT");
         begun = false;
         trackedThreads.push(result);
       } catch (error62) {
-        if (begun) this.execute("ROLLBACK");
+        if (begun && owned) this.execute("ROLLBACK");
+        if (!owned) throw error62;
         trackedThreads.push({ threadId, taskId: null, url: url2, status: "failed", error: error62 instanceof Error ? error62.message : "Could not track this chat." });
       }
     }
@@ -21134,6 +21272,188 @@ var SauronStore = class {
       }
     });
   }
+  reviewChange(change) {
+    const owned = !this.inTransaction;
+    if (owned) this.execute("BEGIN IMMEDIATE");
+    try {
+      const result = change();
+      if (owned) this.execute("COMMIT");
+      return result;
+    } catch (error62) {
+      if (owned) this.execute("ROLLBACK");
+      throw error62;
+    }
+  }
+  configureReview(input2, schedule = () => {
+  }) {
+    const request = configureReviewSchema.parse(input2);
+    return this.transaction("review-config:" + request.operationId, request, () => {
+      const state = this.reviews.state();
+      if (request.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+      if (request.expectedReviewRevision !== state.revision) throw new StoreError("conflict", "Review settings changed. Refresh before saving.");
+      if (request.enabled && state.capability.status !== "verified") throw new StoreError("unavailable", "Verify local chat access before enabling daily reviews.");
+      schedule(request.enabled);
+      this.reviews.save({ ...state, enabled: request.enabled });
+    });
+  }
+  beginReview(kind) {
+    return this.reviewChange(() => {
+      const state = this.reviews.state(), now = this.now().toISOString(), previous = state.run;
+      if (previous?.status === "running" && Date.parse(now) - Date.parse(previous.heartbeatAt) < 15 * 6e4) return { run: previous, started: false };
+      if (state.proposal?.status === "pending" && previous?.status === "completed" && kind !== "probe") return { run: previous, started: false };
+      const resumable = previous && previous.kind === kind && previous.status !== "completed";
+      const reviewed = state.proposal?.id === previous?.id && (state.proposal?.status === "accepted" || state.proposal?.status === "dismissed");
+      const pending = resumable ? [...previous.pending, ...previous.retryChats] : [];
+      const refreshDiscovery = resumable && previous.status === "partial";
+      const run = resumable ? { ...previous, ...reviewed ? { changes: [], basisRevision: null } : {}, leaseId: randomUUID2(), status: "running", heartbeatAt: now, pending, retryChats: [], errors: [], stage: previous.stage === "propose" && pending.length ? "archived" : previous.stage, pageComplete: previous.stage === "propose" && pending.length ? true : previous.pageComplete, ...refreshDiscovery ? { through: now, stage: "active", cursor: null, pageComplete: false } : {} } : { id: randomUUID2(), leaseId: randomUUID2(), kind, status: "running", from: kind === "daily" && state.lastCompleteThrough ? new Date(Date.parse(state.lastCompleteThrough) - 6e4).toISOString() : new Date(Date.parse(now) - 14 * 24 * 60 * 6e4).toISOString(), through: now, startedAt: now, heartbeatAt: now, stage: "active", cursor: null, pageComplete: false, pending: [], seen: {}, seenActivity: {}, chats: [], changes: [], basisRevision: null, errors: [], retryChats: [] };
+      this.reviews.save({ ...state, run });
+      return { run, started: true };
+    });
+  }
+  checkpointReview(runId, leaseId, patch) {
+    this.reviewChange(() => {
+      const run = this.reviews.requireLease(runId, leaseId);
+      this.reviews.save({ ...this.reviews.state(), run: { ...run, ...patch, id: runId, leaseId, heartbeatAt: this.now().toISOString() } });
+    });
+  }
+  reviewCapability(runId, leaseId, capability) {
+    this.reviewChange(() => {
+      this.reviews.requireLease(runId, leaseId);
+      this.reviews.save({ ...this.reviews.state(), capability });
+    });
+  }
+  recordChatEvidence(runId, leaseId, evidence) {
+    this.reviewChange(() => {
+      this.reviews.requireLease(runId, leaseId);
+      if (!evidence.latestAssistant) return;
+      const ids = new Set(this.discussions().filter((link) => link.url === "codex://threads/" + evidence.threadId).map((link) => link.taskId));
+      for (const id of ids) {
+        const task = this.get(id);
+        if (!task) continue;
+        const org = this.organisation.get(task);
+        if (org.chatEvidence === evidence.latestAssistant) continue;
+        const closed = task.userDecision === "complete" || task.userDecision === "dismiss" || org.sourceClosed;
+        const cutoff = org.handledAt ?? task.decidedAt ?? (org.sourceClosed ? org.closedAt ?? task.updatedAt : null);
+        const changed = org.chatEvidence ? org.chatEvidence !== evidence.latestAssistant : cutoff && evidence.latestAssistantAt ? evidence.latestAssistantAt > Date.parse(cutoff) : !org.handledEvidence && !closed;
+        this.organisation.save(task, {
+          ...org,
+          chatEvidence: evidence.latestAssistant,
+          attention: org.attention || changed,
+          reopenSuggested: org.reopenSuggested || changed && (task.userDecision === "complete" || task.userDecision === "dismiss" || org.sourceClosed)
+        });
+        this.save({ ...task, version: task.version + 1, updatedAt: this.now().toISOString() }, "chat-evidence", runId);
+      }
+    });
+  }
+  appendReviewChanges(runId, leaseId, input2, chats, expectedRevision = this.organisation.revision()) {
+    this.reviewChange(() => {
+      const run = this.reviews.requireLease(runId, leaseId);
+      if (expectedRevision !== this.organisation.revision()) throw new StoreError("conflict", "Tasks changed while composing suggestions. Resume to review the latest state.");
+      const changes = validateProposedChanges(input2, chats, this), refs = /* @__PURE__ */ new Map();
+      for (const change of changes) if (change.kind === "create" || change.kind === "track") refs.set(change.key, change.kind === "create" ? "new:" + hash2(change.title.toLocaleLowerCase()) : "track:" + change.threadId);
+      const normalised = changes.map((change) => {
+        const next = { ...change, key: refs.get(change.key) ?? change.key };
+        if ("taskRef" in next) next.taskRef = refs.get(next.taskRef) ?? next.taskRef;
+        if ("parentRef" in next && next.parentRef) next.parentRef = refs.get(next.parentRef) ?? next.parentRef;
+        if (next.kind === "move" || next.kind === "topics") next.key = hash2([next.kind, next.taskRef]);
+        else if (next.kind === "close") next.key = changeIdentity(next);
+        return next;
+      }).filter((change) => this.reviews.allowed(change));
+      const selected = /* @__PURE__ */ new Map();
+      for (const change of [...run.changes, ...normalised]) {
+        const key = change.kind === "move" || change.kind === "topics" ? change.kind + ":" + change.taskRef : changeIdentity(change), previous = selected.get(key);
+        if (change.kind === "topics" && previous?.kind === "topics") selected.set(key, { ...change, topics: [.../* @__PURE__ */ new Set([...previous.topics, ...change.topics])] });
+        else selected.set(key, change);
+      }
+      const merged = [...selected.values()];
+      if (merged.length > 200) throw new StoreError("budget", "Review reached 200 changes. Review this batch before continuing.");
+      this.reviews.save({ ...this.reviews.state(), run: { ...run, changes: merged, basisRevision: run.basisRevision ?? expectedRevision, heartbeatAt: this.now().toISOString() } });
+    });
+  }
+  finishReview(runId, leaseId) {
+    this.reviewChange(() => {
+      const run = this.reviews.requireLease(runId, leaseId), state = this.reviews.state(), tree = taskTree(this.view().items), closureScopes = {};
+      const closing = new Set(run.changes.filter((change) => change.kind === "close").map((change) => change.taskRef));
+      const changes = run.changes.filter((change) => change.kind !== "close" || !tree.ancestors(change.taskRef).some((task) => closing.has(task.id)));
+      for (const change of changes) if (change.kind === "close") closureScopes[change.key] = [change.taskRef, ...tree.descendants(change.taskRef).filter((task) => !closedTask(task)).map((task) => task.id)].sort();
+      const complete = !run.errors.length;
+      this.reviews.save({
+        ...state,
+        nextAttemptAt: complete ? null : new Date(this.now().getTime() + 15 * 6e4).toISOString(),
+        run: { ...run, status: complete ? "completed" : "partial" },
+        ...run.kind !== "probe" ? { proposal: changes.length ? { id: run.id, revision: state.proposal?.id === run.id ? state.proposal.revision + 1 : 0, taskViewRevision: run.basisRevision ?? this.organisation.revision(), changes, closureScopes, coverage: ["Local Codex history only; remote hosts and ChatGPT history are not covered.", ...run.errors], status: "pending" } : null } : {},
+        ...complete && run.kind !== "probe" ? { lastCompleteThrough: run.through, lastDailyDate: reviewDate(new Date(run.through)) } : {}
+      });
+    });
+  }
+  failReview(runId, leaseId, error62) {
+    this.reviewChange(() => {
+      const state = this.reviews.state();
+      if (state.run?.id !== runId || state.run.leaseId !== leaseId || state.run.status !== "running") return;
+      this.reviews.save({
+        ...state,
+        nextAttemptAt: new Date(this.now().getTime() + 15 * 6e4).toISOString(),
+        run: { ...state.run, status: "failed", errors: [...state.run.errors, error62.slice(0, 400)] },
+        ...state.capability.status === "unknown" ? { capability: { status: "unavailable", checkedAt: this.now().toISOString(), runtime: null, detail: error62.slice(0, 400) } } : {}
+      });
+    });
+  }
+  rebaseProposal(input2) {
+    return this.transaction("proposal-rebase:" + input2.operationId, input2, () => {
+      const state = this.reviews.state(), proposal = state.proposal;
+      if (input2.expectedStoreId !== this.storeId || !proposal || proposal.id !== input2.proposalId || proposal.revision !== input2.expectedProposalRevision || proposal.status !== "pending") throw new StoreError("conflict", "Proposal changed. Reload it before reviewing.");
+      const tree = taskTree(this.view().items), closureScopes = {};
+      for (const change of proposal.changes) if (change.kind === "close") closureScopes[change.key] = [change.taskRef, ...tree.descendants(change.taskRef).filter((task) => !closedTask(task)).map((task) => task.id)].sort();
+      this.reviews.save({ ...state, proposal: { ...proposal, revision: proposal.revision + 1, taskViewRevision: this.organisation.revision(), closureScopes } });
+    });
+  }
+  acceptProposal(input2) {
+    const request = acceptProposalSchema.parse(input2);
+    return this.transaction("proposal:" + request.operationId, request, () => {
+      this.assertOrganisation(request.expectedStoreId, request.expectedRevision);
+      const state = this.reviews.state(), proposal = state.proposal;
+      if (state.run?.status === "running" || !proposal || proposal.status !== "pending" || proposal.id !== request.proposalId || proposal.revision !== request.expectedProposalRevision || proposal.taskViewRevision !== request.expectedRevision) throw new StoreError("conflict", "Proposal or tasks changed. Review the latest state before accepting.");
+      if (new Set(request.changes.map((change) => change.key)).size !== request.changes.length) throw new StoreError("duplicate", "Select each change only once.");
+      for (const change of request.changes) {
+        const original = proposal.changes.find((item) => item.key === change.key);
+        if (!original || original.kind !== change.kind || "taskRef" in original && (!("taskRef" in change) || change.taskRef !== original.taskRef) || "threadId" in original && (!("threadId" in change) || change.threadId !== original.threadId || change.title !== original.title)) throw new StoreError("invalid_proposal", "Edit the proposed placement or topics without changing its subject.");
+      }
+      const refs = new Map(this.view().items.map((task) => [task.id, task.id]));
+      const resolve = (ref) => {
+        const id = refs.get(ref);
+        if (!id) throw new StoreError("dependency", "A selected change needs an excluded parent or task. Include it or choose another destination.");
+        return id;
+      };
+      for (const change of request.changes) if (change.kind === "create") {
+        const operationId = randomUUID2();
+        this.createPersonal({ operationId, title: change.title });
+        refs.set(change.key, "personal:" + operationId);
+      }
+      for (const change of request.changes) if (change.kind === "track") {
+        const result = this.trackCodexThreads({ expectedStoreId: this.storeId, threads: [{ threadId: change.threadId, title: change.title }] }), id = result.trackedThreads?.[0]?.taskId;
+        if (!id) throw new StoreError("tracking", "Chat tracking could not be confirmed.");
+        refs.set(change.key, id);
+      }
+      for (const change of request.changes) {
+        if (change.kind === "move" || change.kind === "track" && change.parentRef) this.applyOrganisation({ operationId: randomUUID2(), expectedStoreId: this.storeId, expectedRevision: this.organisation.revision(), action: "move", id: resolve(change.kind === "move" ? change.taskRef : change.key), parentId: change.parentRef ? resolve(change.parentRef) : null });
+        if (change.kind === "topics") this.applyOrganisation({ operationId: randomUUID2(), expectedStoreId: this.storeId, expectedRevision: this.organisation.revision(), action: "topics", id: resolve(change.taskRef), topics: change.topics });
+      }
+      for (const change of request.changes) if (change.kind === "close") {
+        const id = resolve(change.taskRef), tree = taskTree(this.view().items), actual = [id, ...tree.descendants(id).filter((task) => !closedTask(task)).map((task) => task.id)].sort();
+        if (JSON.stringify(actual) !== JSON.stringify(proposal.closureScopes[change.key])) throw new StoreError("conflict", "Selected moves change this closure\u2019s branch. Accept the placements first, then review closure separately.");
+        this.decide({ operationId: randomUUID2(), id, action: "complete", branch: true, expectedVersion: this.get(id).version, expectedStoreId: this.storeId, expectedRevision: this.organisation.revision() });
+      }
+      for (const original of proposal.changes) {
+        const accepted = request.changes.find((change) => change.key === original.key);
+        if (!accepted) this.reviews.dismiss(original);
+        else if (JSON.stringify(accepted) !== JSON.stringify(original)) {
+          this.reviews.dismiss(original);
+          this.reviews.correction({ original, accepted });
+        }
+      }
+      this.reviews.save({ ...this.reviews.state(), proposal: { ...proposal, status: request.changes.length ? "accepted" : "dismissed" } });
+    });
+  }
   assertOrganisation(storeId, revision) {
     if (storeId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
     if (revision !== this.organisation.revision()) throw new StoreError("conflict", "Tasks changed. Refresh and review the change again.");
@@ -21153,12 +21473,13 @@ var SauronStore = class {
     const task = this.get(request.id);
     if (!task) throw new StoreError("not_found", "Task no longer exists. Refresh the list.");
     const org = this.organisation.get(task);
+    this.reviews.correction({ taskId: task.id, action: request.action, value: request });
     if (request.action === "move") {
       taskTree(this.view().items).validateMove(task.id, request.parentId);
       this.organisation.save(task, { ...org, parentId: request.parentId });
       if (request.parentId) this.savePlan(task, { ...this.plan(task), focusOrder: null });
     } else if (request.action === "topics") this.organisation.save(task, { ...org, directTopicIds: this.organisation.assignTopics(request.topics) });
-    else this.organisation.save(task, { ...org, attention: request.needsAttention, handledEvidence: request.needsAttention ? null : org.evidence, reopenSuggested: false });
+    else this.organisation.save(task, { ...org, attention: request.needsAttention, handledEvidence: request.needsAttention ? null : org.evidence, handledAt: request.needsAttention ? null : this.now().toISOString(), reopenSuggested: false });
     this.save({ ...task, version: task.version + 1, updatedAt: this.now().toISOString() }, "organisation", request.operationId);
   }
   decide(input2) {
@@ -21169,14 +21490,14 @@ var SauronStore = class {
       if (old.version !== operation.expectedVersion) throw new StoreError("conflict", "Task changed in another view. Refresh before choosing again.");
       if (operation.expectedStoreId && operation.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
       const branch = tree.descendants(old.id), open2 = branch.filter((task) => !closedTask(task));
-      const path2 = operation.action === "reopen" ? tree.ancestors(old.id).filter(closedTask) : [];
-      if ((operation.action === "complete" || operation.action === "dismiss") && open2.length || path2.length) {
+      const path3 = operation.action === "reopen" ? tree.ancestors(old.id).filter(closedTask) : [];
+      if ((operation.action === "complete" || operation.action === "dismiss") && open2.length || path3.length) {
         if (!operation.branch || operation.expectedRevision === void 0 || !operation.expectedStoreId) throw new StoreError("confirmation_required", "Confirm this branch decision after reviewing affected tasks.");
         this.assertOrganisation(operation.expectedStoreId, operation.expectedRevision);
       }
       if (operation.snoozedUntil && Date.parse(operation.snoozedUntil) <= this.now().getTime()) throw new StoreError("invalid_snooze", "Choose a future snooze time.");
       if (operation.action !== "reopen" && (old.userDecision === "complete" || old.userDecision === "dismiss")) throw new StoreError("terminal", "This task already has a final decision.");
-      const affected = operation.action === "reopen" ? [old, ...path2] : operation.branch && (operation.action === "complete" || operation.action === "dismiss") ? [old, ...open2] : [old];
+      const affected = operation.action === "reopen" ? [old, ...path3] : operation.branch && (operation.action === "complete" || operation.action === "dismiss") ? [old, ...open2] : [old];
       for (const item of affected) {
         const task = this.get(item.id);
         const updated = {
@@ -21188,7 +21509,7 @@ var SauronStore = class {
           updatedAt: this.now().toISOString()
         };
         this.save(updated, operation.action, operation.operationId);
-        if (operation.action !== "snooze") this.organisation.save(updated, { ...this.organisation.get(updated), attention: operation.action === "reopen", reopenSuggested: false, sourceClosed: operation.action === "reopen" ? false : this.organisation.get(updated).sourceClosed });
+        if (operation.action !== "snooze") this.organisation.save(updated, { ...this.organisation.get(updated), attention: operation.action === "reopen", handledEvidence: operation.action === "reopen" ? null : this.organisation.get(updated).evidence, handledAt: operation.action === "reopen" ? null : this.now().toISOString(), reopenSuggested: false, sourceClosed: operation.action === "reopen" ? false : this.organisation.get(updated).sourceClosed });
         const plan = this.plan(updated);
         if (plan.focusOrder !== null && !this.actionable(updated, plan)) this.savePlan(updated, { ...plan, focusOrder: null });
       }
@@ -21196,9 +21517,57 @@ var SauronStore = class {
   }
 };
 
-// src/server/scan.ts
+// src/server/organisation-trigger.ts
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+function triggerOrganisationReview(store2, input2) {
+  const request = reviewTriggerSchema.parse(input2);
+  if (request.expectedStoreId !== store2.storeId) throw Error("Store ID does not match.");
+  const state = store2.reviews.state();
+  if (request.reason === "timer" && state.nextAttemptAt && Date.parse(state.nextAttemptAt) > Date.now()) return store2.view();
+  if (request.reason === "timer" && (!dailyReviewDue(store2.reviews.state(), /* @__PURE__ */ new Date()) || request.kind !== "daily")) return store2.view();
+  const result = store2.beginReview(request.kind);
+  if (!result.started) return store2.view();
+  const child = spawn(process.execPath, [fileURLToPath(new URL("./organisation-worker.js", import.meta.url)), store2.path, store2.storeId, result.run.id, result.run.leaseId], { stdio: "ignore", detached: true });
+  child.once("error", () => store2.failReview(result.run.id, result.run.leaseId, "The organisation worker could not start. Recheck the local runtime."));
+  child.unref();
+  return store2.view();
+}
+
+// src/server/organisation-scheduler.ts
+import { mkdirSync as mkdirSync2, readFileSync, writeFileSync, chmodSync as chmodSync2, existsSync as existsSync2, unlinkSync, renameSync } from "node:fs";
+import { dirname as dirname2, join } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { spawnSync } from "node:child_process";
+var xml = (value) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+function setOrganisationSchedule(path3, storeId, enabled, options = {}) {
+  const uid = options.uid ?? process.getuid?.(), run = options.run ?? ((args2) => spawnSync("/bin/launchctl", args2, { stdio: "ignore" }).status);
+  if ((options.platform ?? process.platform) !== "darwin" || uid === void 0) throw Error("Daily organisation scheduling currently requires macOS. Manual review remains available.");
+  const root = join(dirname2(path3), "organisation-runtime"), label = "com.sauron.organisation." + storeId, target = `gui/${uid}`, plist = join(root, "review.plist");
+  if (!enabled) {
+    const loaded = { status: run(["print", target + "/" + label]) };
+    if (loaded.status === 0 && run(["bootout", target + "/" + label]) !== 0) throw Error("Could not stop the organisation schedule. It remains enabled.");
+    if (existsSync2(plist)) unlinkSync(plist);
+    return;
+  }
+  mkdirSync2(root, { recursive: true, mode: 448 });
+  for (const name of ["check-organisation.js", "organisation-worker.js"]) {
+    const temporary = join(root, name + "." + randomUUID3() + ".tmp");
+    writeFileSync(temporary, readFileSync(join(options.sourceDirectory ?? dirname2(fileURLToPath2(import.meta.url)), name)), { mode: 448 });
+    renameSync(temporary, join(root, name));
+    chmodSync2(join(root, name), 448);
+  }
+  const args = [process.execPath, join(root, "check-organisation.js"), "--database", path3, "--expected-store-id", storeId];
+  const content = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Label</key><string>${xml(label)}</string><key>ProgramArguments</key><array>${args.map((arg) => `<string>${xml(arg)}</string>`).join("")}</array><key>StartInterval</key><integer>60</integer><key>RunAtLoad</key><true/></dict></plist>`;
+  writeFileSync(plist, content, { mode: 384 });
+  if (run(["print", target + "/" + label]) === 0 && run(["bootout", target + "/" + label]) !== 0) throw Error("Could not replace the existing organisation schedule.");
+  if (run(["bootstrap", target, plist]) !== 0) throw Error("Could not enable the daily organisation schedule. No review was enabled.");
+}
+
+// src/server/scan.ts
+import { spawn as spawn2 } from "node:child_process";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
 function refreshAttention(store2, automatic = false) {
   if (store2.coordination().mode === "local_managed" && store2.sync()?.status === "running") return store2.view();
   if (!enabledSources(store2.sourcePreferences()).some((provider) => provider === "slack" || provider === "granola")) return store2.view();
@@ -21213,9 +21582,9 @@ function refreshAttention(store2, automatic = false) {
   const { run, started } = scan;
   if (started) {
     try {
-      const child = spawn(
+      const child = spawn2(
         process.execPath,
-        [fileURLToPath(new URL("./scan-worker.js", import.meta.url)), store2.path, run.id],
+        [fileURLToPath3(new URL("./scan-worker.js", import.meta.url)), store2.path, run.id],
         { detached: true, stdio: "ignore", env: process.env }
       );
       child.once("error", () => store2.failScan(run.id, "The source scanner could not start. Check the desktop runtime and try Refresh again."));
@@ -21228,8 +21597,8 @@ function refreshAttention(store2, automatic = false) {
 }
 
 // src/server/local-update.ts
-import { spawn as spawn2 } from "node:child_process";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { spawn as spawn3 } from "node:child_process";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
 var minute = 6e4;
 function localCheckDue(view, state, reason, now) {
   if (view.coordination?.mode !== "local_managed" || view.sync?.status === "running" || view.scan?.status === "running") return false;
@@ -21270,9 +21639,9 @@ function checkLocalAttention(store2, input2) {
   store2.updateLocalState({ lastTickAt: now.toISOString() });
   if (!due) return store2.view();
   store2.updateLocalState({ lastAttemptAt: now.toISOString(), reason: request.reason });
-  const child = spawn2(
+  const child = spawn3(
     process.execPath,
-    [fileURLToPath2(new URL("./local-update-worker.js", import.meta.url)), store2.path, store2.storeId],
+    [fileURLToPath4(new URL("./local-update-worker.js", import.meta.url)), store2.path, store2.storeId],
     { detached: true, stdio: "ignore", env: { ...process.env, SAURON_LOCAL_ATTEMPT_AT: now.toISOString() } }
   );
   child.once("error", () => store2.updateLocalState({ blocked: "runtime", reason: "Local update worker could not start.", nextAttemptAt: new Date(Date.now() + 5 * minute).toISOString() }));
@@ -21281,13 +21650,13 @@ function checkLocalAttention(store2, input2) {
 }
 
 // src/server/reply.ts
-import { spawn as spawn3 } from "node:child_process";
-import { fileURLToPath as fileURLToPath3 } from "node:url";
+import { spawn as spawn4 } from "node:child_process";
+import { fileURLToPath as fileURLToPath5 } from "node:url";
 function startWorker(store2, id, kind) {
   try {
-    const child = spawn3(
+    const child = spawn4(
       process.execPath,
-      [fileURLToPath3(new URL("./reply-worker.js", import.meta.url)), store2.path, id, kind],
+      [fileURLToPath5(new URL("./reply-worker.js", import.meta.url)), store2.path, id, kind],
       { stdio: "ignore", detached: true, env: process.env }
     );
     child.on("error", () => store2.replies.fail(id));
@@ -21355,6 +21724,17 @@ function invoke(store2, name, args, context) {
       return store2.trackCodexThreads(args);
     case "propose_codex_followups":
       return store2.proposeCodexFollowups(args);
+    case "review_organisation":
+      return triggerOrganisationReview(store2, args);
+    case "configure_organisation_review":
+      return store2.configureReview(args, (enabled) => {
+        if (enabled && store2.reviews.state().capability.runtime !== runtimeFingerprint()) throw Error("The chat runtime changed. Check chat access again before enabling daily reviews.");
+        setOrganisationSchedule(store2.path, store2.storeId, enabled);
+      });
+    case "accept_organisation_proposal":
+      return store2.acceptProposal(args);
+    case "rebase_organisation_proposal":
+      return store2.rebaseProposal(external_exports.strictObject({ operationId: external_exports.string().uuid(), expectedStoreId: external_exports.string().uuid(), proposalId: external_exports.string().uuid(), expectedProposalRevision: external_exports.number().int().nonnegative() }).parse(args));
     case "organise_attention_task":
       return store2.organiseTask(organiseTaskToolSchema.parse(args).request);
     case "plan_attention_task":
@@ -21380,7 +21760,7 @@ function invoke(store2, name, args, context) {
 var port = Number(process.env.PORT ?? 4318);
 var origin = `http://127.0.0.1:${port}`;
 var store = new SauronStore(dataPath());
-var html = readFileSync(fileURLToPath4(new URL("../ui/index.html", import.meta.url)));
+var html = readFileSync2(fileURLToPath6(new URL("../ui/index.html", import.meta.url)));
 var server = createServer(async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
