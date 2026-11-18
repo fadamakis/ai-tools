@@ -1,6 +1,7 @@
 # Working on Sauron
 
 Read [the architecture map](docs/architecture.md) before changing task behaviour.
+Read [the recovery product decisions](docs/product-decisions.md) before changing error messages, save recovery or diagnostics.
 [Task grouping requirements](docs/task-groups.md) define intended behaviour and delivery status.
 Keep their requirement IDs in regression test names. Update requirements, tests and guidance together when behaviour changes.
 

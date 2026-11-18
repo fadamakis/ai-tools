@@ -14,6 +14,7 @@ import {saveDiscussionSchema,type DiscussionLink} from '../shared/contracts.js';
 import { configureSourcesSchema,defaultSourcePreferences,enabledSources,type SourcePreferences,type LiveProvider, decisionSchema, personalTaskSchema, trackCodexThreadsSchema, planTaskSchema, orderTasksSchema, proposeCodexFollowupsSchema, upsertSchema, type Result, type Task, type TaskState, type View, type Observation, type ScanRun, scanOutputSchema, syncSchema, canonicalSourceUrl, providerKind, planningTimeZone, type SyncRun, configureSyncSchema, type SyncCoordination, type LocalState, type SyncReceipt, type TrackedCodexThread, type WorkflowState, type WorkArea, liveProviders, type SyncProgress } from '../shared/contracts.js';
 
 export class StoreError extends Error {
+  rejected=false;
   constructor(public code: string, message: string) { super(message); }
 }
 const hash = (v: unknown): string => createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -173,6 +174,12 @@ export class SauronStore {
     if(!discussion)throw new StoreError('discussion_unconfirmed','The saved chat link could not be read back. Reopen the item to check.');
     return {...result,discussion};
   }
+  checkSave(check:{expectedStoreId:string;id:string;payload:unknown}):Result{
+    if(check.expectedStoreId!==this.storeId)throw new StoreError('wrong_store','Store ID does not match.');
+    const receipt=this.db.prepare('SELECT hash FROM receipts WHERE id=?').get(check.id);
+    const view=this.view();
+    return receipt&&receipt.hash===hash(check.payload)?{...view,receipt:{id:check.id,duplicate:true}}:view;
+  }
   private transaction(id: string, payload: unknown, change: () => void): Result {
     const owned=!this.inTransaction;if(owned)this.execute('BEGIN IMMEDIATE');
     try {
@@ -185,7 +192,7 @@ export class SauronStore {
       const view = this.view();
       if(owned)this.execute('COMMIT');
       return {...view, receipt:{id, duplicate:!!receipt}};
-    } catch (error) { if(owned)this.execute('ROLLBACK'); throw error; }
+    } catch (error) { if(owned){this.execute('ROLLBACK');if(error instanceof StoreError)error.rejected=true;} throw error; }
   }
   upsert(input: unknown): Result {
     const batch = upsertSchema.parse(input);

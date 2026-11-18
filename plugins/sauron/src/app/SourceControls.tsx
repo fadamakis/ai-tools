@@ -1,3 +1,4 @@
+import {RecoveryNotice} from './RecoveryNotice.js';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {Button,Menu} from '@ai-tools/ui';
@@ -46,9 +47,9 @@ function SourceHint({hint,children}:{hint:string;children:ReactNode}) {
 export function SourceControls({vm}:{vm:SauronController}) {
   const preferences=vm.view?.sourcePreferences??defaultSourcePreferences();
   const paused=!enabledSources(preferences).length;
-  const locked=!vm.client||vm.busy||!!vm.pending||!!vm.view?.pendingSourceSync||vm.scanning;
+  const locked=!vm.client||vm.actionLocked||!!vm.view?.pendingSourceSync||vm.scanning;
   const canRefresh=!locked&&(preferences.enabled.slack||preferences.enabled.granola);
-  return <Menu><Menu.Trigger><Button variant="outline" color="secondary" size="md" disabled={!vm.client} aria-busy={vm.scanning}>
+  return <Menu onOpen={()=>vm.setSourceMenuOpen(true)} onClose={()=>vm.setSourceMenuOpen(false)}><Menu.Trigger><Button variant="outline" color="secondary" size="md" disabled={!vm.client} aria-busy={vm.scanning}>
     <Icon name="refresh" className={vm.scanning?'spinning':undefined}/>{vm.scanning?'Refreshing…':'Refresh'}<Icon name="chevron"/>
   </Button></Menu.Trigger><Menu.Content align="end" width={280} minWidth={280}>
     <SourceHint hint="Checks enabled Slack and Meetings sources now. New actions appear in Inbox for review.">
@@ -62,6 +63,7 @@ export function SourceControls({vm}:{vm:SauronController}) {
     </div>
     <p className="inbox-source-help">Controls manual and automatic pulls. Existing tasks stay saved.</p>
     {(vm.sourceSaving||vm.scanning||paused||vm.view?.pendingSourceSync)&&<p className="inbox-source-help" role="status">{vm.sourceSaving?'Saving source settings…':vm.scanning?'Available when this update finishes.':vm.view?.pendingSourceSync?'Waiting for pending update reconciliation.':'Source updates paused'}</p>}
-    {vm.sourceError&&<div className="inbox-source-error" role="alert"><p>{vm.sourceError}</p><Button size="sm" variant="ghost" color="secondary" disabled={locked} onClick={vm.retrySource}>Retry source setting</Button></div>}
+    <RecoveryNotice recovery={vm.sourceRecovery} busy={vm.busy} connected={!!vm.client}/>
+
   </Menu.Content></Menu>;
 }

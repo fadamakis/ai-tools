@@ -1,3 +1,4 @@
+import {listAttentionSchema} from '../shared/contracts.js';
 import {triggerOrganisationReview} from './organisation-trigger.js';
 import {setOrganisationSchedule} from './organisation-scheduler.js';
 import {runtimeFingerprint} from './chat-reader.js';
@@ -13,8 +14,8 @@ import {linkDiscussionSchema} from '../shared/contracts.js';
 
 export function invoke(store: SauronStore, name: string, args: unknown,context?:{conversationUrl?:string}): Result {
   switch(name) {
-    case 'open_attention':
-    case 'list_attention': z.strictObject({}).parse(args); return store.view();
+    case 'open_attention': z.strictObject({}).parse(args);return store.view();
+    case 'list_attention': {const input=listAttentionSchema.parse(args);return input.checkSave?store.checkSave(input.checkSave):store.view();}
     case 'link_attention_discussion': {
       const request=linkDiscussionSchema.parse(args);
       if(!context?.conversationUrl)throw new StoreError('conversation_context_missing','This host did not provide the current chat identity. Copy this chat’s link and use Link a chat on the Sauron item.');

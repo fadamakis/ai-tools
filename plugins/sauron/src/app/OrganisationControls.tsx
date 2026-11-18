@@ -28,7 +28,7 @@ export function TaskOrganisationEditor({task,vm}:{task:Task;vm:SauronController}
   const [topics,setTopics]=useState(names),[baseline,setBaseline]=useState(names);
   useEffect(()=>{if(topics===baseline){setTopics(names);setBaseline(names);}},[names]);
   const inherited=(vm.view?.topics??[]).filter(topic=>task.topicIds?.includes(topic.id)&&!task.directTopicIds?.includes(topic.id));
-  const disabled=vm.busy||!!vm.pending||!!org.pending;
+  const disabled=vm.actionLocked||!!org.pending;
   return <section className="inbox-organisation" aria-label={`Organisation for ${task.title}`}>
     <h3>Organisation</h3>
     {task.parentId&&<p>Parent: {org.tree.byId.get(task.parentId)?.title}</p>}

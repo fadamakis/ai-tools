@@ -171,7 +171,7 @@ test('interrupted Inbox save is recoverable after reopening without duplicate ta
       interrupted=true;await route.fetch();await route.abort('failed');
     }else await route.continue();
   });
-  await page.getByRole('button',{name:'Save task',exact:true}).click();await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();await page.reload();
+  await page.getByRole('button',{name:'Save task',exact:true}).click();await expect(page.getByRole('alert',{name:'Save recovery'})).toBeVisible();await page.reload();
   await expect(page.getByRole('heading',{name:'Recover this task',exact:true})).toBeVisible();expect((await call(request,'list_attention')).items.filter(t=>t.title==='Recover this task')).toHaveLength(1);
 });
 test('rendering failure offers a dependency-independent page reload',async({page})=>{
@@ -345,7 +345,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
     const complete=page.getByRole('button',{name:'Complete Complete without flashing',exact:true});
     await complete.click();await sending;
     await expect(complete).toHaveAttribute('aria-busy','true');
-    await expect(page.getByText('Check an interrupted save',{exact:true})).toHaveCount(0);
+    await expect(page.getByRole('alert',{name:'Save recovery'})).toHaveCount(0);
     const during=(await reader.boundingBox())!;
     expect(during.y).toBeCloseTo(before.y,1);expect(during.height).toBeCloseTo(before.height,1);
     release();
@@ -377,9 +377,9 @@ test('failed decisions retain recovery across reopening and a slow retry',async(
   });
   try{
     await page.getByRole('button',{name:'Complete Recover a failed decision',exact:true}).click();
-    const recovery=page.getByText('Check an interrupted save',{exact:true});await expect(recovery).toBeVisible();
+    const recovery=page.getByRole('alert',{name:'Save recovery'});await expect(recovery).toBeVisible();
     await page.reload();await expect(recovery).toBeVisible();
-    const retry=page.getByRole('button',{name:'Retry decision',exact:true});await retry.click();await retrying;
+    const retry=page.getByRole('button',{name:'Retry save',exact:true});await retry.click();await retrying;
     await expect(recovery).toBeVisible();await expect(retry).toBeDisabled();
     release();await expect(recovery).toHaveCount(0);
     await expect(page.getByRole('button',{name:/^History 1/})).toBeVisible();
@@ -450,11 +450,11 @@ test('an interrupted committed reopen recovers into Waiting without another deci
     }else await route.continue();
   });
   await page.locator('.inbox-task-detail').getByRole('button',{name:'Reopen task',exact:true}).click();
-  await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();
+  await expect(page.getByRole('alert',{name:'Save recovery'})).toBeVisible();
   await page.reload();
   await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
   await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'Recover reopened workflow',exact:true})).toBeVisible();
-  await expect(page.getByText('Check an interrupted save',{exact:true})).toHaveCount(0);expect(reopens).toBe(1);
+  await expect(page.getByRole('alert',{name:'Save recovery'})).toHaveCount(0);expect(reopens).toBe(1);
   const db=new DatabaseSync(join(dir,'test.sqlite'));try{expect(db.prepare("SELECT count(*) AS count FROM history WHERE task_id=? AND kind='reopen'").get(task.id)?.count).toBe(1);}finally{db.close();}
 });
 
@@ -530,14 +530,16 @@ test('failed and conflicting plan saves retain drafts and use the original versi
     }else await route.continue();
   });
   await editor.getByRole('button',{name:'Save plan',exact:true}).click();
-  await expect(page.getByRole('alert').filter({hasText:'Fixture save unavailable'})).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText:'Couldn’t confirm the task plan'})).toBeVisible();
   await expect(name).toHaveValue('Keep this draft');
   await call(request,'plan_attention_task',{id:task.id,expectedVersion:task.version,operationId:crypto.randomUUID(),nextAction:'Concurrent saved action'});
-  await editor.getByRole('button',{name:'Save plan',exact:true}).click();
-  await expect(page.getByRole('alert').filter({hasText:'Task changed in another view'})).toBeVisible();
+  await page.getByRole('button',{name:'Retry save',exact:true}).click();
+  await expect(page.getByRole('alert').filter({hasText:'saved information changed'})).toBeVisible();
+  await page.getByRole('button',{name:'Review latest tasks',exact:true}).click();
   await expect(name).toHaveValue('Keep this draft');
   await expect(editor.getByRole('button',{name:'Save plan',exact:true})).toBeDisabled();
   expect((await call(request,'list_attention')).items[0].title).toBe('Save failure task');
+  await page.getByRole('button',{name:'Dismiss retry',exact:true}).click();
   await editor.getByRole('button',{name:'Keep my edits'}).click();
   await editor.getByRole('button',{name:'Save plan',exact:true}).click();
   await expect(page.getByText('Task plan saved.',{exact:true})).toBeVisible();
@@ -561,7 +563,7 @@ for(const recovered of [false,true])test(`personal creation clears filters after
     });
   }
   await page.getByRole('button',{name:'Save task',exact:true}).click();
-  if(recovered){await expect(page.getByText('Check an interrupted save',{exact:true})).toBeVisible();await pollSaved(page);}
+  if(recovered){await expect(page.getByRole('alert',{name:'Save recovery'})).toBeVisible();await pollSaved(page);}
   await expect(page.getByRole('radio',{name:recovered?/^Waiting /:/^Today /})).toHaveAttribute('aria-checked','true');
   await expect(page.locator('.inbox-tasks').getByRole('heading',{name:'New visible task',exact:true})).toBeVisible();
   await expect(page.getByRole('searchbox',{name:'Search tasks'})).toHaveValue('');
@@ -616,7 +618,7 @@ test('O-03: excluded dependencies block acceptance and a lost committed response
   const view=await add(request,'Existing work'),existing=view.items[0];seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'move',key:'move',taskRef:existing.id,parentRef:'parent',reason:'Related.',evidenceIds:[]}]);
   await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).uncheck();await expect(page.getByText('A selected change needs an excluded parent or task. Include it or choose another destination.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).check();
   let lost=false;await page.route('**/api/tool',async route=>{if(!lost&&route.request().postDataJSON().name==='accept_organisation_proposal'){lost=true;await route.fetch();await route.abort('failed');return;}await route.continue();});
-  await page.getByRole('button',{name:'Accept 2 selected changes'}).click();await expect(page.getByRole('button',{name:'Retry review action'})).toBeVisible();await page.reload();await page.getByText('Organise tasks',{exact:true}).click();await page.getByRole('button',{name:'Retry review action'}).click();await expect(page.getByRole('button',{name:'Retry review action'})).toHaveCount(0);expect((await call(request,'list_attention')).items.filter(task=>task.title==='Suggested parent')).toHaveLength(1);
+  await page.getByRole('button',{name:'Accept 2 selected changes'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toBeVisible();await page.reload();await page.getByText('Organise tasks',{exact:true}).click();await page.getByRole('button',{name:'Retry save'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toHaveCount(0);expect((await call(request,'list_attention')).items.filter(task=>task.title==='Suggested parent')).toHaveLength(1);
 });
 test('O-03: refreshing a stale proposal preserves the user’s excluded closure',async({page,request})=>{
   const view=await add(request,'Keep open'),id=view.items[0].id;seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'close',key:'close',taskRef:id,reason:'Review relevance.',evidenceIds:[]}]);

@@ -23,7 +23,7 @@ export function TaskActions({task,vm,label=`Actions for ${task.title}`}:{task:Ta
     vm.order(next,next.filter(id=>focusIds.includes(id)));
   };
   const toggleFocus=()=>vm.order(ids,focus.includes(task.id)?focus.filter(id=>id!==task.id):[...focus,task.id]);
-  return <Menu.Root open={open} onOpenChange={setOpen} modal={false}><Menu.Trigger asChild><Button ref={trigger} color="secondary" variant="ghost" size="sm" uniform aria-label={label} disabled={vm.busy||!!vm.pending}><span aria-hidden="true" className="inbox-ellipsis">⋯</span></Button></Menu.Trigger>
+  return <Menu.Root open={open} onOpenChange={setOpen} modal={false}><Menu.Trigger asChild><Button ref={trigger} color="secondary" variant="ghost" size="sm" uniform aria-label={label} disabled={vm.actionLocked}><span aria-hidden="true" className="inbox-ellipsis">⋯</span></Button></Menu.Trigger>
     <Menu.Portal><Menu.Content className="inbox-task-menu" align="end" sideOffset={5} collisionPadding={12} style={{minWidth:180}} onCloseAutoFocus={event=>event.preventDefault()} onEscapeKeyDown={()=>trigger.current?.focus()}>
       {(task.state==='ready'||task.state==='in_progress')&&<>
         {!task.parentId&&(focus.includes(task.id)?<Menu.Item className="inbox-task-menu-item" onSelect={toggleFocus}>Remove from Top 3</Menu.Item>:focus.length<3&&<Menu.Item className="inbox-task-menu-item" onSelect={toggleFocus}>Add to Top 3</Menu.Item>)}

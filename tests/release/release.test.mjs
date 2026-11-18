@@ -54,3 +54,15 @@ test('failed package build leaves the prior marketplace intact and restores sour
  assert.equal(digest(path.join(f.root,'stable')),before);
  for(const name of products) assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,'plugins',name,'plugin.json'))).version,'0.2.0');
 });
+
+test('Sauron portable packages retain the product rationale linked from architecture',t=>{
+ const f=fixture(t),docs=path.join(f.root,'plugins/sauron/docs');
+ fs.mkdirSync(docs,{recursive:true});
+ fs.writeFileSync(path.join(docs,'architecture.md'),'# Architecture\n\n[Product rationale](product-decisions.md)\n');
+ fs.writeFileSync(path.join(docs,'product-decisions.md'),'# Recovery intentions\n\nPreserve intended changes and explain recovery.\n');
+ f.run('portable');
+ const packagedDocs=path.join(f.root,'portable/plugins/sauron/docs');
+ const architecture=fs.readFileSync(path.join(packagedDocs,'architecture.md'),'utf8');
+ const link=architecture.match(/\]\(([^)]+)\)/)[1];
+ assert.equal(fs.readFileSync(path.resolve(packagedDocs,link),'utf8'),fs.readFileSync(path.join(docs,'product-decisions.md'),'utf8'));
+});

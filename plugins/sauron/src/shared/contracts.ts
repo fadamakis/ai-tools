@@ -255,3 +255,5 @@ export const syntheticObservation = (version = 1): Observation => ({
   sourceState: 'needs_you', sourceUrl: 'https://example.invalid/attention/review-proof',
   lastCheckedAt: new Date().toISOString(),
 });
+
+export const listAttentionSchema=z.strictObject({checkSave:z.strictObject({expectedStoreId:z.string().uuid(),id:z.string().min(1).max(200),payload:z.unknown()}).optional()});

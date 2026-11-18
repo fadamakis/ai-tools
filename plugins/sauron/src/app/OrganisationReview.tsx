@@ -1,3 +1,7 @@
+import {diagnostics,correlation} from './diagnostics.js';
+import {useRecovery,type Run} from './useRecovery.js';
+import {reviewTriggerSchema,configureReviewSchema,acceptProposalSchema} from '../shared/review-contracts.js';
+import {z} from 'zod';
 import {useEffect,useState} from 'react';
 import {Button,Checkbox} from '@ai-tools/ui';
 import type {Client} from './client.js';
@@ -9,26 +13,34 @@ import {devBuildId} from '../shared/build-info.js';
 
 type Pending={tool:string;args:Record<string,unknown>;storeId:string};
 const pendingKey='sauron:review-pending:v1';
-const readPending=():Pending|null=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)??'null');}catch{return null;}};
-export function useOrganisationReview(view:Result|null,client:Client|null,run:(work:()=>Promise<Result>)=>Promise<Result|undefined>,apply:(view:Result)=>void){
-  const [pending,setPending]=useState<Pending|null>(readPending);
-  const remember=(value:Pending|null)=>{setPending(value);try{if(value)sessionStorage.setItem(pendingKey,JSON.stringify(value));else sessionStorage.removeItem(pendingKey);}catch{}};
-  const call=async(tool:string,args:Record<string,unknown>)=>{
-    if(!client||!view)return;remember({tool,args,storeId:view.storeId});
-    const saved=await run(()=>client.call(tool,args));if(saved)remember(null);return saved;
-  };
-  const busy=view?.organisationReview?.run?.status==='running';
+const rebaseSchema=z.strictObject({operationId:z.string().uuid(),expectedStoreId:z.string().uuid(),proposalId:z.string().uuid(),expectedProposalRevision:z.number().int().nonnegative()});
+const reviewSchemas={review_organisation:reviewTriggerSchema,configure_organisation_review:configureReviewSchema,accept_organisation_proposal:acceptProposalSchema,rebase_organisation_proposal:rebaseSchema};
+export function useOrganisationReview(view:Result|null,client:Client|null,run:Run,apply:(view:Result)=>void){
+  const recovery=useRecovery<Pending>({key:pendingKey,action:'review',view,client,run,
+    parse:value=>{const saved=value as Pending;const schema=reviewSchemas[saved.tool as keyof typeof reviewSchemas];if(!schema)throw Error('invalid');return {tool:saved.tool,storeId:z.string().uuid().parse(saved.storeId),args:schema.parse(saved.args)};},
+    store:value=>value.storeId,label:value=>value.tool==='configure_organisation_review'?'the daily review setting':value.tool==='accept_organisation_proposal'?'the selected task suggestions':value.tool==='rebase_organisation_proposal'?'the refreshed task suggestions':'the chat review',execute:(client,value)=>client.call(value.tool,value.args),
+    prepare:(value,latest)=>{
+      const state=latest.organisationReview;if(!state)return null;
+      if(value.tool==='accept_organisation_proposal'&&(!state.proposal||state.proposal.id!==value.args.proposalId||state.proposal.revision!==value.args.expectedProposalRevision||state.proposal.taskViewRevision!==latest.taskViewRevision))return null;
+      return {...value,args:{...value.args,...('operationId' in value.args?{operationId:operationId()}:{}),...('expectedRevision' in value.args?{expectedRevision:latest.taskViewRevision}:{}),...('expectedReviewRevision' in value.args?{expectedReviewRevision:state.revision}:{})}};
+    },
+    summary:value=>value.tool==='configure_organisation_review'?`Intended change: turn daily task review ${value.args.enabled?'on':'off'}.`:value.tool==='accept_organisation_proposal'?`Apply the selected suggestions: ${(value.args.changes as ProposalChange[]).map(change=>change.kind+': '+('title' in change?change.title:change.taskRef)).join('; ')}.`:'Run the previously requested task review action.'});
+  const pending=recovery.pending;
+  const call=(tool:string,args:Record<string,unknown>)=>view?recovery.submit({tool,args,storeId:view.storeId}):Promise.resolve(undefined);
+  const savedRun=view?.organisationReview?.run;
+  useEffect(()=>{if(!savedRun)return;const id=correlation('review-run:'+savedRun.id);if(savedRun.status==='failed'||savedRun.status==='partial')diagnostics.record('review_run','failed',id,'unknown','unconfirmed');else if(savedRun.status==='completed')diagnostics.record('review_run','saved',id,'unknown','saved');},[savedRun?.id,savedRun?.status]);
+  const busy=savedRun?.status==='running';
   useEffect(()=>{
     if(!busy||!client)return;let active=true,loading=false;
     const timer=window.setInterval(async()=>{if(loading)return;loading=true;try{const saved=await client.call('list_attention');if(active)apply(saved);}catch{}finally{loading=false;}},1500);
     return()=>{active=false;window.clearInterval(timer);};
   },[busy,client]);
-  return {pending,busy,call,cancel:()=>remember(null),retry:()=>pending&&view?.storeId===pending.storeId?call(pending.tool,pending.args):undefined};
+  return {pending,busy,call,recovery,cancel:recovery.dismiss,retry:recovery.retry};
 }
 export function OrganisationReview({vm}:{vm:SauronController}){
   const state=vm.view?.organisationReview,review=vm.review;
   if(!state)return null;
-  const disabled=vm.busy||!!vm.pending||!!vm.organisation.pending||!!review.pending||review.busy;
+  const disabled=vm.actionLocked||!!vm.organisation.pending||!!review.pending||review.busy;
   const origin=state.proposal?.status==='pending'?(state.proposal.origin??state.run?.origin):state.run?.origin;
   const liveDev=!!devBuildId&&origin==='local_history'&&(state.run?.status!=='completed'||state.proposal?.status==='pending');
   const reviewDisabled=disabled||liveDev;
@@ -41,9 +53,9 @@ export function OrganisationReview({vm}:{vm:SauronController}){
     <p>{devBuildId?'Daily review is disabled in Sauron Dev.':`Daily review: ${state.enabled?'on at 07:00 Europe/Berlin':'off'}.`} Local Codex chats only. Suggestions wait here for your review.</p>
     <Button color="secondary" size="sm" variant="outline" disabled={!!devBuildId||disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
     {state.run&&<p role="status">{review.busy?'Review running. Progress is saved.':state.run.status==='partial'?'Review has incomplete coverage. Resume to retry missing reads.':state.run.status==='failed'?'Review interrupted. Resume from saved progress.':'Review complete.'}</p>}
-    {!!state.run?.errors.length&&<ul>{state.run.errors.map((error,i)=><li key={i}>{error}</li>)}</ul>}
+    {!!state.run?.errors.length&&<><p role="alert">Some chats could not be reviewed. Existing tasks are unchanged by these suggestions. Run the review again to continue.</p><details><summary>Review details</summary><ul>{state.run.errors.map((error,i)=><li key={i}>{error}</li>)}</ul></details></>}
     {state.proposal?.status==='pending'&&!review.busy&&<ProposalEditor key={state.proposal.id} proposal={state.proposal} vm={vm}/>}
-    {review.pending&&<div role="status"><p>A review action needs checking. Retrying uses its original request.</p><Button color="secondary" size="sm" disabled={vm.busy} onClick={()=>void review.retry()}>Retry review action</Button><Button color="secondary" size="sm" variant="ghost" onClick={review.cancel}>Cancel retry</Button></div>}
+
   </details>;
 }
 function ProposalEditor({proposal,vm}:{proposal:ReviewProposal;vm:SauronController}){
@@ -54,7 +66,7 @@ function ProposalEditor({proposal,vm}:{proposal:ReviewProposal;vm:SauronControll
   const selected=new Set(draft.selected),stale=draft.revision!==proposal.revision||proposal.taskViewRevision!==vm.view?.taskViewRevision;
   const references=new Set([...(vm.view?.items??[]).map(task=>task.id),...draft.changes.filter(change=>selected.has(change.key)&&(change.kind==='create'||change.kind==='track')).map(change=>change.key)]);
   const dependency=draft.changes.filter(change=>selected.has(change.key)).some(change=>('parentRef' in change&&change.parentRef&&!references.has(change.parentRef))||('taskRef' in change&&!references.has(change.taskRef)));
-  const disabled=vm.busy||!!vm.review.pending||!!vm.pending||!!vm.organisation.pending;
+  const disabled=vm.actionLocked;
   const edit=(key:string,patch:Record<string,unknown>)=>setDraft(old=>({...old,changes:old.changes.map(change=>change.key===key?{...change,...patch} as ProposalChange:change)}));
   const name=(ref:string)=>{const change=draft.changes.find(change=>change.key===ref);return (vm.view?.items??[]).find(task=>task.id===ref)?.title??(change&&'title' in change?change.title:ref);};
   const accept=()=>void vm.review.call('accept_organisation_proposal',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedRevision:vm.view!.taskViewRevision,proposalId:proposal.id,expectedProposalRevision:proposal.revision,changes:draft.changes.filter(change=>selected.has(change.key))});

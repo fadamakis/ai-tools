@@ -55,8 +55,8 @@ test('source explanations appear on hover and keyboard focus without changing me
 test('save failures retain the confirmed value and retry without closing the dropdown',async({page,request})=>{
  let fail=true;await page.route('**/api/tool',async route=>{if(route.request().postDataJSON().name==='configure_attention_sources'&&fail){fail=false;await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'Fixture save failure'})});}else await route.continue();});
  await page.goto(origin);await page.getByRole('button',{name:'Refresh',exact:true}).click();const github=page.getByRole('menuitemcheckbox',{name:'GitHub',exact:true});await github.click();
- await expect(page.getByRole('alert')).toContainText('Fixture save failure');await expect(github).toBeChecked();
- await page.getByRole('button',{name:'Retry source setting'}).click();await expect(github).not.toBeChecked();await expect(page.getByRole('alert')).toHaveCount(0);expect((await call(request,'list_attention')).sourcePreferences?.revision).toBe(1);
+ await expect(page.getByRole('alert')).toContainText('Couldn’t confirm the source setting');await expect(github).toBeChecked();
+ await page.getByRole('button',{name:'Retry save'}).click();await expect(github).not.toBeChecked();await expect(page.getByRole('alert')).toHaveCount(0);expect((await call(request,'list_attention')).sourcePreferences?.revision).toBe(1);
 });
 test('all-off state pauses updates without hiding tasks or creating a new scan',async({page,request})=>{
  const before=await call(request,'list_attention');for(const provider of liveProviders){const view=await call(request,'list_attention');await call(request,'configure_attention_sources',{expectedStoreId:view.storeId,operationId:randomUUID(),expectedRevision:view.sourcePreferences!.revision,provider,enabled:false});}

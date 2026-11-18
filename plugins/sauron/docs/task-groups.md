@@ -198,3 +198,13 @@ Current capability and compatibility references:
 
 Implementation covers local Codex history only. Remote hosts and ChatGPT history are outside current discovery coverage.
 Installation and opening Sauron do not enable reviews or schedules.
+
+## Error recovery requirements
+
+- **ER-01/ER-02:** Saved outcomes require a response or matching receipt. Only confirmed rejection permits a new reviewed request.
+- **ER-03/ER-04:** Local diagnostics are bounded and content-free; active failures outlive history eviction. Storage failure never blocks task actions.
+- **ER-05:** Requests belonging to another store are explained and dismissible, and cannot be submitted to the current store.
+- **ER-06:** Conflicts preserve intent and require explicit review before reapplication.
+- **ER-07:** Lost responses recover through original operation receipts without duplicate mutations.
+- **ER-08:** Malformed pending data is dismissible. Unavailable session storage does not invent failed saves.
+- **ER-09:** Diagnostics offer a manual-copy fallback when clipboard access fails and fit narrow panels.

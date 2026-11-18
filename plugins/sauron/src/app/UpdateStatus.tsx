@@ -1,5 +1,6 @@
 import {defaultSourcePreferences,enabledSources,selectionMatches} from '../shared/contracts.js';
-import React from 'react';
+import React,{useEffect} from 'react';
+import {diagnostics,correlation} from './diagnostics.js';
 import type { Result } from '../shared/contracts.js';
 import { UpdatedTime } from './UpdatedTime.js';
 
@@ -21,6 +22,7 @@ export function UpdateStatus({view}:{view:Result}) {
   const lastUpdate=automatic?syncMatches?sync?.lastSuccessAt:null:scanMatches&&scan?.status==='completed'?scan.finishedAt:syncMatches?sync?.lastSuccessAt:null;
   const running=scan?.status==='running'||sync?.status==='running';
   const stale=!paused&&!selectionChanged&&automatic&&coordination.freshness.status==='stale';
+  useEffect(()=>{for(const [kind,run] of [['manual',scan],['automatic',sync]] as const){if(!run)continue;const action=kind==='manual'?'source_check':'source_sync';if(run.status==='failed'||run.status==='partial')diagnostics.record(action,'failed',correlation(kind+':'+run.id),'unknown','unconfirmed');else if(run.status==='completed')diagnostics.record(action,'saved',correlation(kind+':'+run.id),'unknown','saved');}},[scan?.id,scan?.status,sync?.id,sync?.status]);
   return <aside className="inbox-update" aria-label="Updates">
     <div className="inbox-update-summary">
       <span role="status">{paused?'Source updates paused':running?scan?.status==='running'?preferences.enabled.slack&&preferences.enabled.granola?'Checking Slack and Granola…':'Checking enabled manual sources…':'Checking your sources…'
@@ -52,7 +54,7 @@ export function UpdateStatus({view}:{view:Result}) {
     </div>
     {!paused&&!selectionChanged&&local&&view.local?.blocked&&<p role="status" className="inbox-update-warning">{view.local.reason||'Local update is waiting. Saved tasks are still available.'}</p>}
     {stale&&!running&&!syncWarning&&<p className="inbox-update-warning">Some updates may be missing. {coordination.freshness.businessHoursActive?'Your automatic update is overdue.':'Outside automatic update hours.'}</p>}
-    {syncWarning&&<p role="alert" className="inbox-update-warning">{sync.status==='partial'?'Automatic update incomplete.':'Automatic update failed.'} {sync.error} Your saved tasks are still available. Check Update details for source coverage.</p>}
-    {manualWarning&&<p role="alert" className="inbox-update-warning">Manual check: {scan.error||'Some sources were not checked.'} Use Refresh to try again.</p>}
+    {syncWarning&&<p role="alert" className="inbox-update-warning">{sync.status==='partial'?'Automatic update incomplete.':'Automatic update failed.'} Your saved tasks are still available. Check Update details for source coverage. Refresh checks Slack and meetings; other sources require the automatic coordinator or a chat update.</p>}
+    {manualWarning&&<p role="alert" className="inbox-update-warning">Manual check: {scan.status==='partial'?'Some enabled sources were not checked.':'Enabled sources could not be checked.'} Earlier tasks remain saved. Use Refresh to try again.</p>}
   </aside>;
 }

@@ -1,3 +1,4 @@
+import {serverErrorDetail} from './errors.js';
 import { dataPath } from './data-path.mjs';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -29,7 +30,7 @@ const server=createServer(async(req,res)=>{
     for await(const chunk of req) {body+=chunk; if(body.length>32_768) throw Error('Request too large');}
     const {name, arguments:args}=JSON.parse(body);
     res.end(JSON.stringify(invoke(store,name,args)));
-  } catch(error) {res.writeHead(400).end(JSON.stringify({error:error instanceof Error? error.message:'Request failed'}));}
+  } catch(error) {res.writeHead(400).end(JSON.stringify({error:error instanceof Error? error.message:'Request failed',errorDetail:serverErrorDetail(error)}));}
 });
 server.listen(port,'127.0.0.1',()=>console.error(`Sauron preview: ${origin}`));
 function close(){server.close(()=>{store.close();process.exit(0);});}
