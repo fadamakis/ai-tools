@@ -32,6 +32,26 @@ test('source toggles persist, preserve tasks and task filters, and support keybo
  await expect(page.getByRole('heading',{name:'Fixture: review a Slack reply',exact:true})).toBeVisible();
  expect((await call(request,'list_attention')).sourcePreferences?.enabled.github).toBe(false);
 });
+test('source explanations appear on hover and keyboard focus without changing menu actions',async({page})=>{
+ await page.goto(origin);await page.getByRole('button',{name:'Refresh',exact:true}).click();
+ const refresh=page.getByRole('menuitem',{name:'Refresh now',exact:true});
+ await refresh.hover();await expect(page.getByRole('tooltip')).toHaveText('Checks enabled Slack and Meetings sources now. New actions appear in Inbox for review.');
+ await expect(refresh).toHaveAttribute('aria-description','Checks enabled Slack and Meetings sources now. New actions appear in Inbox for review.');
+ for(const [label,copy] of [
+  ['Slack','Finds requests to you, unanswered DMs, and commitments you made in Slack.'],
+  ['Jira','Finds issues with a current action personally assigned to you. Checked by automatic or chat updates.'],
+  ['GitHub','Finds issues and pull requests where you owe a review or action. Checked by automatic or chat updates.'],
+  ['Calendar','Finds explicit preparation or follow-up for upcoming events. Checked by automatic or chat updates.'],
+  ['Meetings (Granola)','Finds actions assigned to you or commitments you made in recent work meeting notes.'],
+ ]){
+  const item=page.getByRole('menuitemcheckbox',{name:label,exact:true});await item.hover();await expect(page.getByRole('tooltip')).toHaveText(copy);await expect(item).toHaveAttribute('aria-description',copy);
+ }
+ const github=page.getByRole('menuitemcheckbox',{name:'GitHub',exact:true});
+ await github.hover();await expect(page.getByRole('tooltip')).toHaveText('Finds issues and pull requests where you owe a review or action. Checked by automatic or chat updates.');
+ await page.mouse.move(0,0);await github.focus();await expect(page.getByRole('tooltip')).toHaveText('Finds issues and pull requests where you owe a review or action. Checked by automatic or chat updates.');
+ await page.keyboard.press('Space');await expect(github).not.toBeChecked();
+ await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeFocused();
+});
 test('save failures retain the confirmed value and retry without closing the dropdown',async({page,request})=>{
  let fail=true;await page.route('**/api/tool',async route=>{if(route.request().postDataJSON().name==='configure_attention_sources'&&fail){fail=false;await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'Fixture save failure'})});}else await route.continue();});
  await page.goto(origin);await page.getByRole('button',{name:'Refresh',exact:true}).click();const github=page.getByRole('menuitemcheckbox',{name:'GitHub',exact:true});await github.click();
@@ -50,5 +70,5 @@ test('active runs keep the dropdown available and lock source changes',async({pa
 for(const theme of ['light','dark'] as const)test(`source menu fits narrow ${theme} panels`,async({page},testInfo)=>{
  await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width:375,height:850});await page.goto(origin);await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.getByRole('menuitemcheckbox',{name:'Meetings (Granola)',exact:true})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath(`sources-${theme}-375.png`),fullPage:true});
- for(const width of [320,1100]){await page.setViewportSize({width,height:850});await expect.poll(()=>page.locator('html').evaluate(element=>element.scrollWidth<=window.innerWidth)).toBe(true);await expect(page.getByRole('menu')).toBeVisible();await page.screenshot({path:testInfo.outputPath(`sources-${theme}-${width}.png`),fullPage:true});}
+ for(const width of [320,1100]){await page.setViewportSize({width,height:850});await expect.poll(()=>page.locator('html').evaluate(element=>element.scrollWidth<=window.innerWidth)).toBe(true);await expect(page.getByRole('menu')).toBeVisible();await page.getByRole('menuitemcheckbox',{name:'Meetings (Granola)',exact:true}).hover();const tooltip=page.getByRole('tooltip');await expect(tooltip).toBeVisible();const box=await tooltip.boundingBox();expect(box).not.toBeNull();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(width);await page.screenshot({path:testInfo.outputPath(`sources-${theme}-${width}.png`),fullPage:true});}
 });
