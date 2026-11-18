@@ -1,3 +1,4 @@
+import {errorDetail,failureMessage} from '../shared/errors.js';
 import React, { useId, useRef, useState } from 'react';
 import { Button,Input } from '@ai-tools/ui';
 import type { Task,DiscussionLink,Result } from '../shared/contracts.js';
@@ -11,7 +12,7 @@ function ChatLinkForm({taskId,storeId,client,disabled,onSaved}:{taskId:string;st
     if(gate.current||disabled||!url.trim())return;
     gate.current=true;setSaving(true);setError('');
     try{onSaved(await client.call('save_attention_discussion_link',{expectedStoreId:storeId,taskId,url}));}
-    catch(e){setError(e instanceof Error?e.message:'The chat link could not be saved.');}
+    catch(e){setError(failureMessage('the chat link',errorDetail(e)));}
     finally{gate.current=false;setSaving(false);}
   }
   // Native form submission is disabled by the app sandbox. Explicit click and

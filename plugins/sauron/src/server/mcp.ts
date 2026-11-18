@@ -1,3 +1,5 @@
+import {listAttentionSchema} from '../shared/contracts.js';
+import {serverErrorDetail} from './errors.js';
 import {reviewTriggerSchema,configureReviewSchema,acceptProposalSchema} from '../shared/review-contracts.js';
 import {organiseTaskToolSchema} from '../shared/organisation.js';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
@@ -38,7 +40,7 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
       inputSchema:z.strictObject({}), annotations:readOnly,
       _meta:{ui:{resourceUri:uiUri, visibility:['app']}, 'openai/ui':{entrypoints:[{type:'global'}]}}},
     {name:'list_attention', title:'Read Sauron', description:'Read saved tasks, manual scan status, and dot sync status including lastSuccessAt. Read before a dot sync and compare storeId.',
-      inputSchema:z.strictObject({}), annotations:readOnly, _meta:{ui:{visibility:['app','model']}}},
+      inputSchema:listAttentionSchema, annotations:readOnly, _meta:{ui:{visibility:['app','model']}}},
     {name:'link_attention_discussion',title:'Link this chat to a Sauron item',description:'Save a durable link from a Sauron item to the CURRENT conversation, using per-call host identity metadata. Use at the start of a discussion opened from Sauron. Does not change task decisions, read sources or send messages. Never guess a conversation ID; if this host omits identity, ask the user to paste their chat link through Link a chat on the item.',
       inputSchema:linkDiscussionSchema,annotations:{...readOnly,readOnlyHint:false,idempotentHint:true},_meta:{ui:{visibility:['app','model']}}},
     {name:'save_attention_discussion_link',title:'Save a pasted conversation link',description:'Save the ChatGPT or Codex conversation URL the user pasted on this Sauron item. Changes only its saved discussion links.',
@@ -96,7 +98,7 @@ export function createServer(store: SauronStore, htmlPath: string, options:{invo
         const result={...response,...(options.buildId?{dev:{buildId:options.buildId,fixtures:true}}:{})};
         return {content:[{type:'text' as const,text:JSON.stringify(result)}], structuredContent:result};
       } catch(error) {
-        return {isError:true, content:[{type:'text' as const,text:error instanceof Error ? error.message : 'Save failed'}]};
+        return {isError:true, structuredContent:{error:serverErrorDetail(error)}, content:[{type:'text' as const,text:error instanceof Error ? error.message : 'Save failed'}]};
       }
     });
   }

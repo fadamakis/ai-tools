@@ -55,7 +55,7 @@ test('unconfirmed delivery keeps the copyable draft and blocks an automatic or r
   await stop();await start(true);await page.goto(origin);await page.getByRole('button',{name:/^Discuss the example/}).click();await page.getByRole('button',{name:'Prepare reply'}).click();
   await expect(page.getByLabel('Reply draft',{exact:true})).toHaveValue('Thanks! Which example should I look at?');
   await page.getByRole('button',{name:'Send to Slack'}).click();
-  await expect(page.getByRole('alert')).toContainText('Delivery could not be confirmed');
+  await expect(page.getByRole('alert')).toContainText('couldn’t confirm whether the reply was sent');
   await expect(page.getByRole('button',{name:'Send to Slack'})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Copy reply'})).toBeEnabled();
   await expect(page.getByRole('button',{name:'Check Slack discussion'})).toBeVisible();

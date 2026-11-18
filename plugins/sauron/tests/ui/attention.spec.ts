@@ -95,8 +95,8 @@ test('save lost before delivery remains retryable after reload',async({page,requ
   });
   await page.getByRole('button',{name:/^Complete /}).click();await expect(page.getByRole('alert')).toBeVisible();
   expect((await call(request,'list_attention')).items[0].state).toBe('ready');
-  await page.unroute('**/api/tool');await page.reload();await expect(page.getByText('Check an interrupted save')).toBeVisible();
-  await page.getByRole('button',{name:'Retry decision'}).click();
+  await page.unroute('**/api/tool');await page.reload();await expect(page.getByRole('alert',{name:'Save recovery'})).toBeVisible();
+  await page.getByRole('button',{name:'Retry save'}).click();
   await expect(page.getByRole('button',{name:/^History 1/})).toBeVisible();
 });
 test('committed save with lost response is reconciled on reload',async({page,request})=>{
@@ -107,7 +107,7 @@ test('committed save with lost response is reconciled on reload',async({page,req
   await page.getByRole('button',{name:/^Complete /}).click();await expect(page.getByRole('alert')).toBeVisible();
   expect((await call(request,'list_attention')).items[0].state).toBe('done');
   await page.unroute('**/api/tool');await page.reload();
-  await expect(page.getByText('Check an interrupted save')).toHaveCount(0);
+  await expect(page.getByRole('alert',{name:'Save recovery'})).toHaveCount(0);
   await expect(page.getByRole('button',{name:/^History 1/})).toBeVisible();
 });
 test('snooze survives replay; Waiting and source links render; layouts fit narrow and wide screens',async({page,request})=>{
@@ -169,11 +169,11 @@ for(const committed of [false,true])test(`interrupted personal creation ${commit
   await page.getByRole('button',{name:'Save task'}).click();await expect(page.getByRole('alert')).toBeVisible();
   expect((await call(request,'list_attention')).items).toHaveLength(committed?1:0);
   await page.unroute('**/api/tool');await page.reload();
-  if(!committed){await expect(page.getByRole('button',{name:'Retry task'})).toBeVisible();await page.getByRole('button',{name:'Retry task'}).click();}
+  if(!committed){await expect(page.getByRole('button',{name:'Retry save'})).toBeVisible();await page.getByRole('button',{name:'Retry save'}).click();}
   await expect(page.getByRole('radio',{name:/^Waiting 1/})).toBeVisible();
   await page.getByRole('radio',{name:/^Waiting 1/}).click();
   await expect(page.getByRole('heading',{name:'A recoverable personal task',exact:true})).toBeVisible();
-  await expect(page.getByText('Check an interrupted save')).toHaveCount(0);
+  await expect(page.getByRole('alert',{name:'Save recovery'})).toHaveCount(0);
   expect((await call(request,'list_attention')).items).toHaveLength(1);
   const db=new DatabaseSync(dbPath);try{expect(db.prepare("SELECT count(*) AS count FROM history WHERE kind='personal'").get()?.count).toBe(1);}finally{db.close();}
 });
@@ -261,11 +261,11 @@ test('completion can be reopened deliberately, and snoozed tasks can be brought 
 test('failed load has an actionable retry and never claims an empty list',async({page})=>{
   await page.route('**/api/tool',route=>route.abort());
   await page.goto(origin);
-  await expect(page.getByRole('alert')).toContainText('Your list could not be loaded.');
+  await expect(page.getByRole('alert')).toContainText('Couldn’t load the latest tasks.');
   await expect(page.getByRole('heading',{name:'Start with one task',exact:true})).toHaveCount(0);
   await expect(page.getByText('Loading your saved tasks…')).toHaveCount(0);
   await page.unroute('**/api/tool');
-  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.getByRole('button',{name:'Reload tasks',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Start with one task',exact:true})).toBeVisible();
 });
 test('long task names fit compact history on mobile in light and dark themes',async({page,request})=>{
@@ -306,7 +306,7 @@ test('a runtime failure reenables Refresh and preserves the saved list',async({p
   await open(page);await seed(page);
   writeFileSync(join(dir,'runtime.cjs'),'#!/usr/bin/env node\nprocess.exit(1);',{mode:0o700});
   await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
-  await expect(page.getByRole('alert')).toContainText('The source check did not finish');
+  await expect(page.getByRole('alert')).toContainText('Enabled sources could not be checked');
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   await expect(page.getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
   expect((await call(request,'list_attention')).scan?.status).toBe('failed');
@@ -376,7 +376,7 @@ test('dot sync has distinct partial/error and last-success state, real provider 
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   const next={runId:randomUUID(),expectedStoreId:initial.storeId};await call(request,'sync_attention',{request:{...next,phase:'start'}});
   await call(request,'sync_attention',{request:{...next,phase:'finish',checkedAt:new Date().toISOString(),sources:{...sources,calendar:{status:'failed',detail:'Calendar unavailable'}},items:[]}});
-  await page.reload();await expect(page.getByRole('alert')).toContainText('Some sources were not checked');
+  await page.reload();await expect(page.getByRole('alert')).toContainText('Automatic update incomplete.');
   await expect(page.locator('.inbox-update [role=status]')).toContainText('Last full update');
   await page.getByText('Update details',{exact:true}).click();
   await expect(page.getByText('Calendar (failed): Calendar unavailable',{exact:true})).toBeVisible();

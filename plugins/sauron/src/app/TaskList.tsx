@@ -19,12 +19,12 @@ export function TaskList({vm,active,detailId,rowRefs,select}:Props){
       const priorGroup=prior?(prior.focusOrder?'Top 3':prior.state==='in_progress'?'In progress':'Ready'):null;
       return <React.Fragment key={task.id}>
         {group&&group!==priorGroup&&<h3 className="inbox-task-group">{group}</h3>}
-        <article className={`inbox-task ${task.id===active?.id?'is-selected':''} ${context?'is-context':''}`} style={{'--task-depth':Math.min(depth,5)} as React.CSSProperties} draggable={!vm.busy&&!vm.pending&&!vm.organisation.pending}
+        <article className={`inbox-task ${task.id===active?.id?'is-selected':''} ${context?'is-context':''}`} style={{'--task-depth':Math.min(depth,5)} as React.CSSProperties} draggable={!vm.actionLocked}
           onDragStart={event=>event.dataTransfer.setData('application/x-sauron-task',task.id)} onDragOver={event=>event.preventDefault()}
-          onDrop={event=>{event.preventDefault();const dragged=vm.organisation.tree.byId.get(event.dataTransfer.getData('application/x-sauron-task'));if(dragged&&dragged.id!==task.id)vm.organisation.requestMove(dragged,task.id);}}>
+          onDrop={event=>{event.preventDefault();if(vm.actionLocked)return;const dragged=vm.organisation.tree.byId.get(event.dataTransfer.getData('application/x-sauron-task'));if(dragged&&dragged.id!==task.id)vm.organisation.requestMove(dragged,task.id);}}>
           <div className="inbox-row">
             {!!children.length&&<Button className="inbox-expand" color="secondary" size="sm" variant="ghost" uniform aria-label={`${expanded?'Collapse':'Expand'} ${task.title}`} aria-expanded={expanded} onClick={()=>vm.organisation.toggle(task.id)}><Icon name={expanded?'chevron':'forward'}/></Button>}
-            {!historical&&task.state!=='inbox'&&!context&&<Button className="inbox-complete" color="secondary" variant="outline" size="sm" uniform aria-label={`Complete ${task.title}`} title="Complete task" loading={completing} aria-busy={completing} disabled={vm.busy||!!vm.pending||!!vm.organisation.pending} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/></Button>}
+            {!historical&&task.state!=='inbox'&&!context&&<Button className="inbox-complete" color="secondary" variant="outline" size="sm" uniform aria-label={`Complete ${task.title}`} title="Complete task" loading={completing} aria-busy={completing} disabled={vm.actionLocked||!!vm.organisation.pending} onClick={()=>vm.decide(task,'complete')}><Icon name="check"/></Button>}
             <button ref={node=>{if(node)rowRefs.current.set(task.id,node);else rowRefs.current.delete(task.id);}} className="inbox-task-open" type="button" aria-current={task.id===active?.id?'true':undefined} aria-controls={detailId} onClick={()=>select(task)} onKeyDown={event=>{
               if(event.key==='ArrowRight'&&children.length){event.preventDefault();if(!expanded)vm.organisation.toggle(task.id);return;}
               if(event.key==='ArrowLeft'&&expanded&&children.length){event.preventDefault();vm.organisation.toggle(task.id);return;}

@@ -28,7 +28,7 @@ function TaskPlanEditor({task,vm}:{task:Task;vm:SauronController}){
   },[task,baseline,changed.length]);
   const change=<K extends keyof typeof draft>(key:K,value:typeof draft[K])=>setDraft(previous=>({...previous,[key]:value}));
   const {title,nextAction,area,workflowState,dueDate,reviewDate}=draft;
-  const disabled=vm.busy||!!vm.pending;
+  const disabled=vm.actionLocked;
   const submit=async()=>{
     if(disabled||conflict)return;
     const saved=await vm.plan(baseline.task,{...draft,dueDate:dueDate||null,reviewDate:reviewDate||null});
@@ -57,9 +57,10 @@ function TaskPlanEditor({task,vm}:{task:Task;vm:SauronController}){
 }
 function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:SauronController;position:number;total:number;back:()=>void;previous?:()=>void;next?:()=>void}){
   const titleId=useId();const historical=task.state==='done'||task.state==='dismissed';
-  const disabled=vm.busy||!!vm.pending;
+  const disabled=vm.actionLocked;
   const completing=vm.busy&&vm.pending?.kind==='decision'&&vm.pending.input.id===task.id&&vm.pending.input.action==='complete';
-  const source=()=>{if(task.sourceUrl)void vm.client?.open(task.sourceUrl).catch(()=>vm.setError('The source link could not be opened. Try again from the task.'));};
+  const [sourceError,setSourceError]=useState('');
+  const source=()=>{if(task.sourceUrl)void vm.client?.open(task.sourceUrl).then(()=>setSourceError('')).catch(()=>setSourceError('Couldn’t open the source link. Use the source button to try again.'));};
   return <section className="inbox-task-detail" aria-labelledby={titleId}>
     <div className="inbox-reader-tools">
       <Button className="inbox-back" color="secondary" variant="ghost" size="sm" onClick={back}><Icon name="back"/> Back to tasks</Button>
@@ -69,6 +70,7 @@ function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:Sa
       <div className="inbox-reader-paging"><span>{position} of {total}</span><Button uniform size="sm" color="secondary" variant="ghost" aria-label="Previous task" disabled={!previous} onClick={previous}><Icon name="back"/></Button><Button uniform size="sm" color="secondary" variant="ghost" aria-label="Next task" disabled={!next} onClick={next}><Icon name="forward"/></Button></div>
     </div>
     <div className="inbox-reader-content">
+      {sourceError&&<p role="alert">{sourceError}</p>}
       <div className="inbox-detail-meta"><SourceBadge task={task}/><span className={`inbox-state inbox-state-${task.state}`}>{labels[task.state]}</span><span>{areaLabels[task.area??'unassigned']}</span></div>
       <h2 id={titleId} tabIndex={-1} aria-label={`Task details: ${task.title}`}>{task.title}</h2>
       {historical&&<p className="inbox-detail-date">{task.state==='dismissed'?'Dismissed':task.userDecision==='complete'?'Completed':'Resolved at source'}{task.decidedAt&&<> · <time dateTime={task.decidedAt}>{date(task.decidedAt)}</time></>}</p>}
