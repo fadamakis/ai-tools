@@ -61,6 +61,8 @@ Remote Codex hosts and ChatGPT history are explicitly outside current discovery 
 
 ## Error recovery
 
+The [product decisions](product-decisions.md) explain the intentions behind these recovery mechanisms.
+
 The clients share approved error categories and preserve structured server errors alongside legacy text responses.
 Only input validation or a confirmed transaction rollback establishes rejection; transport and unexpected failures remain unconfirmed.
 `list_attention` accepts an optional `checkSave` containing the expected store, receipt ID and original payload.
