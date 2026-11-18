@@ -58,3 +58,18 @@ The store decides whether 07:00 Europe/Berlin is due, including catch-up and day
 The scheduler uses stable runtime copies beside the database, an expected store ID and a leased worker.
 Incomplete reviews retain their watermark and checkpoints, with a 15-minute automatic retry delay.
 Remote Codex hosts and ChatGPT history are explicitly outside current discovery coverage.
+
+## Error recovery
+
+The [product decisions](product-decisions.md) explain the intentions behind these recovery mechanisms.
+
+The clients share approved error categories and preserve structured server errors alongside legacy text responses.
+Only input validation or a confirmed transaction rollback establishes rejection; transport and unexpected failures remain unconfirmed.
+`list_attention` accepts an optional `checkSave` containing the expected store, receipt ID and original payload.
+It returns a receipt only when both identity and payload match a committed operation. Matching task values are not confirmation.
+
+Recovery retains original requests, including their operation IDs. Conflicts require a fresh read and explicit review before reapplication.
+Requests from another store cannot be replayed. Older requests without store identity can be confirmed by receipt but otherwise require dismissal.
+Session-local diagnostics use an allowlist and exclude task content, request payloads and raw exception text.
+They retain 100 historical events separately from active failures and may disappear on panel closure or Codex restart.
+No database schema or saved-request migration is required.

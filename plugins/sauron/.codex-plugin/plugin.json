@@ -1,6 +1,6 @@
 {
   "name": "sauron",
-  "version": "0.6.25",
+  "version": "0.6.26",
   "description": "Source-backed dot updates, Slack and Granola checks, replies, and personal tasks.",
   "author": {
     "name": "Fotis"

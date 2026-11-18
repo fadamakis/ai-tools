@@ -5,22 +5,6 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/server/data-path.mjs
-import os from "node:os";
-import path from "node:path";
-function dataPath(env = process.env, home = os.homedir(), platform = process.platform) {
-  if (env.ATTENTION_DB) return path.resolve(env.ATTENTION_DB);
-  return path.join(home, platform === "darwin" ? "Library/Application Support/Sauron" : ".local/share/sauron", "attention.sqlite");
-}
-
-// src/server/preview.ts
-import { createServer } from "node:http";
-import { readFileSync as readFileSync2 } from "node:fs";
-import { fileURLToPath as fileURLToPath6 } from "node:url";
-
-// src/server/review-store.ts
-import { createHash } from "node:crypto";
-
 // ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
@@ -19738,6 +19722,9 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
+// src/server/review-store.ts
+import { createHash } from "node:crypto";
+
 // src/shared/review-contracts.ts
 var proposalChangeSchema = external_exports.discriminatedUnion("kind", [
   external_exports.strictObject({ kind: external_exports.literal("create"), key: external_exports.string().min(1).max(100), title: external_exports.string().trim().min(1).max(160), reason: external_exports.string().min(1).max(600), evidenceIds: external_exports.array(external_exports.string()).max(30) }),
@@ -19860,8 +19847,8 @@ import { statSync, realpathSync } from "node:fs";
 
 // src/server/codex-cli.mjs
 import fs from "node:fs";
-import os2 from "node:os";
-import path2 from "node:path";
+import os from "node:os";
+import path from "node:path";
 var executable = (filename) => {
   try {
     fs.accessSync(filename, fs.constants.X_OK);
@@ -19873,15 +19860,15 @@ var executable = (filename) => {
 function resolveCodexCli({
   env = process.env,
   platform = process.platform,
-  home = os2.homedir(),
-  applicationDirectories = ["/Applications", path2.join(home, "Applications")]
+  home = os.homedir(),
+  applicationDirectories = ["/Applications", path.join(home, "Applications")]
 } = {}) {
-  const fromPath = (name) => (env.PATH || "").split(path2.delimiter).filter(Boolean).map((directory) => executable(path2.join(directory, name))).find(Boolean);
+  const fromPath = (name) => (env.PATH || "").split(path.delimiter).filter(Boolean).map((directory) => executable(path.join(directory, name))).find(Boolean);
   if (env.CODEX_CLI_PATH) return executable(env.CODEX_CLI_PATH) || !/[/\\]/.test(env.CODEX_CLI_PATH) && fromPath(env.CODEX_CLI_PATH) || env.CODEX_CLI_PATH;
   if (platform === "darwin") {
     for (const directory of applicationDirectories) {
       for (const relative of ["ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex", "Codex.app/Contents/Resources/codex"]) {
-        const bundled = executable(path2.join(directory, relative));
+        const bundled = executable(path.join(directory, relative));
         if (bundled) return bundled;
       }
     }
@@ -20091,6 +20078,7 @@ var saveDiscussionSchema = linkDiscussionSchema.extend({ url: external_exports.s
     return external_exports.NEVER;
   }
 }) });
+var listAttentionSchema = external_exports.strictObject({ checkSave: external_exports.strictObject({ expectedStoreId: external_exports.string().uuid(), id: external_exports.string().min(1).max(200), payload: external_exports.unknown() }).optional() });
 
 // src/server/local-policy.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -20421,6 +20409,7 @@ var StoreError = class extends Error {
     super(message);
     this.code = code;
   }
+  rejected = false;
 };
 var hash2 = (v) => createHash5("sha256").update(JSON.stringify(v)).digest("hex");
 var facts = ({ lastCheckedAt: _, ...rest }) => rest;
@@ -20619,6 +20608,12 @@ var SauronStore = class {
     if (!discussion) throw new StoreError("discussion_unconfirmed", "The saved chat link could not be read back. Reopen the item to check.");
     return { ...result, discussion };
   }
+  checkSave(check2) {
+    if (check2.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+    const receipt = this.db.prepare("SELECT hash FROM receipts WHERE id=?").get(check2.id);
+    const view = this.view();
+    return receipt && receipt.hash === hash2(check2.payload) ? { ...view, receipt: { id: check2.id, duplicate: true } } : view;
+  }
   transaction(id, payload, change) {
     const owned = !this.inTransaction;
     if (owned) this.execute("BEGIN IMMEDIATE");
@@ -20633,7 +20628,10 @@ var SauronStore = class {
       if (owned) this.execute("COMMIT");
       return { ...view, receipt: { id, duplicate: !!receipt } };
     } catch (error62) {
-      if (owned) this.execute("ROLLBACK");
+      if (owned) {
+        this.execute("ROLLBACK");
+        if (error62 instanceof StoreError) error62.rejected = true;
+      }
       throw error62;
     }
   }
@@ -21522,6 +21520,37 @@ var SauronStore = class {
   }
 };
 
+// src/shared/errors.ts
+var errorCategories = ["conflict", "wrong_store", "not_found", "invalid", "unavailable", "connection", "build_mismatch", "unknown"];
+function approvedCategory(code) {
+  if (["conflict", "sources_changed", "id_reuse", "terminal", "confirmation_required"].includes(String(code))) return "conflict";
+  if (code === "wrong_store") return "wrong_store";
+  if (code === "not_found") return "not_found";
+  if (["invalid", "invalid_parent", "invalid_snooze", "cycle", "self_parent"].includes(String(code))) return "invalid";
+  return errorCategories.includes(code) ? code : "unknown";
+}
+
+// src/server/errors.ts
+function serverErrorDetail(error62) {
+  return {
+    category: error62 instanceof ZodError ? "invalid" : error62 instanceof StoreError ? approvedCategory(error62.code) : "unknown",
+    outcome: error62 instanceof ZodError || error62 instanceof StoreError && error62.rejected ? "rejected" : "unconfirmed"
+  };
+}
+
+// src/server/data-path.mjs
+import os2 from "node:os";
+import path2 from "node:path";
+function dataPath(env = process.env, home = os2.homedir(), platform = process.platform) {
+  if (env.ATTENTION_DB) return path2.resolve(env.ATTENTION_DB);
+  return path2.join(home, platform === "darwin" ? "Library/Application Support/Sauron" : ".local/share/sauron", "attention.sqlite");
+}
+
+// src/server/preview.ts
+import { createServer } from "node:http";
+import { readFileSync as readFileSync2 } from "node:fs";
+import { fileURLToPath as fileURLToPath6 } from "node:url";
+
 // src/server/organisation-trigger.ts
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -21692,9 +21721,12 @@ function sendReply(store2, input2) {
 function invoke(store2, name, args, context) {
   switch (name) {
     case "open_attention":
-    case "list_attention":
       external_exports.strictObject({}).parse(args);
       return store2.view();
+    case "list_attention": {
+      const input2 = listAttentionSchema.parse(args);
+      return input2.checkSave ? store2.checkSave(input2.checkSave) : store2.view();
+    }
     case "link_attention_discussion": {
       const request = linkDiscussionSchema.parse(args);
       if (!context?.conversationUrl) throw new StoreError("conversation_context_missing", "This host did not provide the current chat identity. Copy this chat\u2019s link and use Link a chat on the Sauron item.");
@@ -21797,7 +21829,7 @@ var server = createServer(async (req, res) => {
     const { name, arguments: args } = JSON.parse(body);
     res.end(JSON.stringify(invoke(store, name, args)));
   } catch (error62) {
-    res.writeHead(400).end(JSON.stringify({ error: error62 instanceof Error ? error62.message : "Request failed" }));
+    res.writeHead(400).end(JSON.stringify({ error: error62 instanceof Error ? error62.message : "Request failed", errorDetail: serverErrorDetail(error62) }));
   }
 });
 server.listen(port, "127.0.0.1", () => console.error(`Sauron preview: ${origin}`));

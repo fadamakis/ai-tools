@@ -35082,6 +35082,7 @@ var saveDiscussionSchema = linkDiscussionSchema.extend({ url: external_exports.s
     return external_exports.NEVER;
   }
 }) });
+var listAttentionSchema = external_exports.strictObject({ checkSave: external_exports.strictObject({ expectedStoreId: external_exports.string().uuid(), id: external_exports.string().min(1).max(200), payload: external_exports.unknown() }).optional() });
 
 // src/server/local-policy.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -35412,6 +35413,7 @@ var StoreError = class extends Error {
     super(message);
     this.code = code;
   }
+  rejected = false;
 };
 var hash2 = (v) => createHash5("sha256").update(JSON.stringify(v)).digest("hex");
 var facts = ({ lastCheckedAt: _, ...rest }) => rest;
@@ -35610,6 +35612,12 @@ var SauronStore = class {
     if (!discussion) throw new StoreError("discussion_unconfirmed", "The saved chat link could not be read back. Reopen the item to check.");
     return { ...result, discussion };
   }
+  checkSave(check2) {
+    if (check2.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+    const receipt = this.db.prepare("SELECT hash FROM receipts WHERE id=?").get(check2.id);
+    const view = this.view();
+    return receipt && receipt.hash === hash2(check2.payload) ? { ...view, receipt: { id: check2.id, duplicate: true } } : view;
+  }
   transaction(id, payload, change) {
     const owned = !this.inTransaction;
     if (owned) this.execute("BEGIN IMMEDIATE");
@@ -35624,7 +35632,10 @@ var SauronStore = class {
       if (owned) this.execute("COMMIT");
       return { ...view, receipt: { id, duplicate: !!receipt } };
     } catch (error62) {
-      if (owned) this.execute("ROLLBACK");
+      if (owned) {
+        this.execute("ROLLBACK");
+        if (error62 instanceof StoreError) error62.rejected = true;
+      }
       throw error62;
     }
   }
@@ -36512,6 +36523,24 @@ var SauronStore = class {
     });
   }
 };
+
+// src/shared/errors.ts
+var errorCategories = ["conflict", "wrong_store", "not_found", "invalid", "unavailable", "connection", "build_mismatch", "unknown"];
+function approvedCategory(code) {
+  if (["conflict", "sources_changed", "id_reuse", "terminal", "confirmation_required"].includes(String(code))) return "conflict";
+  if (code === "wrong_store") return "wrong_store";
+  if (code === "not_found") return "not_found";
+  if (["invalid", "invalid_parent", "invalid_snooze", "cycle", "self_parent"].includes(String(code))) return "invalid";
+  return errorCategories.includes(code) ? code : "unknown";
+}
+
+// src/server/errors.ts
+function serverErrorDetail(error62) {
+  return {
+    category: error62 instanceof ZodError ? "invalid" : error62 instanceof StoreError ? approvedCategory(error62.code) : "unknown",
+    outcome: error62 instanceof ZodError || error62 instanceof StoreError && error62.rejected ? "rejected" : "unconfirmed"
+  };
+}
 
 // ../../node_modules/.pnpm/@modelcontextprotocol+server@2.3.1/node_modules/@modelcontextprotocol/server/dist/index.mjs
 var DEFAULT_MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
@@ -38207,9 +38236,12 @@ function sendReply(store2, input2) {
 function invoke(store2, name, args, context) {
   switch (name) {
     case "open_attention":
-    case "list_attention":
       external_exports.strictObject({}).parse(args);
       return store2.view();
+    case "list_attention": {
+      const input2 = listAttentionSchema.parse(args);
+      return input2.checkSave ? store2.checkSave(input2.checkSave) : store2.view();
+    }
     case "link_attention_discussion": {
       const request = linkDiscussionSchema.parse(args);
       if (!context?.conversationUrl) throw new StoreError("conversation_context_missing", "This host did not provide the current chat identity. Copy this chat\u2019s link and use Link a chat on the Sauron item.");
@@ -38348,7 +38380,7 @@ function createServer(store2, htmlPath, options = {}) {
       name: "list_attention",
       title: "Read Sauron",
       description: "Read saved tasks, manual scan status, and dot sync status including lastSuccessAt. Read before a dot sync and compare storeId.",
-      inputSchema: external_exports.strictObject({}),
+      inputSchema: listAttentionSchema,
       annotations: readOnly,
       _meta: { ui: { visibility: ["app", "model"] } }
     },
@@ -38527,7 +38559,7 @@ function createServer(store2, htmlPath, options = {}) {
         const result = { ...response, ...options.buildId ? { dev: { buildId: options.buildId, fixtures: true } } : {} };
         return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
       } catch (error62) {
-        return { isError: true, content: [{ type: "text", text: error62 instanceof Error ? error62.message : "Save failed" }] };
+        return { isError: true, structuredContent: { error: serverErrorDetail(error62) }, content: [{ type: "text", text: error62 instanceof Error ? error62.message : "Save failed" }] };
       }
     });
   }

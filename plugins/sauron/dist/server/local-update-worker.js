@@ -20077,6 +20077,7 @@ var saveDiscussionSchema = linkDiscussionSchema.extend({ url: external_exports.s
     return external_exports.NEVER;
   }
 }) });
+var listAttentionSchema = external_exports.strictObject({ checkSave: external_exports.strictObject({ expectedStoreId: external_exports.string().uuid(), id: external_exports.string().min(1).max(200), payload: external_exports.unknown() }).optional() });
 
 // src/server/local-policy.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -20556,6 +20557,7 @@ var StoreError = class extends Error {
     super(message);
     this.code = code;
   }
+  rejected = false;
 };
 var hash2 = (v) => createHash4("sha256").update(JSON.stringify(v)).digest("hex");
 var facts = ({ lastCheckedAt: _, ...rest }) => rest;
@@ -20754,6 +20756,12 @@ var SauronStore = class {
     if (!discussion) throw new StoreError("discussion_unconfirmed", "The saved chat link could not be read back. Reopen the item to check.");
     return { ...result, discussion };
   }
+  checkSave(check2) {
+    if (check2.expectedStoreId !== this.storeId) throw new StoreError("wrong_store", "Store ID does not match.");
+    const receipt = this.db.prepare("SELECT hash FROM receipts WHERE id=?").get(check2.id);
+    const view = this.view();
+    return receipt && receipt.hash === hash2(check2.payload) ? { ...view, receipt: { id: check2.id, duplicate: true } } : view;
+  }
   transaction(id, payload, change) {
     const owned = !this.inTransaction;
     if (owned) this.execute("BEGIN IMMEDIATE");
@@ -20768,7 +20776,10 @@ var SauronStore = class {
       if (owned) this.execute("COMMIT");
       return { ...view, receipt: { id, duplicate: !!receipt } };
     } catch (error62) {
-      if (owned) this.execute("ROLLBACK");
+      if (owned) {
+        this.execute("ROLLBACK");
+        if (error62 instanceof StoreError) error62.rejected = true;
+      }
       throw error62;
     }
   }
