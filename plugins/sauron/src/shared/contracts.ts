@@ -188,7 +188,8 @@ export const trackCodexThreadsSchema = z.strictObject({
   threads: z.array(z.strictObject({
     parentId:z.string().min(1).nullable().optional(),
     threadId: z.string().uuid(),
-    title: z.string().trim().min(1).max(160),
+    title: z.string().trim().min(1).max(160).describe('Verified original Codex chat title; source context, not the generated task title.'),
+    taskTitle: z.string().trim().min(1).max(160).optional().describe('Outcome-led Sauron title derived from the latest work the user requested or accepted. Supply for new direct captures after reading the chat; clarify materially different outcomes first.'),
     nextAction: z.string().trim().max(400).default(''),
   })).min(1).max(20),
 });

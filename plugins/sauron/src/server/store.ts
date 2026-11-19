@@ -576,7 +576,7 @@ export class SauronStore {
           if(this.get(id))throw new StoreError('task_collision','A personal task already uses this chat ID.');
           const time=this.now().toISOString();
           this.save({id,obligationKey:id,sourceVersion:1,provider:'personal',
-            title:thread.title,nextAction:thread.nextAction,sourceState:'needs_you',
+            title:thread.taskTitle??thread.title,nextAction:thread.nextAction,sourceState:'needs_you',
             sourceUrl:null,lastCheckedAt:null,version:1,userDecision:null,
             decidedAt:null,snoozedUntil:null,updatedAt:time,createdAt:time,state:'needs_you'},
           'personal',threadId);

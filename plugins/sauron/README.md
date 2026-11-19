@@ -30,6 +30,8 @@ Use the daily summary to review Inbox and choose focus work. Weekly review links
 
 To track selected Codex chats, first ask Codex to list and categorize chats started in the last 24 hours. Then select the ones you want with `@Sauron track threads X, Y, and Z`. Sauron creates one personal task per selected chat, saves a link back to it, and reuses that task if you track the same chat again. The listing step does not create tasks. Codex needs access to its chat listing and reading tools to verify the selections.
 
+For new direct captures, Codex reads the conversation and names the task for the latest outcome you requested or accepted. The chat title is only a hint. Clear outcomes save immediately, followed by the saved Sauron title in chat. Materially different outcomes need one focused clarification; other clear selections can still save. You can ask Codex to amend the saved title on the same task. Tracking an existing chat again preserves its Sauron title and decisions. Follow-up proposals and organisation-review tracking keep their existing naming behaviour. See the [capture acceptance scenarios](docs/codex-capture.md).
+
 For several follow-ups from one selected chat, ask Codex to propose those actions in Sauron. `propose_codex_followups` links each distinct proposal to the verified chat and leaves every proposal in Inbox. Repeating the same chat ID and action key reuses the existing proposal, including any review decision.
 
 ## Use
