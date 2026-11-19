@@ -20026,7 +20026,8 @@ var trackCodexThreadsSchema = external_exports.strictObject({
   threads: external_exports.array(external_exports.strictObject({
     parentId: external_exports.string().min(1).nullable().optional(),
     threadId: external_exports.string().uuid(),
-    title: external_exports.string().trim().min(1).max(160),
+    title: external_exports.string().trim().min(1).max(160).describe("Verified original Codex chat title; source context, not the generated task title."),
+    taskTitle: external_exports.string().trim().min(1).max(160).optional().describe("Outcome-led Sauron title derived from the latest work the user requested or accepted. Supply for new direct captures after reading the chat; clarify materially different outcomes first."),
     nextAction: external_exports.string().trim().max(400).default("")
   })).min(1).max(20)
 });
@@ -21100,7 +21101,7 @@ var SauronStore = class {
               obligationKey: id,
               sourceVersion: 1,
               provider: "personal",
-              title: thread.title,
+              title: thread.taskTitle ?? thread.title,
               nextAction: thread.nextAction,
               sourceState: "needs_you",
               sourceUrl: null,

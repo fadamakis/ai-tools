@@ -1,20 +1,20 @@
 {
-  "sourceCommit": "11286b89412df04cb8974aeef933c9b2e92373e6",
+  "sourceCommit": "3008ed0cc20c4d134a70882174b34d9c5d752c56",
   "products": {
     "shelob": {
-      "version": "0.11.16",
-      "inputDigest": "b1213982f30b8d949b00c7ef62224c509752a1b106b2b236379c455be5184a20",
-      "packageDigest": "9af6007923ea8e9a2d68bace0caae93e11fdffd4ca746db9d704e49f0a2acdb0"
+      "version": "0.11.17",
+      "inputDigest": "12afa2d79a9e4c7ef2c38c8033d6265c4845628a2214deb76001e4689b875426",
+      "packageDigest": "97454f67e865f0b710d32f796cb02efca18442f6014acedf54a161febe07e7b2"
     },
     "sauron": {
-      "version": "0.6.26",
-      "inputDigest": "93f133da222e537dd4468e2b2245a1cef708b30f2fe837a0f225da92454600f7",
-      "packageDigest": "6dfa93a34e44e5ef4881de9c2fe22b7102bb550c38528163d92a834f58ecd1e2"
+      "version": "0.6.27",
+      "inputDigest": "602745e3893c19c14d23d3f57b782796b8673353bed96d6d0ca9a7b1cf5962eb",
+      "packageDigest": "311286c17ac84930e9c772851e2a14964e7854eef6a91973ba19dac117d4fc66"
     },
     "workbench": {
-      "version": "0.4.6",
-      "inputDigest": "a5adf04fd517c54278306a12e93dd41b9bdc6d51bfac9915c66ac9add9101f78",
-      "packageDigest": "f7791982a2ccfb370ae01ea222b056a829182d3a61fd3f5a3ab5a48635035644"
+      "version": "0.4.7",
+      "inputDigest": "deb58a7e8141f71e75225a96f91bfd2afe94ecccd44ad65f1bb68203aeb6bd8c",
+      "packageDigest": "f2d36ae8adbec4edad7cb4828928528a3466841edc0b755c35cd3f97451a1e8c"
     }
   },
   "changed": [

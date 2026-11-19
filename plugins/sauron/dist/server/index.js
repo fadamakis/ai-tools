@@ -35062,7 +35062,8 @@ var trackCodexThreadsSchema = external_exports.strictObject({
   threads: external_exports.array(external_exports.strictObject({
     parentId: external_exports.string().min(1).nullable().optional(),
     threadId: external_exports.string().uuid(),
-    title: external_exports.string().trim().min(1).max(160),
+    title: external_exports.string().trim().min(1).max(160).describe("Verified original Codex chat title; source context, not the generated task title."),
+    taskTitle: external_exports.string().trim().min(1).max(160).optional().describe("Outcome-led Sauron title derived from the latest work the user requested or accepted. Supply for new direct captures after reading the chat; clarify materially different outcomes first."),
     nextAction: external_exports.string().trim().max(400).default("")
   })).min(1).max(20)
 });
@@ -36140,7 +36141,7 @@ var SauronStore = class {
               obligationKey: id,
               sourceVersion: 1,
               provider: "personal",
-              title: thread.title,
+              title: thread.taskTitle ?? thread.title,
               nextAction: thread.nextAction,
               sourceState: "needs_you",
               sourceUrl: null,
@@ -38483,7 +38484,7 @@ function createServer(store2, htmlPath, options = {}) {
     {
       name: "track_codex_threads",
       title: "Track selected Codex chats",
-      description: "Create one personal task per explicitly selected Codex chat and save its chat link atomically. First use Codex app tools to verify each selected chat ID and title; never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Explicit parentId placement requires the observed taskViewRevision as expectedRevision, including null to move to the top level. Read saved state after a lost placement response. Report created, already_tracked and failed entries.",
+      description: "Create one personal task per explicitly selected Codex chat and save its chat link atomically. For direct capture, read each selected conversation and supply taskTitle describing the latest outcome the user requested or accepted, without expanding responsibility. Keep title as the verified original chat title. Ask a focused question before capturing materially different possible outcomes; save clear selections immediately. Never invent IDs, infer selection from this tool, or scan chats here. Read list_attention for the expected store ID. Repeated calls reuse the task linked to each chat. Explicit parentId placement requires the observed taskViewRevision as expectedRevision, including null to move to the top level. Read saved state after a lost placement response. Report created, already_tracked and failed entries with their persisted Sauron titles. Repeated tracking never renames existing tasks; use plan_attention_task for requested amendments.",
       inputSchema: trackCodexThreadsSchema,
       annotations: { ...readOnly, readOnlyHint: false, idempotentHint: true },
       _meta: { ui: { visibility: ["app", "model"] } }

@@ -20,3 +20,16 @@ Organisation assistance retains schema 4. Its review, proposal and checkpoint re
 Release-one writers preserve those records but cannot operate organisation assistance.
 Stop older running Sauron processes before upgrading from schema 3. Constructor checks prevent old builds reopening an upgraded store, but cannot revoke an already open connection.
 Daily schedules remain off unless enabled explicitly. No verification test installs a real schedule.
+
+
+## Direct Codex capture titles
+
+`track_codex_threads` accepts optional `threads[].taskTitle` (1–160 characters after trimming) alongside the original chat `title`.
+New direct captures supply the agreed outcome as `taskTitle`; the store saves that value as the task title.
+Calls without it retain the original `title` fallback, including existing organisation-review tracking.
+Repeated capture never renames an existing linked task. Requested amendments use the existing planning title override.
+
+This change adds no database fields or schema version and performs no backfill.
+Task IDs, discussion links, user decisions and existing titles remain readable.
+The stored task uses the existing title format, so older builds can read its outcome title without understanding the new input field.
+New callers require an updated tool schema before sending `taskTitle`; older strict tool schemas reject that field.

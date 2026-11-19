@@ -208,3 +208,14 @@ Installation and opening Sauron do not enable reviews or schedules.
 - **ER-07:** Lost responses recover through original operation receipts without duplicate mutations.
 - **ER-08:** Malformed pending data is dismissible. Unavailable session storage does not invent failed saves.
 - **ER-09:** Diagnostics offer a manual-copy fallback when clipboard access fails and fit narrow panels.
+
+
+## Direct Codex capture titles
+
+- **C-01:** New direct captures use an outcome-led title derived from the latest work the user requested or accepted. Chat titles remain source context. Existing callers without a separate task title remain valid.
+- **C-02:** Capture preserves the agreed responsibility and completion condition. Assistant suggestions, superseded work and implementation uncertainty do not establish a new commitment.
+- **C-03:** Materially different outcomes require focused clarification. Clear selections save immediately; inaccessible chats or chats with no agreed remaining work require the user to specify an outcome.
+- **C-04:** Capture reports persisted titles and distinguishes saved, already tracked, pending and failed selections. Amendments edit the same task; recapture preserves titles, decisions and links.
+
+These rules apply only to new direct capture. Existing tasks, follow-up proposals and organisation-review tracking retain their current behaviour.
+See [capture acceptance scenarios](codex-capture.md) for the conversation-level checks.
