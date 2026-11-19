@@ -66,3 +66,17 @@ test('Sauron portable packages retain the product rationale linked from architec
  const link=architecture.match(/\]\(([^)]+)\)/)[1];
  assert.equal(fs.readFileSync(path.resolve(packagedDocs,link),'utf8'),fs.readFileSync(path.join(docs,'product-decisions.md'),'utf8'));
 });
+
+test('Sauron portable packages retain capture guidance linked from README and requirements',t=>{
+ const f=fixture(t),plugin=path.join(f.root,'plugins/sauron'),docs=path.join(plugin,'docs');
+ fs.mkdirSync(docs,{recursive:true});
+ fs.writeFileSync(path.join(plugin,'README.md'),'# Sauron\n\n[Capture scenarios](docs/codex-capture.md)\n');
+ fs.writeFileSync(path.join(docs,'task-groups.md'),'# Requirements\n\n[Capture scenarios](codex-capture.md)\n');
+ const guidance='# Capture scenarios\n\nName the agreed outcome.\n';fs.writeFileSync(path.join(docs,'codex-capture.md'),guidance);
+ f.run('portable');
+ const packaged=path.join(f.root,'portable/plugins/sauron');
+ for(const entry of ['README.md','docs/task-groups.md']){
+  const document=path.join(packaged,entry),link=fs.readFileSync(document,'utf8').match(/\]\(([^)]+)\)/)[1];
+  assert.equal(fs.readFileSync(path.resolve(path.dirname(document),link),'utf8'),guidance);
+ }
+});

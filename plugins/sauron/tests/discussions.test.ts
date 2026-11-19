@@ -7,7 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {SauronStore} from '../src/server/store.js';
-import {syntheticObservation} from '../src/shared/contracts.js';
+import {trackCodexThreadsSchema,syntheticObservation} from '../src/shared/contracts.js';
 import {discussionConversationUrl} from '../src/server/discussion-context.js';
 
 test('discussion links survive observations and restart without changing tasks or decisions',t=>{
@@ -76,6 +76,43 @@ test('selected Codex chats create linked tasks once and preserve decisions acros
   assert.deepEqual(store.trackCodexThreads(request).trackedThreads?.map(item=>item.status),['already_tracked','already_tracked']);
 });
 
+test('C-01/C-04: outcome titles survive amendment, recapture and disposable saved-state reopening',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'sauron-outcome-titles-')),path=join(dir,'fixture.sqlite');
+  let store=new SauronStore(path);t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const threadId=randomUUID(),legacyId=randomUUID(),outcome='Establish why Datadog SCIM provisioning returns HTTP 400';
+  const request={expectedStoreId:store.storeId,threads:[{threadId,title:'Datadog SCIM · 400 diagnosis',taskTitle:outcome}]};
+  const legacy=store.trackCodexThreads({expectedStoreId:store.storeId,threads:[{threadId:legacyId,title:'Existing legacy capture'}]});
+  const legacyTask=legacy.items.find(task=>task.id===`personal:${legacyId}`)!;
+  store.close();store=new SauronStore(path);
+  const created=store.trackCodexThreads(request),task=created.items.find(task=>task.id===`personal:${threadId}`)!;
+  assert.equal(task.title,outcome);assert.equal(task.nextAction,'');
+  assert.deepEqual(created.items.find(task=>task.id===legacyTask.id),legacyTask);
+  const amendedTitle='Establish why Datadog SCIM fails in the sandbox';
+  store.planTask({operationId:randomUUID(),id:task.id,expectedVersion:task.version,title:amendedTitle});
+  const before=store.view();
+  const replay=store.trackCodexThreads({...request,threads:[{...request.threads[0],title:'Renamed Codex chat',taskTitle:'Get the entire Datadog integration working'}]});
+  assert.equal(replay.trackedThreads?.[0]?.status,'already_tracked');
+  assert.deepEqual(replay.items,before.items);assert.deepEqual(replay.discussions,before.discussions);
+  store.close();store=new SauronStore(path);
+  assert.equal(store.storeId,before.storeId);assert.deepEqual(store.view().items,before.items);
+  assert.deepEqual(store.view().discussions,before.discussions);
+  assert.equal(store.view().items.find(item=>item.id===task.id)?.title,amendedTitle);
+  assert.equal(store.trackCodexThreads(request).trackedThreads?.[0]?.taskId,task.id);
+});
+
+test('C-01: supplied task titles reject blank or oversized outcomes before any task is saved',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'sauron-outcome-validation-')),store=new SauronStore(join(dir,'fixture.sqlite'));
+  t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
+  const thread={threadId:randomUUID(),title:'Verified chat'};
+  for(const taskTitle of ['', '   ', 'x'.repeat(161),null]){
+    assert.throws(()=>store.trackCodexThreads({expectedStoreId:store.storeId,threads:[thread,{threadId:randomUUID(),title:'Other chat',taskTitle}]}));
+    assert.equal(store.view().items.length,0);
+  }
+  const parsed=trackCodexThreadsSchema.parse({expectedStoreId:store.storeId,threads:[{...thread,taskTitle:'  Establish the cause  '}]});
+  assert.equal(parsed.threads[0].taskTitle,'Establish the cause');
+  assert.equal(store.trackCodexThreads({expectedStoreId:store.storeId,threads:[{...thread,taskTitle:'x'.repeat(160)}]}).items[0].title.length,160);
+});
+
 test('tracking reports a colliding chat separately and never writes to the wrong store',t=>{
   const dir=mkdtempSync(join(tmpdir(),'sauron-tracked-chat-errors-')),store=new SauronStore(join(dir,'fixture.sqlite'));
   t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true});});
@@ -110,9 +147,13 @@ test('the real MCP tool saves the host conversation idempotently and exposes pas
     const {tools}=await client.listTools();
     assert.deepEqual((tools.find(tool=>tool.name==='save_attention_discussion_link')!._meta?.ui as any).visibility,['app']);
     const selected=randomUUID();
-    const tracked=await client.callTool({name:'track_codex_threads',arguments:{expectedStoreId:before.storeId,threads:[{threadId:selected,title:'Selected Codex chat'}]}});
+    const tracked=await client.callTool({name:'track_codex_threads',arguments:{expectedStoreId:before.storeId,threads:[{threadId:selected,title:'Datadog SCIM · 400 diagnosis',taskTitle:'Establish why Datadog SCIM provisioning returns HTTP 400'}]}});
     assert.equal(tracked.isError,undefined);
     assert.equal((tracked.structuredContent as any).trackedThreads[0].status,'created');
+    assert.equal((tracked.structuredContent as any).items.find((task:any)=>task.id===`personal:${selected}`)?.title,'Establish why Datadog SCIM provisioning returns HTTP 400');
+    const legacyId=randomUUID();
+    const legacy=await client.callTool({name:'track_codex_threads',arguments:{expectedStoreId:before.storeId,threads:[{threadId:legacyId,title:'Legacy caller title'}]}});
+    assert.equal((legacy.structuredContent as any).items.find((task:any)=>task.id===`personal:${legacyId}`)?.title,'Legacy caller title');
     assert.equal((tracked.structuredContent as any).discussions.find((link:any)=>link.taskId===`personal:${selected}`)?.url,`codex://threads/${selected}`);
   }finally{await client.close();}
 });
