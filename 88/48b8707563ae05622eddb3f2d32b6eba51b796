@@ -1,0 +1,57 @@
+plugins/sauron/src/app/OrganisationReview.tsx
+  s_3c4475f7a21372::t_8924adc794cce9 49,52,54-58,60
+  s_3c4475f7a21372::t_70346907f27d9e 53,59
+  s_3c4475f7a21372::t_f7a6e1da571df4 48,65
+plugins/sauron/src/app/InboxView.tsx
+  s_3c4475f7a21372::t_75f3ee1adddca1 109-118
+  s_6771e2c235dc85::t_967844fec08117 71,73-77
+  s_3c4475f7a21372::t_ad843ac1d38467 127,129-133
+  s_3c4475f7a21372::t_70346907f27d9e 49,54-63,102-103
+  s_3c4475f7a21372::t_567264c0ffe709 37-45,81
+  s_3c4475f7a21372::t_d2049a6de106a0 72,78
+  s_3c4475f7a21372::t_a11d7ef609c719 7,46-47,64-66,87,91-94,98-99
+  s_3c4475f7a21372::t_9f85694fc8ee27 126,128
+  s_3c4475f7a21372::t_43e9175315515f 48,50-53,95-97,104-107,120
+  s_3c4475f7a21372::t_5bfc3d869b9814 68-69,122-125,134-147,160,163
+  s_3c4475f7a21372::t_8924adc794cce9 85-86,88-90,100-101,108
+  s_3c4475f7a21372::t_8b36ee515df6e6 83
+plugins/sauron/src/app/inbox.css
+  s_3c4475f7a21372::t_ad843ac1d38467 75-76,81-86
+  s_6771e2c235dc85::t_967844fec08117 19-22,24-32,34-37,41-42
+  s_3c4475f7a21372::t_8924adc794cce9 89-90,116
+  s_6771e2c235dc85::t_54a612c09a5452 23
+  s_3c4475f7a21372::t_9f85694fc8ee27 78-80
+  s_3c4475f7a21372::t_a11d7ef609c719 92-99
+  s_3c4475f7a21372::t_d2049a6de106a0 10-11,112-114
+  s_3c4475f7a21372::t_16198bb7ddad3d 77
+  s_6771e2c235dc85::t_aea39f0d96f93e 33,38-40
+  s_3c4475f7a21372::t_736f23eeb607c3 115
+  s_3c4475f7a21372::t_43e9175315515f 88,246,248,252,273
+  s_3c4475f7a21372::t_70346907f27d9e 247,249-251,253-261
+  s_3c4475f7a21372::t_75f3ee1adddca1 70-74,181,272,274
+  s_3c4475f7a21372::t_0b9f8f72917fec 176-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8848b8707563ae05622eddb3f2d32b6eba51b796",
+  "prompts": {},
+  "sessions": {
+    "s_3c4475f7a21372": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fe98-c2aa-7f32-a3ec-9c79ae194383",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    },
+    "s_6771e2c235dc85": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fea6-bb62-7a72-85d6-a4430352f03a",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
