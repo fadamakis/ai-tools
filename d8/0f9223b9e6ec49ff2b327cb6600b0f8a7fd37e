@@ -1,0 +1,36 @@
+plugins/sauron/src/app/UpdateStatus.tsx
+  s_3c4475f7a21372::t_d50c8a907f12b5 16-24,39,45,49,52,58
+  s_3c4475f7a21372::t_a3ce16c0e2b398 40-43,47,50
+  s_3c4475f7a21372::t_75f3ee1adddca1 7-15,36,80,86
+  s_3c4475f7a21372::t_bde828f1cc1c8c 34,48,51,53-57,59-67,70,88
+plugins/sauron/src/app/Dialog.tsx
+  s_3c4475f7a21372::t_5bfc3d869b9814 5,8-9
+  s_3c4475f7a21372::t_43e9175315515f 6-7
+  s_3c4475f7a21372::t_ec5d48dfec6176 1-4,10-11
+plugins/sauron/src/app/SourceControls.tsx
+  s_3c4475f7a21372::t_97222b46902fdb 57
+  s_3c4475f7a21372::t_d50c8a907f12b5 2,52,64
+  s_3c4475f7a21372::t_7be0bf99ad17dd 1,55-56,63,70,73-77
+plugins/sauron/src/app/DiagnosticsView.tsx
+  s_3c4475f7a21372::t_3d1abb02e752cb 4,6-13,17-43,46-81
+plugins/sauron/src/app/InboxView.tsx
+  s_3c4475f7a21372::t_504155824afb2a 1,83
+plugins/sauron/src/app/inbox.css
+  s_3c4475f7a21372::t_1ffc1c544e6e59 22-26,162-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d80f9223b9e6ec49ff2b327cb6600b0f8a7fd37e",
+  "prompts": {},
+  "sessions": {
+    "s_3c4475f7a21372": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fe98-c2aa-7f32-a3ec-9c79ae194383",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
