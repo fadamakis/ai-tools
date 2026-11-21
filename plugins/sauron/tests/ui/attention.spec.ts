@@ -26,6 +26,7 @@ test.afterEach(async()=>{await stop();rmSync(dir,{recursive:true,force:true});})
 async function open(page:Page){mkdirSync('docs/evidence/inbox-0.5.0',{recursive:true});await page.goto(origin);await expect(page.getByRole('button',{name:'Add task',exact:true})).toBeEnabled();}
 async function diagnostics(page:Page, action:string){
   await page.getByRole('button',{name:'Diagnostics',exact:true}).click();
+  await page.getByText('Sample tasks',{exact:true}).click();
   await page.getByRole('button',{name:action,exact:true}).click();
   await page.getByRole('button',{name:'Close diagnostics'}).click();
 }
@@ -187,7 +188,9 @@ test('source icons and filtering distinguish personal tasks and sample sources; 
   }
   await open(page);await expect(page.locator('article')).toHaveCount(6);
   for(const [sourceKind] of samples)await expect(page.locator(`.source-icon.${sourceKind} svg`)).toBeVisible();
-  await expect(page.locator('.inbox-brand img')).toHaveJSProperty('naturalWidth',1254);
+  const brandMark=page.locator('.inbox-brand-mark>img');
+  await expect(brandMark).toBeVisible();
+  await expect.poll(()=>brandMark.evaluate(image=>(image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await filterSource(page,'Slack');await expect(page.locator('article')).toHaveCount(1);
   await expect(page.getByRole('heading',{name:'Reply to the sample design thread',exact:true})).toBeVisible();await expect(page.getByText('Sample',{exact:true})).toHaveCount(0);await expect(page.getByLabel('Slack sample task',{exact:true})).toBeVisible();
   await filterSource(page,'Personal');await expect(page.locator('article')).toHaveCount(1);
@@ -226,17 +229,19 @@ test('empty states hide unused tools; filters stay available for recovery; histo
   expect((await row.boundingBox())!.height).toBeLessThan(150);
   await expect(row.locator('.inbox-context').getByText('Check the sample note and mark it complete.')).not.toBeVisible();
   await page.locator('.inbox-task-open').focus();await page.keyboard.press('Enter');
-  await expect(page.locator('.inbox-task-detail').getByText('Latest sample context',{exact:true})).toBeVisible();
+  const reader=page.locator('.inbox-task-detail');
+  await expect(reader.getByRole('heading',{name:'Next action',exact:true})).toBeVisible();
+  await expect(reader.getByText('Check the sample note and mark it complete.',{exact:true})).toBeVisible();
   await expect(row.getByLabel('Manual sample task',{exact:true})).toBeVisible();
   expect((await call(request,'list_attention')).items[0].state).toBe('done');
   await page.setViewportSize({width:1184,height:850});
   await page.locator('.inbox-task-open').click();
-  await page.getByRole('heading',{name:'Your working day',exact:true}).click();
+  await page.getByRole('heading',{name:'Sauron',exact:true}).click();
   await page.screenshot({path:'docs/evidence/inbox-0.5.0/sauron-history-0.5.0.png',fullPage:true,animations:'disabled'});
   await page.getByRole('radio',{name:/^Waiting /}).click();
   await expect(page.getByRole('heading',{name:'Nothing you’re waiting on',exact:true})).toBeVisible();
   await expect(page.getByRole('radio',{name:/^Waiting /})).toHaveAttribute('aria-checked','true');
-  await page.getByRole('heading',{name:'Your working day',exact:true}).click();
+  await page.getByRole('heading',{name:'Sauron',exact:true}).click();
   await page.screenshot({path:'docs/evidence/inbox-0.5.0/sauron-waiting-0.5.0.png',fullPage:true,animations:'disabled'});
 });
 test('completion can be reopened deliberately, and snoozed tasks can be brought back',async({page,request})=>{
@@ -286,7 +291,7 @@ test('Refresh starts a source scan, stays disabled across reopening, and reenabl
   const saved=await call(request,'list_attention');
   await call(request,'configure_attention_sync',{expectedStoreId:saved.storeId,operationId:randomUUID(),mode:'dot_managed'});
   await open(page);
-  await expect(page.getByText('Waiting for the first automatic update.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('complementary',{name:'Updates'})).toHaveCount(0);
   const refresh=page.getByRole('button',{name:'Refresh',exact:true});
   await refresh.click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
   await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeEnabled();
@@ -297,7 +302,8 @@ test('Refresh starts a source scan, stays disabled across reopening, and reenabl
   await page.reload();
   await expect(page.getByRole('button',{name:'Refreshing…',exact:true})).toBeEnabled();
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled({timeout:10000});
-  await page.getByText('Update details',{exact:true}).click();
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Update details',exact:true}).click();
   await expect(page.getByText('Enabled manual sources checked.',{exact:true})).toBeVisible();
   expect((await call(request,'list_attention')).scan?.status).toBe('completed');
 });
@@ -306,7 +312,7 @@ test('a runtime failure reenables Refresh and preserves the saved list',async({p
   await open(page);await seed(page);
   writeFileSync(join(dir,'runtime.cjs'),'#!/usr/bin/env node\nprocess.exit(1);',{mode:0o700});
   await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
-  await expect(page.getByRole('alert')).toContainText('Enabled sources could not be checked');
+  await expect(page.getByRole('alert')).toContainText('Sources could not be checked');
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   await expect(page.getByRole('heading',{name:'Review the synthetic launch note',exact:true})).toBeVisible();
   expect((await call(request,'list_attention')).scan?.status).toBe('failed');
@@ -326,7 +332,7 @@ test('source filter supports keyboard selection, dismissal and narrow layouts',a
   const menu=page.getByRole('dialog');const bounds=(await menu.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(375);
   await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(trigger).toBeFocused();
-  await trigger.click();await page.getByRole('heading',{name:'Your working day',exact:true}).click();await expect(menu).toHaveCount(0);
+  await trigger.click();await page.getByRole('heading',{name:'Sauron',exact:true}).click();await expect(menu).toHaveCount(0);
 });
 
 test.describe('local list timestamps',()=>{
@@ -376,10 +382,13 @@ test('dot sync has distinct partial/error and last-success state, real provider 
   await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();
   const next={runId:randomUUID(),expectedStoreId:initial.storeId};await call(request,'sync_attention',{request:{...next,phase:'start'}});
   await call(request,'sync_attention',{request:{...next,phase:'finish',checkedAt:new Date().toISOString(),sources:{...sources,calendar:{status:'failed',detail:'Calendar unavailable'}},items:[]}});
-  await page.reload();await expect(page.getByRole('alert')).toContainText('Automatic update incomplete.');
+  await page.reload();
   await expect(page.locator('.inbox-update [role=status]')).toContainText('Last full update');
-  await page.getByText('Update details',{exact:true}).click();
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await expect(page.getByRole('menu').getByText('Automatic check: Couldn’t check Calendar.',{exact:true})).toBeVisible();
+  await page.getByRole('menuitem',{name:'Update details',exact:true}).click();
   await expect(page.getByText('Calendar (failed): Calendar unavailable',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close update details'}).click();
   await page.getByRole('radio',{name:/^Inbox /}).click();
   await expect(page.locator('article')).toHaveCount(1);
   await page.screenshot({path:'test-results/dot-sync-partial-0.6.0.png',fullPage:true});

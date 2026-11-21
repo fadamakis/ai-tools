@@ -122,7 +122,13 @@ export function InboxView({vm}:{vm:SauronController}){
       {vm.adding&&<Dialog title={vm.draft.parentId?`New child of ${vm.organisation.tree.byId.get(vm.draft.parentId)?.title??'task'}`:'New personal task'} close={vm.cancelDraft} closeDisabled={vm.busy}>
         {loadError}
         {recovery}
-        <form className="inbox-composer" onSubmit={event=>{event.preventDefault();submit();}}>
+        <form className="inbox-composer" onSubmit={event=>{event.preventDefault();submit();}}
+          onKeyDown={event=>{
+            if(event.key==='Enter'&&!event.nativeEvent.isComposing&&event.target===titleRef.current){
+              event.preventDefault();
+              submit();
+            }
+          }}>
           <div className="inbox-composer-field inbox-composer-title">
             <label htmlFor="inbox-task-title">Task name</label>
             <Input id="inbox-task-title" size="2xl" ref={titleRef} value={vm.draft.title} maxLength={160} required placeholder="What needs to get done?" disabled={disabled} onChange={event=>vm.changeDraft({title:event.target.value})}/>
@@ -140,7 +146,7 @@ export function InboxView({vm}:{vm:SauronController}){
             </div>
             <div className="inbox-composer-actions">
               <Button type="button" variant="ghost" color="secondary" disabled={vm.busy} onClick={vm.cancelDraft}>Cancel</Button>
-              <Button type="submit" color="primary" disabled={disabled||!vm.draft.title.trim()}>Save task</Button>
+              <Button type="button" color="primary" disabled={disabled||!vm.draft.title.trim()} onClick={submit}>Save task</Button>
             </div>
           </div>
         </form>
