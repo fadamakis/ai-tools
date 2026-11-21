@@ -1,0 +1,20 @@
+plugins/sauron/assets/sidebar-icon.svg
+  s_6771e2c235dc85::t_703fd87c7f466c 3
+  s_6771e2c235dc85::t_369ae1b55e0d66 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fe5ac02d5742d426be52e65fbb2780651bb5da07",
+  "prompts": {},
+  "sessions": {
+    "s_6771e2c235dc85": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fea6-bb62-7a72-85d6-a4430352f03a",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
