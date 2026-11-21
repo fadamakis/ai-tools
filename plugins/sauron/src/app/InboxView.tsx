@@ -4,7 +4,7 @@ import {DiagnosticsView} from './DiagnosticsView.js';
 import {OrganisationReview} from './OrganisationReview.js';
 import {OrganisationDialog} from './OrganisationControls.js';
 import {SourceControls} from './SourceControls.js';
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@ai-tools/ui';
 import { Input } from '@ai-tools/ui';
 import { Textarea } from '@ai-tools/ui';
@@ -34,29 +34,117 @@ function TaskFilter({kind,TriggerView,value,options,onChange}:{kind:string;Trigg
 export function InboxView({vm}:{vm:SauronController}){
   const disabled=vm.actionLocked;
   const titleRef=useRef<HTMLInputElement>(null);
-  useEffect(()=>{if(vm.adding)titleRef.current?.focus();},[vm.adding]);
+  const addTaskTrigger=useRef<HTMLButtonElement>(null);
+  const restoreAddTaskFocus=useRef(false);
+  useEffect(()=>{
+    if(vm.adding)titleRef.current?.focus({preventScroll:true});
+    else if(restoreAddTaskFocus.current){
+      restoreAddTaskFocus.current=false;
+      addTaskTrigger.current?.focus({preventScroll:true});
+    }
+  },[vm.adding]);
+  const organisationPanelId=useId();
+  const [organisationOpen,setOrganisationOpen]=useState(false);
+  const organisationTrigger=useRef<HTMLButtonElement>(null);
+  const organisationPanel=useRef<HTMLElement>(null);
+  const closeOrganisation=()=>{
+    setOrganisationOpen(false);
+    organisationTrigger.current?.focus({preventScroll:true});
+  };
+  useEffect(()=>{
+    if(!organisationOpen)return;
+    const closeOnOutsideClick=(event:PointerEvent)=>{
+      if(event.target instanceof Node&&!organisationTrigger.current?.contains(event.target)&&!organisationPanel.current?.contains(event.target)){
+        setOrganisationOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown',closeOnOutsideClick);
+    return()=>document.removeEventListener('pointerdown',closeOnOutsideClick);
+  },[organisationOpen]);
+  const inboxCount=vm.count('inbox');
+  const organisation=vm.view?.organisationReview;
+  const suggestions=organisation?.proposal?.status==='pending'?organisation.proposal.changes.length:null;
   const submit=()=>{if(vm.draft.title.trim()&&!disabled)vm.save({kind:'create',input:{...vm.draft,operationId:operationId(),...(vm.draft.parentId?{expectedStoreId:vm.view!.storeId,expectedRevision:vm.view!.taskViewRevision??0}:{})}});};
+  const recovery=<RecoveryNotice recovery={vm.taskRecovery} busy={vm.busy} connected={!!vm.client}/>;
+  const loadError=vm.error&&<div role="alert" className="inbox-message"><p>{vm.error}</p><Button size="sm" variant="outline" color="secondary" disabled={vm.busy} onClick={()=>vm.c.current?vm.readSaved():vm.setConnectionAttempt(n=>n+1)}>{vm.c.current?'Reload tasks':'Reconnect'}</Button><Button size="sm" variant="ghost" color="secondary" onClick={()=>vm.setError('')}>Dismiss message</Button></div>;
   return <div className="inbox-app">
-    <header className="inbox-bar"><div className="inbox-bar-inner"><div className="inbox-brand"><img src={logo} alt=""/><span>{devBuildId?'Sauron Dev':'Sauron'}</span></div>
+    <header className="inbox-bar"><div className="inbox-bar-inner">
+      <h1 className="inbox-brand">
+        <span className="inbox-brand-mark" aria-hidden="true">
+          <img src={logo} alt=""/>
+          <span className="inbox-brand-eye"><img src={logo} alt=""/></span>
+        </span>
+        <span>{devBuildId?'Sauron Dev':'Sauron'}</span>
+      </h1>
       <div className="inbox-header-actions">{vm.client?.mode==='Local preview'&&<Button uniform variant="ghost" color="secondary" aria-label={`Switch to ${vm.theme==='light'?'dark':'light'} theme`} onClick={()=>{const next=vm.theme==='light'?'dark':'light';document.documentElement.dataset.theme=next;vm.setTheme(next);}}><Icon name={vm.theme==='light'?'moon':'sun'}/></Button>}
         <SourceControls vm={vm}/>
+        <Button ref={addTaskTrigger} className="inbox-add-task" color="primary" pill size="md" aria-haspopup="dialog" disabled={!vm.client||disabled||vm.adding} onClick={()=>{restoreAddTaskFocus.current=true;vm.setAdding(true);}}><Icon name="plus"/> Add task</Button>
       </div></div></header>
-    <main className="inbox-main"><section className="inbox-heading"><div><h1>Your working day</h1><p className="inbox-muted">Choose what matters, then keep it moving.</p></div>
-      <Button className="inbox-add-task" color="primary" pill size="xl" disabled={!vm.client||disabled||vm.adding} onClick={()=>vm.setAdding(true)}><Icon name="plus"/> Add task</Button></section>
+    <main className="inbox-main">
       {vm.view&&<UpdateStatus view={vm.view}/>}
-      {vm.view&&<section className="inbox-day-summary" aria-label="Daily review"><div><strong>Today</strong><span>{vm.view.items.filter(task=>task.focusOrder&&(task.state==='ready'||task.state==='in_progress')).length} of 3 focus tasks chosen</span></div><div><strong>{vm.count('inbox')} to review</strong><span>Clarify new work before adding it to your list.</span></div>{vm.count('in_progress')>2&&<span className="inbox-wip-hint">{vm.count('in_progress')} in progress. Finish one before starting more.</span>}<Button size="sm" variant="outline" color="secondary" onClick={()=>vm.selectState('inbox')}>Review Inbox</Button><Button size="sm" variant="ghost" color="secondary" onClick={()=>vm.setWeeklyReview(!vm.weeklyReview)}>{vm.weeklyReview?'Close weekly review':'Weekly review'}</Button></section>}
-      {!!vm.view?.items.some(task=>task.reopenSuggestion?.length)&&<section className="inbox-message" aria-label="New activity in closed tasks"><h2>New activity in closed work</h2>{vm.view.items.filter(task=>task.reopenSuggestion?.length).map(task=><div key={task.id}><span>{task.title}</span><Button color="secondary" size="sm" variant="outline" disabled={disabled} onClick={()=>vm.decide(task,'reopen')}>Reopen {task.title}</Button><Button color="secondary" size="sm" variant="ghost" disabled={disabled} onClick={()=>void vm.organisation.attention(task,false)}>Keep closed</Button></div>)}</section>}
+      {vm.view&&<section className="inbox-day-summary" aria-label="Daily review">
+        <div className="inbox-focus-summary">
+          <strong>Today</strong><span aria-hidden="true">·</span>
+          <span>{vm.view.items.filter(task=>task.focusOrder&&(task.state==='ready'||task.state==='in_progress')).length} of 3 focus tasks</span>
+        </div>
+        <div className="inbox-review-summary">
+          <Button className={inboxCount>0?'inbox-review-inbox':''} size="sm" variant={inboxCount>0?'outline':'ghost'} color="secondary" onClick={()=>vm.selectState('inbox')}>
+            Review Inbox <span className="inbox-review-count">{inboxCount}</span>
+          </Button>
+          <Button size="sm" variant="ghost" color="secondary" aria-expanded={vm.weeklyReview} onClick={()=>vm.setWeeklyReview(!vm.weeklyReview)}>{vm.weeklyReview?'Close weekly review':'Weekly review'}</Button>
+          {organisation&&<Button ref={organisationTrigger} className="inbox-organise-toggle" size="sm" variant="ghost" color="secondary"
+            aria-expanded={organisationOpen} aria-controls={organisationPanelId} onClick={()=>setOrganisationOpen(!organisationOpen)}
+            onKeyDown={event=>{if(organisationOpen&&event.key==='Escape'){event.preventDefault();closeOrganisation();}}}>
+            {`Organise tasks${suggestions===null?'':` · ${suggestions} suggestions`}`} <Icon name="chevron"/>
+          </Button>}
+        </div>
+        {vm.count('in_progress')>2&&<span className="inbox-wip-hint">{vm.count('in_progress')} in progress. Finish one before starting more.</span>}
+        {organisation&&<section ref={organisationPanel} id={organisationPanelId} className="inbox-organisation-panel"
+          data-proposals={suggestions!==null} aria-label="Organise tasks" hidden={!organisationOpen}
+          onKeyDown={event=>{if(event.key==='Escape'&&!event.defaultPrevented){event.preventDefault();closeOrganisation();}}}>
+          {organisationOpen&&<RecoveryNotice recovery={vm.review.recovery} busy={vm.busy} connected={!!vm.client}/>}
+          <OrganisationReview vm={vm}/>
+        </section>}
+      </section>}
+      {!!vm.view?.items.some(task=>task.reopenSuggestion?.length)&&<section className="inbox-message inbox-reopen-notice" aria-label="New activity in closed tasks">
+        <h2>New activity in closed work</h2>
+        {vm.view.items.filter(task=>task.reopenSuggestion?.length).map(task=><div className="inbox-reopen-row" key={task.id}>
+          <span>{task.title}</span>
+          <div className="inbox-reopen-actions">
+            <Button color="secondary" size="sm" variant="outline" aria-label={`Reopen ${task.title}`} disabled={disabled} onClick={()=>vm.decide(task,'reopen')}>Reopen</Button>
+            <Button color="secondary" size="sm" variant="ghost" aria-label={`Keep closed: ${task.title}`} disabled={disabled} onClick={()=>void vm.organisation.attention(task,false)}>Keep closed</Button>
+          </div>
+        </div>)}
+      </section>}
       {!vm.sourceMenuOpen&&<RecoveryNotice recovery={vm.sourceRecovery} busy={vm.busy} connected={!!vm.client}/>}
-      <RecoveryNotice recovery={vm.review.recovery} busy={vm.busy} connected={!!vm.client}/>
-      <OrganisationReview vm={vm}/>
+      {!organisationOpen&&<RecoveryNotice recovery={vm.review.recovery} busy={vm.busy} connected={!!vm.client}/>}
       {vm.weeklyReview&&<section className="inbox-weekly" aria-label="Weekly review"><h2>Review the week</h2><p>Clear the Inbox, check what you are waiting for, then choose your next actions.</p><div><Button size="sm" variant="outline" color="secondary" onClick={()=>vm.selectState('inbox')}>Inbox {vm.count('inbox')}</Button><Button size="sm" variant="outline" color="secondary" onClick={()=>vm.selectState('waiting')}>Waiting {vm.count('waiting')}</Button><Button size="sm" variant="outline" color="secondary" onClick={()=>vm.selectState('today')}>Ready {vm.count('today')}</Button></div></section>}
-      {vm.adding&&<section className="inbox-composer" aria-labelledby="inbox-add-title"><h2 id="inbox-add-title">{vm.draft.parentId?`New child of ${vm.organisation.tree.byId.get(vm.draft.parentId)?.title}`:"New personal task"}</h2>
-        <form onSubmit={e=>{e.preventDefault();submit();}} onKeyDown={e=>{if(e.key==='Enter'&&e.target instanceof HTMLInputElement){e.preventDefault();submit();}}}>
-          <label htmlFor="inbox-task-title">Task name</label><Input id="inbox-task-title" ref={titleRef} value={vm.draft.title} maxLength={160} required placeholder="What needs to get done?" disabled={disabled} onChange={e=>vm.changeDraft({title:e.target.value})}/>
-          <label htmlFor="inbox-task-notes">Notes <span className="inbox-muted">(optional)</span></label><Textarea id="inbox-task-notes" rows={2} maxLength={400} placeholder="Add a next step or a little context" value={vm.draft.nextAction} disabled={disabled} onChange={e=>vm.changeDraft({nextAction:e.target.value})}/>
-          <div className="inbox-composer-bottom"><div className="inbox-start"><span>Start in</span><SegmentedControl aria-label="Initial task state" size="md" pill={false} value={vm.draft.sourceState} disabled={disabled} onChange={value=>vm.changeDraft({sourceState:value})}><SegmentedControl.Option value="needs_you">Ready</SegmentedControl.Option><SegmentedControl.Option value="waiting">Waiting</SegmentedControl.Option></SegmentedControl></div>
-            <div className="inbox-composer-actions"><Button variant="ghost" color="secondary" disabled={disabled} onClick={vm.cancelDraft}>Cancel</Button><Button color="primary" disabled={disabled||!vm.draft.title.trim()} onClick={submit}>Save task</Button></div>
-          </div></form></section>}
+      {vm.adding&&<Dialog title={vm.draft.parentId?`New child of ${vm.organisation.tree.byId.get(vm.draft.parentId)?.title??'task'}`:'New personal task'} close={vm.cancelDraft} closeDisabled={vm.busy}>
+        {loadError}
+        {recovery}
+        <form className="inbox-composer" onSubmit={event=>{event.preventDefault();submit();}}>
+          <div className="inbox-composer-field inbox-composer-title">
+            <label htmlFor="inbox-task-title">Task name</label>
+            <Input id="inbox-task-title" size="2xl" ref={titleRef} value={vm.draft.title} maxLength={160} required placeholder="What needs to get done?" disabled={disabled} onChange={event=>vm.changeDraft({title:event.target.value})}/>
+          </div>
+          <div className="inbox-composer-field">
+            <label htmlFor="inbox-task-notes">Notes <span className="inbox-composer-optional">(optional)</span></label>
+            <Textarea id="inbox-task-notes" rows={3} maxLength={400} placeholder="Add a next step or a little context" value={vm.draft.nextAction} disabled={disabled} onChange={event=>vm.changeDraft({nextAction:event.target.value})}/>
+          </div>
+          <div className="inbox-composer-bottom">
+            <div className="inbox-start"><span>Start in</span>
+              <SegmentedControl aria-label="Initial task state" size="md" pill={false} value={vm.draft.sourceState} disabled={disabled} onChange={value=>vm.changeDraft({sourceState:value})}>
+                <SegmentedControl.Option value="needs_you">Ready</SegmentedControl.Option>
+                <SegmentedControl.Option value="waiting">Waiting</SegmentedControl.Option>
+              </SegmentedControl>
+            </div>
+            <div className="inbox-composer-actions">
+              <Button type="button" variant="ghost" color="secondary" disabled={vm.busy} onClick={vm.cancelDraft}>Cancel</Button>
+              <Button type="submit" color="primary" disabled={disabled||!vm.draft.title.trim()}>Save task</Button>
+            </div>
+          </div>
+        </form>
+      </Dialog>}
       <section className="inbox-list" aria-label="Task list"><nav className="inbox-nav" aria-label="Task states"><SegmentedControl className="inbox-active-states" aria-label="Active task states" size="md" pill={false} value={vm.filter==='today'||vm.filter==='inbox'||vm.filter==='waiting'?vm.filter:''} onChange={state=>{if(state)vm.selectState(state);}}>
         {(['today','inbox','waiting'] as const).map(state=><SegmentedControl.Option key={state} value={state}>{state==='today'?'Today':labels[state]} <span className="inbox-count">{vm.count(state)}</span></SegmentedControl.Option>)}</SegmentedControl>
         <div className="inbox-secondary">{(['snoozed','done'] as const).map(state=><Button key={state} variant="ghost" color="secondary" size="sm" selected={state==='done'?vm.history:vm.filter===state} onClick={()=>state==='done'&&vm.history?vm.returnToTasks():vm.selectState(state)}>{state==='done'?'History':'Snoozed'} <span className="inbox-count">{state==='done'?vm.count('done')+vm.count('dismissed'):vm.count(state)}</span></Button>)}</div></nav>
@@ -69,10 +157,10 @@ export function InboxView({vm}:{vm:SauronController}){
           <Button className="inbox-attention-filter" color="secondary" size="md" variant="outline" selected={vm.organisation.attentionOnly} aria-pressed={vm.organisation.attentionOnly} onClick={()=>vm.organisation.setAttentionOnly(!vm.organisation.attentionOnly)}>Needs attention</Button>
           <span className="inbox-result-count">{vm.matchedCount} {vm.matchedCount===1?'task':'tasks'}</span>
         </div>}
-        {vm.error&&<div role="alert" className="inbox-message"><p>{vm.error}</p><Button size="sm" variant="outline" color="secondary" disabled={vm.busy} onClick={()=>vm.c.current?vm.readSaved():vm.setConnectionAttempt(n=>n+1)}>{vm.c.current?'Reload tasks':'Reconnect'}</Button><Button size="sm" variant="ghost" color="secondary" onClick={()=>vm.setError('')}>Dismiss message</Button></div>}
+        {!vm.adding&&loadError}
         <RecoveryNotice recovery={vm.organisation.recovery} busy={vm.busy} connected={!!vm.client}/>
         <RecoveryNotice recovery={vm.editRecovery} busy={vm.busy} connected={!!vm.client}/>
-        <RecoveryNotice recovery={vm.taskRecovery} busy={vm.busy} connected={!!vm.client}/>
+        {!vm.adding&&recovery}
 
         <div className="inbox-results">{!vm.view?(!vm.error&&<div className="inbox-empty">Loading your saved tasks…</div>):vm.items.length===0?(!vm.error&&<div className="inbox-empty"><Icon name={vm.hasFilters?'search':vm.filter==='waiting'||vm.filter==='snoozed'?'clock':'check'}/><h2>{vm.hasFilters?'No matching tasks':vm.emptyTitles[vm.filter]}</h2><p>{vm.hasFilters?'Try another search or clear your filters.':vm.emptyDescriptions[vm.filter]}</p>{vm.hasFilters&&<Button variant="outline" color="secondary" onClick={()=>{vm.setQuery('');vm.setSource('all');vm.setArea('all');vm.organisation.setTopic('all');vm.organisation.setAttentionOnly(false);}}>Clear filters</Button>}</div>):<TaskReader key={vm.filter} vm={vm}/>}</div>
       </section><footer className="inbox-footer">{devBuildId&&<span className="inbox-muted inbox-dev-build" data-dev-build={devBuildId}>Fixtures · {devBuildId}</span>}<Button variant="ghost" color="secondary" size="sm" onClick={()=>vm.setDiagnostics(true)}>Diagnostics</Button></footer>
