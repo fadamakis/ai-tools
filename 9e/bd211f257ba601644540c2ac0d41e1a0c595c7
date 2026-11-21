@@ -1,0 +1,44 @@
+plugins/sauron/tests/ui/local-updates.spec.ts
+  s_3c4475f7a21372::t_3d53f80832aaca 26
+  s_3c4475f7a21372::t_f9bb54d3bb626c 24-25
+plugins/sauron/tests/ui/inbox.spec.ts
+  s_3c4475f7a21372::t_e99c6079ebf775 41
+  s_3c4475f7a21372::t_43e9175315515f 637-643
+  s_3c4475f7a21372::t_26657eca09dde1 272
+  s_3c4475f7a21372::t_c9a069c3bbeb15 718
+  s_3c4475f7a21372::t_c0ab431fea6447 719-728
+  s_3c4475f7a21372::t_1444884ee3e510 663,665,669
+  s_3c4475f7a21372::t_70346907f27d9e 648,651-653,655-657
+  s_3c4475f7a21372::t_d2049a6de106a0 361
+  s_3c4475f7a21372::t_97222b46902fdb 273-274
+  s_3c4475f7a21372::t_5bfc3d869b9814 647,688-693
+  s_3c4475f7a21372::t_92c0f63cbd9e4f 259-260,262
+  s_3c4475f7a21372::t_d50c8a907f12b5 258,261
+  s_3c4475f7a21372::t_d760a0eba96444 71,84-95,255,263,275,322-328,330-331,635-636,644-646,649-650,658
+plugins/sauron/tests/ui/attention.spec.ts
+  s_3c4475f7a21372::t_92c0f63cbd9e4f 383,385-386
+  s_3c4475f7a21372::t_d091e74d53ab1d 230-232
+  s_3c4475f7a21372::t_3d53f80832aaca 292,303-304,313,389
+  s_3c4475f7a21372::t_d2049a6de106a0 237,242,333
+  s_3c4475f7a21372::t_77ef1c0b674be9 29,387
+plugins/sauron/tests/ui/dev.spec.ts
+  s_3c4475f7a21372::t_f295e96be2d76f 77
+plugins/sauron/tests/ui/mcp-app.spec.ts
+  s_3c4475f7a21372::t_3df57c599ed70a 61,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9ebd211f257ba601644540c2ac0d41e1a0c595c7",
+  "prompts": {},
+  "sessions": {
+    "s_3c4475f7a21372": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fe98-c2aa-7f32-a3ec-9c79ae194383",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
