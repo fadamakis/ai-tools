@@ -1,3 +1,4 @@
+import {Dialog} from './Dialog.js';
 import {RecoveryNotice} from './RecoveryNotice.js';
 import {DiagnosticsView} from './DiagnosticsView.js';
 import {OrganisationReview} from './OrganisationReview.js';
@@ -29,13 +30,6 @@ function TaskFilter({kind,TriggerView,value,options,onChange}:{kind:string;Trigg
   return <div className={`inbox-filter inbox-${kind}-filter`} ref={ref} onKeyDownCapture={event=>{if(event.key==='Escape')restoreFocus();}}>
     <Select TriggerView={TriggerView} size="md" pill={false} dropdownIconType="chevronDown" block value={value} options={options} listMinWidth={200} listMaxWidth={280} onChange={option=>{onChange(option.value);restoreFocus();}}/>
   </div>;
-}
-function Dialog({title,close,children}:{title:string;close:()=>void;children:React.ReactNode}){
-  const ref=useRef<HTMLDialogElement>(null);const id=useId();
-  useEffect(()=>{ref.current?.showModal();},[]);
-  return <dialog ref={ref} className="inbox-dialog" aria-labelledby={id} onCancel={close}>
-    <header><h2 id={id}>{title}</h2><Button variant="ghost" color="secondary" uniform aria-label={`Close ${title.toLowerCase()}`} onClick={close}><Icon name="close"/></Button></header>{children}
-  </dialog>;
 }
 export function InboxView({vm}:{vm:SauronController}){
   const disabled=vm.actionLocked;
@@ -86,7 +80,7 @@ export function InboxView({vm}:{vm:SauronController}){
 
       {vm.branchDecision&&<Dialog title={vm.branchDecision.action==='reopen'?'Reopen this task and closed ancestors?':'Close the whole branch?'} close={()=>vm.setBranchDecision(null)}><p>{vm.branchDecision.task.title}</p><p>{vm.branchDecision.action==='reopen'?'The necessary closed ancestors will reopen. Top 3 will stay unchanged.':'All open descendants will receive the same decision. Keeping the parent open changes nothing.'}</p>{vm.branchDecision.revision!==vm.view?.taskViewRevision&&<p role="alert">Tasks changed. Cancel and review the branch again.</p>}<div className="inbox-dialog-actions"><Button variant="ghost" color="secondary" onClick={()=>vm.setBranchDecision(null)}>{vm.branchDecision.action==='reopen'?'Cancel':'Keep parent open'}</Button><Button color="secondary" disabled={vm.busy||vm.branchDecision.revision!==vm.view?.taskViewRevision} onClick={()=>{vm.decide(vm.branchDecision!.task,vm.branchDecision!.action,true);vm.setBranchDecision(null);}}>{vm.branchDecision.action==='reopen'?'Reopen path':'Confirm branch closure'}</Button></div></Dialog>}
       {vm.dismiss&&<Dialog title="Dismiss this task?" close={()=>vm.setDismiss(null)}><p>It will stay dismissed if the same source update arrives again.</p><p className="inbox-context">{vm.dismiss.title}</p><div className="inbox-dialog-actions"><Button autoFocus variant="ghost" color="secondary" onClick={()=>vm.setDismiss(null)}>Cancel</Button><Button color="primary" onClick={()=>{vm.decide(vm.dismiss!,'dismiss');vm.setDismiss(null);}}>Confirm dismiss</Button></div></Dialog>}
-      {vm.diagnostics&&<Dialog title="Diagnostics" close={()=>vm.setDiagnostics(false)}><p>{vm.client?.mode??'Connecting'} · Local store</p><dl><dt>Version</dt><dd>{__SAURON_VERSION__}</dd>{devBuildId&&<><dt>Fixture build</dt><dd>{devBuildId}</dd></>}<dt>Automatic update mode</dt><dd>{vm.view?.coordination?.mode??'independent'}</dd><dt>Sync freshness</dt><dd>{vm.view?.coordination?.freshness.status??'never'}</dd><dt>Store ID</dt><dd>{vm.view?.storeId}</dd></dl><DiagnosticsView/><h3>Sample tasks</h3><p>{devBuildId?'Refresh and reply actions use fixtures. No connected services are contacted.':'Refresh checks Slack and Granola. These controls create separate test records.'}</p><div className="inbox-detail-actions"><Button size="sm" variant="outline" color="secondary" disabled={!vm.client||disabled} onClick={vm.seed}>Create synthetic task</Button><Button size="sm" variant="outline" color="secondary" disabled={!vm.client||disabled} onClick={vm.replay}>Replay incoming update</Button></div></Dialog>}
+      {vm.diagnostics&&<Dialog title="Diagnostics" close={()=>vm.setDiagnostics(false)}><DiagnosticsView vm={vm}/></Dialog>}
     </main>
     {vm.notice&&<div role="status" className="inbox-notice"><span>{vm.notice}</span>{vm.reopenTask&&!vm.busy&&<Button variant="ghost" color="secondary" size="sm" disabled={!!vm.pending} onClick={()=>vm.decide(vm.reopenTask!,'reopen')}>Reopen task</Button>}<Button variant="ghost" color="secondary" size="sm" uniform aria-label="Dismiss notification" onClick={vm.dismissNotice}><Icon name="close"/></Button></div>}
   </div>;

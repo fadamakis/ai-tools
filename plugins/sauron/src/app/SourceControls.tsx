@@ -1,3 +1,5 @@
+import {Dialog} from './Dialog.js';
+import {automaticCheckWarning,UpdateDetails} from './UpdateStatus.js';
 import {RecoveryNotice} from './RecoveryNotice.js';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
@@ -47,23 +49,30 @@ function SourceHint({hint,children}:{hint:string;children:ReactNode}) {
 export function SourceControls({vm}:{vm:SauronController}) {
   const preferences=vm.view?.sourcePreferences??defaultSourcePreferences();
   const paused=!enabledSources(preferences).length;
+  const automaticWarning=automaticCheckWarning(vm.view);
   const locked=!vm.client||vm.actionLocked||!!vm.view?.pendingSourceSync||vm.scanning;
   const canRefresh=!locked&&(preferences.enabled.slack||preferences.enabled.granola);
-  return <Menu onOpen={()=>vm.setSourceMenuOpen(true)} onClose={()=>vm.setSourceMenuOpen(false)}><Menu.Trigger><Button variant="outline" color="secondary" size="md" disabled={!vm.client} aria-busy={vm.scanning}>
+  const [showDetails,setShowDetails]=useState(false);
+  const trigger=useRef<HTMLButtonElement>(null);
+  return <><Menu onOpen={()=>vm.setSourceMenuOpen(true)} onClose={()=>vm.setSourceMenuOpen(false)}><Menu.Trigger><Button ref={trigger} variant="outline" color="secondary" size="md" disabled={!vm.client} aria-busy={vm.scanning}>
     <Icon name="refresh" className={vm.scanning?'spinning':undefined}/>{vm.scanning?'Refreshing…':'Refresh'}<Icon name="chevron"/>
   </Button></Menu.Trigger><Menu.Content align="end" width={280} minWidth={280}>
     <SourceHint hint="Checks enabled Slack and Meetings sources now. New actions appear in Inbox for review.">
       <Menu.Item disabled={!canRefresh} onSelect={vm.refresh}>Refresh now</Menu.Item>
     </SourceHint>
-    <p className="inbox-source-help">Checks enabled Slack and Meetings sources.</p>
+    <Menu.Item disabled={!vm.view} onSelect={()=>setShowDetails(true)}>Update details</Menu.Item>
+    {automaticWarning&&<p className="inbox-source-help">{automaticWarning}</p>}
     <Menu.Separator/>
     <p className="inbox-source-heading" id="input-sources-label">Input sources</p>
     <div role="group" aria-labelledby="input-sources-label">
       {sources.map(({provider,label,hint})=><SourceHint key={provider} hint={hint}><Menu.CheckboxItem checked={preferences.enabled[provider]} disabled={locked} indicatorPosition="end" onSelect={event=>event.preventDefault()} onCheckedChange={enabled=>vm.saveSource(provider,enabled)}>{label}</Menu.CheckboxItem></SourceHint>)}
     </div>
-    <p className="inbox-source-help">Controls manual and automatic pulls. Existing tasks stay saved.</p>
-    {(vm.sourceSaving||vm.scanning||paused||vm.view?.pendingSourceSync)&&<p className="inbox-source-help" role="status">{vm.sourceSaving?'Saving source settings…':vm.scanning?'Available when this update finishes.':vm.view?.pendingSourceSync?'Waiting for pending update reconciliation.':'Source updates paused'}</p>}
+    {(vm.sourceSaving||vm.scanning||paused||vm.view?.pendingSourceSync)&&<p className="inbox-source-help" role="status">{vm.sourceSaving?'Saving source settings…':vm.scanning?'Available when this update finishes.':vm.view?.pendingSourceSync?'Finishing the previous update.':'Source updates paused'}</p>}
     <RecoveryNotice recovery={vm.sourceRecovery} busy={vm.busy} connected={!!vm.client}/>
 
-  </Menu.Content></Menu>;
+  </Menu.Content></Menu>
+    {showDetails&&vm.view&&<Dialog title="Update details" close={()=>{setShowDetails(false);requestAnimationFrame(()=>trigger.current?.focus());}}>
+      <UpdateDetails view={vm.view}/>
+    </Dialog>}
+  </>;
 }
