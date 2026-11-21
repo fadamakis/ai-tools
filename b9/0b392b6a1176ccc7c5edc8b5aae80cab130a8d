@@ -1,0 +1,24 @@
+plugins/sauron/src/app/TaskReader.tsx
+  s_3c4475f7a21372::t_75f3ee1adddca1 76-79,84-88
+plugins/sauron/src/app/TaskList.tsx
+  s_3c4475f7a21372::t_a3ce16c0e2b398 30-33
+  s_3c4475f7a21372::t_75f3ee1adddca1 18-21,40-41
+plugins/sauron/src/app/inbox.css
+  s_3c4475f7a21372::t_bc7d2302ffbdc3 44-48,50,126-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b90b392b6a1176ccc7c5edc8b5aae80cab130a8d",
+  "prompts": {},
+  "sessions": {
+    "s_3c4475f7a21372": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1fe98-c2aa-7f32-a3ec-9c79ae194383",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
