@@ -74,7 +74,7 @@ test('Sauron Dev shows its build, simulates refresh and replies, and routes disc
       store.finishReview(run.id,run.leaseId);
     }finally{store.close();}
     await app.getByRole('button',{name:'Refresh',exact:true}).click();await app.getByRole('menuitem',{name:'Refresh now',exact:true}).click();
-    await app.locator('summary').filter({hasText:'Organise tasks'}).click();
+    await app.getByRole('button',{name:/^Organise tasks/}).click();
     await expect(app.getByText('Real local-history review.',{exact:true})).toBeVisible();
     await expect(app.getByRole('button',{name:'Review last 14 days',exact:true})).toBeDisabled();
     await expect(app.getByRole('button',{name:'Check chat access',exact:true})).toBeDisabled();

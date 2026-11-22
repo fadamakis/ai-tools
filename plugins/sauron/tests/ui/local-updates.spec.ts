@@ -21,7 +21,9 @@ test('local status is honest, launch/online events coalesce and saved decisions 
   child=spawn(process.execPath,['dist/server/preview.js'],{env:{...process.env,PORT:'4815',ATTENTION_DB:path,SAURON_CODEX_BIN:runtime},stdio:['ignore','ignore','pipe']});
   await new Promise<void>((resolve,reject)=>{child!.stderr!.on('data',chunk=>{if(String(chunk).includes('Sauron preview:'))resolve();});child!.once('error',reject);child!.once('exit',code=>reject(Error(`Preview exited ${code}`)));});
   await page.goto('http://127.0.0.1:4815');await expect(page.locator('.inbox-update-warning').filter({hasText:'Offline. Catch-up will run when the connection is available.'})).toBeVisible();
-  await page.getByText('Update details',{exact:true}).click();await expect(page.getByText('This Mac checks Slack, meetings, Jira, GitHub and Calendar while available.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Update details',exact:true}).click();await expect(page.getByText('This Mac checks Slack, meetings, Jira, GitHub and Calendar while available.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close update details'}).click();
   await page.evaluate(()=>{window.dispatchEvent(new Event('online'));window.dispatchEvent(new Event('online'));});
   await page.getByRole('button',{name:/^History/}).click();await expect(page.getByRole('heading',{name:'Keep this completed task',exact:true})).toBeVisible();
   expect(existsSync(marker)).toBe(false);mkdirSync('docs/evidence/local-updates',{recursive:true});await page.screenshot({path:'docs/evidence/local-updates/offline.png',fullPage:true});

@@ -45,18 +45,24 @@ export function OrganisationReview({vm}:{vm:SauronController}){
   const liveDev=!!devBuildId&&origin==='local_history'&&(state.run?.status!=='completed'||state.proposal?.status==='pending');
   const reviewDisabled=disabled||liveDev;
   const start=(kind:'probe'|'bootstrap'|'daily')=>void review.call('review_organisation',{expectedStoreId:vm.view!.storeId,kind});
-  return <details className="inbox-organisation-review"><summary>Organise tasks{state.proposal?.status==='pending'?` · ${state.proposal.changes.length} suggestions`:''}</summary>
-    <p>{state.capability.detail}</p>
+  return <div className="inbox-organisation-review">
+    {state.capability.status!=='unknown'&&<p className="inbox-muted">{state.capability.detail}</p>}
     {(origin||devBuildId)&&<p>{origin==='local_history'?'Real local-history review.':'Simulated chat review.'}</p>}
     {devBuildId&&<p>Panel reviews use simulated chats. For real local history, run <code>pnpm sauron:dev:bootstrap</code>.{liveDev?' Resume that command or review its saved proposal before starting a simulated review.':''}</p>}
-    <div className="inbox-detail-actions"><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('probe')}>Check chat access</Button><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('bootstrap')}>Review last 14 days</Button><Button color="secondary" size="sm" variant="outline" disabled={reviewDisabled} onClick={()=>start('daily')}>Review changed chats</Button></div>
-    <p>{devBuildId?'Daily review is disabled in Sauron Dev.':`Daily review: ${state.enabled?'on at 07:00 Europe/Berlin':'off'}.`} Local Codex chats only. Suggestions wait here for your review.</p>
-    <Button color="secondary" size="sm" variant="outline" disabled={!!devBuildId||disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
+    <div className="inbox-review-actions">
+      <Button color="secondary" size="sm" variant="ghost" disabled={reviewDisabled} onClick={()=>start('probe')}>Check chat access</Button>
+      <Button color="secondary" size="sm" variant="ghost" disabled={reviewDisabled} onClick={()=>start('bootstrap')}>Review last 14 days</Button>
+      <Button color="secondary" size="sm" variant="ghost" disabled={reviewDisabled} onClick={()=>start('daily')}>Review changed chats</Button>
+    </div>
+    <div className="inbox-review-schedule">
+      <span className="inbox-muted">{devBuildId?'Daily review unavailable in Sauron Dev':state.enabled?'Daily review runs at 07:00 Europe/Berlin':'Daily review off'} · Local Codex chats only</span>
+      <Button color="secondary" size="sm" variant="ghost" disabled={!!devBuildId||disabled||(!state.enabled&&state.capability.status!=='verified')} onClick={()=>void review.call('configure_organisation_review',{operationId:operationId(),expectedStoreId:vm.view!.storeId,expectedReviewRevision:state.revision,enabled:!state.enabled})}>{state.enabled?'Disable daily review':'Enable daily review at 07:00'}</Button>
+    </div>
     {state.run&&<p role="status">{review.busy?'Review running. Progress is saved.':state.run.status==='partial'?'Review has incomplete coverage. Resume to retry missing reads.':state.run.status==='failed'?'Review interrupted. Resume from saved progress.':'Review complete.'}</p>}
     {!!state.run?.errors.length&&<><p role="alert">Some chats could not be reviewed. Existing tasks are unchanged by these suggestions. Run the review again to continue.</p><details><summary>Review details</summary><ul>{state.run.errors.map((error,i)=><li key={i}>{error}</li>)}</ul></details></>}
     {state.proposal?.status==='pending'&&!review.busy&&<ProposalEditor key={state.proposal.id} proposal={state.proposal} vm={vm}/>}
 
-  </details>;
+  </div>;
 }
 function ProposalEditor({proposal,vm}:{proposal:ReviewProposal;vm:SauronController}){
   const draftKey='sauron:proposal-draft:'+proposal.id;

@@ -38,6 +38,7 @@ for(const theme of ['light','dark'] as const){
     await page.getByRole('button',{name:'Add task',exact:true}).click();
     expect(await contrastRatio(page.getByRole('textbox',{name:'Task name',exact:true}),'::placeholder')).toBeGreaterThanOrEqual(4.5);
     expect(await contrastRatio(page.getByRole('textbox',{name:'Notes (optional)',exact:true}),'::placeholder')).toBeGreaterThanOrEqual(4.5);
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
     await toggle.click();
     await expect(page.locator('html')).toHaveAttribute('data-theme',theme==='dark'?'light':'dark');
   });
@@ -67,7 +68,7 @@ test('new source work is reviewed before entering Today, with area and distinct 
   await call(request,'upsert_attention_items',{batchId:'review-source',items:[syntheticObservation()]});
   await open(page);
   await expect(page.getByRole('radio',{name:/^Today 0/})).toBeVisible();
-  await page.getByRole('radio',{name:/^Inbox 1/}).click();
+  await page.getByRole('button',{name:'Review Inbox 1',exact:true}).click();
   await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
   await expect(page.getByRole('button',{name:/^Complete /})).toHaveCount(0);
   const editor=page.getByRole('form',{name:'Plan Review the synthetic launch note'});
@@ -80,8 +81,18 @@ test('new source work is reviewed before entering Today, with area and distinct 
   await call(request,'upsert_attention_items',{batchId:'review-source-newer',items:[syntheticObservation(2)]});
   await page.reload();
   await page.getByRole('button',{name:/^Review the synthetic launch note/}).click();
-  await expect(page.getByText('A repeated check still asks for review.',{exact:true})).toBeVisible();
-  await expect(page.getByText('Your next action: Ask Ayhan about learner impact.',{exact:true})).toBeVisible();
+  const reader=page.getByRole('region',{name:'Task details: Review the synthetic launch note'});
+  const nextAction=reader.getByRole('heading',{name:'Next action',exact:true});
+  const sourceContext=reader.getByRole('heading',{name:'Latest sample context',exact:true});
+  await expect(nextAction).toBeVisible();
+  await expect(reader.getByText('Ask Ayhan about learner impact.',{exact:true}).and(reader.getByRole('paragraph'))).toBeVisible();
+  await expect(reader.getByText('A repeated check still asks for review.',{exact:true})).toBeVisible();
+  for(const [width,height] of [[1280,800],[1440,900]]){
+    await page.setViewportSize({width,height});
+    const actionBounds=(await nextAction.boundingBox())!;
+    expect(actionBounds.y).toBeLessThan((await sourceContext.boundingBox())!.y);
+    expect(actionBounds.y+actionBounds.height).toBeLessThan(height);
+  }
   const saved=(await call(request,'list_attention')).items[0];
   expect(saved.area).toBe('blex');expect(saved.dueDate).toBe('2026-11-05');expect(saved.reviewDate).toBe('2026-11-04');
   await page.getByRole('button',{name:/^Filter by area:/}).click();
@@ -241,11 +252,15 @@ for(const outcome of ['recovered','new-failure','partial','next-update'] as cons
   await page.route('**/api/tool',route=>route.fulfill({json:view}));
   await open(page);
   await expect(page.getByRole('heading',{name:'Review saved task',exact:true})).toBeVisible();
-  const details=page.locator('.inbox-update details');await expect(details).not.toHaveAttribute('open','');
+  await expect(page.getByRole('dialog',{name:'Update details'})).toHaveCount(0);
   if(outcome==='recovered'||outcome==='next-update')await expect(page.getByRole('alert')).toHaveCount(0);
   else await expect(page.getByRole('alert').filter({hasText:'Manual check:'})).toContainText('Use Refresh to try again.');
-  if(outcome==='partial')await expect(page.getByRole('alert').filter({hasText:'Automatic update incomplete.'})).toBeVisible();
-  await page.getByText('Update details',{exact:true}).click();
+  const refresh=page.getByRole('button',{name:/^Refresh/});
+  const automaticWarning=page.getByText('Automatic check: Couldn’t check Calendar.',{exact:true});
+  await expect(automaticWarning).toHaveCount(0);
+  await refresh.click();
+  if(outcome==='partial')await expect(page.getByRole('menu').getByText('Automatic check: Couldn’t check Calendar.',{exact:true})).toBeVisible();
+  await page.getByRole('menuitem',{name:'Update details',exact:true}).click();
   await expect(page.getByText('The source check did not finish.',{exact:true})).toBeVisible();
   if(outcome==='recovered'||outcome==='next-update')await expect(page.getByText('A full automatic update completed after this check.',{exact:true})).toBeVisible();
   if(outcome==='partial')await expect(page.getByText('Calendar (failed): Calendar unavailable',{exact:true})).toBeVisible();
@@ -253,6 +268,10 @@ for(const outcome of ['recovered','new-failure','partial','next-update'] as cons
   for(const width of [320,375,768,1280]){
     await page.setViewportSize({width,height:900});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  }
+  if(outcome==='partial'){
+    await page.getByRole('button',{name:'Close update details'}).click();
+    await expect(automaticWarning).toHaveCount(0);
   }
 });
 
@@ -300,10 +319,16 @@ test('task list fills the remaining desktop height as the window and update deta
   }
   await page.setViewportSize({width:1440,height:900});
   const closed=(await reader.boundingBox())!;
-  await page.getByText('Update details',{exact:true}).click();
-  expect((await reader.boundingBox())!.height).toBeLessThan(closed.height);
-  await page.getByText('Update details',{exact:true}).click();
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Update details',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Update details'});
+  await expect(dialog).toBeVisible();
+  const bounds=(await dialog.boundingBox())!;
+  expect(bounds.x+bounds.width/2).toBeCloseTo(720,0);
+  expect(bounds.y+bounds.height/2).toBeCloseTo(450,0);
   expect((await reader.boundingBox())!.height).toBeCloseTo(closed.height,0);
+  await dialog.getByRole('button',{name:'Close update details'}).click();
+  await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeFocused();
 });
 
 test('reader tools stay clear of scrolling content and portaled menus',async({page,request})=>{
@@ -333,7 +358,7 @@ for(const width of [1440,375])test(`completion feedback keeps the task list stab
   await page.setViewportSize({width,height:1000});
   await page.emulateMedia({colorScheme:width===375?'dark':'light'});
   await add(request,'Complete without flashing');await add(request,'Keep this task');await add(request,'Another remaining task');await open(page);
-  expect((await page.getByRole('heading',{name:'Your working day',exact:true}).boundingBox())!.y).toBeLessThan(120);
+  expect((await page.getByRole('heading',{name:'Sauron',exact:true}).boundingBox())!.y).toBeLessThan(120);
   const reader=page.locator('.inbox-reader'),before=(await reader.boundingBox())!;
   let release!:()=>void,started!:()=>void;
   const held=new Promise<void>(resolve=>{release=resolve;}),sending=new Promise<void>(resolve=>{started=resolve;});
@@ -607,22 +632,41 @@ test('O-03: editable proposals preserve excluded closures across reload and appl
   await page.setViewportSize({width:375,height:1000});await page.emulateMedia({colorScheme:'dark'});
   await add(request,'Existing work');const view=await add(request,'Keep open');const existing=view.items.find(task=>task.title==='Existing work')!,keep=view.items.find(task=>task.title==='Keep open')!;
   seedProposal([{kind:'create',key:'group',title:'Suggested group',reason:'Related work.',evidenceIds:[]},{kind:'move',key:'move',taskRef:existing.id,parentRef:'group',reason:'Related.',evidenceIds:[]},{kind:'topics',key:'topics',taskRef:'group',topics:['routines'],reason:'Shared subject.',evidenceIds:[]},{kind:'close',key:'close',taskRef:keep.id,reason:'Review relevance.',evidenceIds:[]}]);
-  await open(page);await page.getByText('Organise tasks · 4 suggestions',{exact:true}).click();
-  const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await page.getByRole('textbox',{name:'Parent name',exact:true}).fill('Chosen group');
-  await page.reload();await page.getByText('Organise tasks · 4 suggestions',{exact:true}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('textbox',{name:'Parent name',exact:true})).toHaveValue('Chosen group');
+  await open(page);
+  const organise=page.getByRole('button',{name:'Organise tasks · 4 suggestions',exact:true});
+  const panel=page.getByRole('region',{name:'Organise tasks',exact:true});
+  const list=page.locator('.inbox-list');
+  const before=(await list.boundingBox())!;
+  await organise.click();
+  await expect(panel).toBeVisible();
+  expect((await list.boundingBox())!.y).toBe(before.y);
+  await expect(page.getByRole('radio',{name:/^Today/})).toBeVisible();
+  const closure=panel.getByRole('checkbox',{name:'Close branch: Keep open'});
+  const parentName=panel.getByRole('textbox',{name:'Parent name',exact:true});
+  await closure.uncheck();await parentName.fill('Chosen group');
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(organise).toBeFocused();
+  await organise.click();await expect(closure).not.toBeChecked();await expect(parentName).toHaveValue('Chosen group');
+  await page.getByRole('heading',{name:'Sauron',exact:true}).click();
+  await expect(panel).toHaveCount(0);
+  await page.reload();await organise.click();await expect(closure).not.toBeChecked();await expect(parentName).toHaveValue('Chosen group');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();mkdirSync(evidence,{recursive:true});await page.screenshot({path:evidence+'/proposal-375.png',fullPage:true});
-  await page.getByRole('button',{name:'Accept 3 selected changes'}).click();await expect(page.getByRole('heading',{name:'Chosen group',exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Accept 3 selected changes'}).click();
+  await expect(panel.getByRole('button',{name:'Accept 3 selected changes'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Organise tasks',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Chosen group',exact:true})).toBeVisible();
   const saved=await call(request,'list_attention'),parent=saved.items.find(task=>task.title==='Chosen group')!;expect(saved.items.find(task=>task.id===existing.id)?.parentId).toBe(parent.id);expect(saved.items.find(task=>task.id===keep.id)?.state).toBe('ready');expect(parent.directTopicIds).toHaveLength(1);
 });
 test('O-03: excluded dependencies block acceptance and a lost committed response retries without duplicate parents',async({page,request})=>{
   const view=await add(request,'Existing work'),existing=view.items[0];seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'move',key:'move',taskRef:existing.id,parentRef:'parent',reason:'Related.',evidenceIds:[]}]);
-  await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).uncheck();await expect(page.getByText('A selected change needs an excluded parent or task. Include it or choose another destination.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).check();
+  await open(page);await page.getByRole('button',{name:'Organise tasks · 2 suggestions',exact:true}).click();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).uncheck();await expect(page.getByText('A selected change needs an excluded parent or task. Include it or choose another destination.',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('checkbox',{name:'Create parent: Suggested parent'}).check();
   let lost=false;await page.route('**/api/tool',async route=>{if(!lost&&route.request().postDataJSON().name==='accept_organisation_proposal'){lost=true;await route.fetch();await route.abort('failed');return;}await route.continue();});
-  await page.getByRole('button',{name:'Accept 2 selected changes'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toBeVisible();await page.reload();await page.getByText('Organise tasks',{exact:true}).click();await page.getByRole('button',{name:'Retry save'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toHaveCount(0);expect((await call(request,'list_attention')).items.filter(task=>task.title==='Suggested parent')).toHaveLength(1);
+  await page.getByRole('button',{name:'Accept 2 selected changes'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Organise tasks',exact:true}).click();await page.getByRole('button',{name:'Retry save'}).click();await expect(page.getByRole('button',{name:'Retry save'})).toHaveCount(0);expect((await call(request,'list_attention')).items.filter(task=>task.title==='Suggested parent')).toHaveLength(1);
 });
 test('O-03: refreshing a stale proposal preserves the user’s excluded closure',async({page,request})=>{
   const view=await add(request,'Keep open'),id=view.items[0].id;seedProposal([{kind:'create',key:'parent',title:'Suggested parent',reason:'Group work.',evidenceIds:[]},{kind:'close',key:'close',taskRef:id,reason:'Review relevance.',evidenceIds:[]}]);
-  await open(page);await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await add(request,'Concurrent work');await page.reload();await page.getByText('Organise tasks · 2 suggestions',{exact:true}).click();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('button',{name:'Load latest proposal'}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeEnabled();
+  await open(page);await page.getByRole('button',{name:'Organise tasks · 2 suggestions',exact:true}).click();const closure=page.getByRole('checkbox',{name:'Close branch: Keep open'});await closure.uncheck();await add(request,'Concurrent work');await page.reload();await page.getByRole('button',{name:'Organise tasks · 2 suggestions',exact:true}).click();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeDisabled();await page.getByRole('button',{name:'Load latest proposal'}).click();await expect(closure).not.toBeChecked();await expect(page.getByRole('button',{name:'Accept 1 selected change'})).toBeEnabled();
 });
 
 for(const theme of ['light','dark'] as const)test(`N-01 T-03: workspace polish keeps filters and nested tasks usable in ${theme}`,async({page,request},testInfo)=>{
@@ -641,7 +685,12 @@ for(const theme of ['light','dark'] as const)test(`N-01 T-03: workspace polish k
   await addTask.focus();await expect(addTask).toBeFocused();
   expect(await addTask.evaluate(el=>getComputedStyle(el).outlineStyle)).not.toBe('none');
   await addTask.hover();expect(await contrastRatio(addTask)).toBeGreaterThanOrEqual(4.5);
-  await addTask.click();await expect(addTask).toBeDisabled();await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await addTask.click();
+  const composer=page.getByRole('dialog',{name:'New personal task',exact:true});
+  await expect(composer.getByRole('textbox',{name:'Task name',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(composer).toHaveCount(0);
+  await expect(addTask).toBeFocused();
   const topicFilter=page.getByRole('button',{name:/^Filter by topic:/});
   await topicFilter.focus();await page.keyboard.press('Space');await page.getByRole('option',{name:topic,exact:true}).click();
   await expect(topicFilter).toBeFocused();await topicFilter.press('Space');await page.keyboard.press('Escape');await expect(topicFilter).toBeFocused();
@@ -666,6 +715,17 @@ for(const theme of ['light','dark'] as const)test(`N-01 T-03: workspace polish k
   const siblingRow=page.locator('.inbox-task').filter({has:page.getByRole('heading',{name:'Prepare the weekly team update',exact:true})});
   expect((await parentRow.locator('.inbox-task-open').boundingBox())!.x).toBe((await siblingRow.locator('.inbox-task-open').boundingBox())!.x);
   await page.setViewportSize({width:720,height:500});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+  await page.getByRole('button',{name:'Back to tasks',exact:true}).click();
+  const childRow=page.locator('.inbox-task').filter({has:page.getByRole('heading',{name:/^Child 1:/})});
+  const parentBounds=(await parentRow.boundingBox())!,childBounds=(await childRow.boundingBox())!;
+  expect(childBounds.x).toBe(parentBounds.x);
+  expect(childBounds.width).toBe(parentBounds.width);
+  const parentTitle=(await parentRow.getByRole('heading').boundingBox())!;
+  const childTitle=(await childRow.getByRole('heading').boundingBox())!;
+  expect(childTitle.x).toBeGreaterThan(parentTitle.x);
+  const normal=await childRow.evaluate(row=>getComputedStyle(row).backgroundColor);
+  await childRow.hover({position:{x:4,y:6}});
+  expect(await childRow.evaluate(row=>getComputedStyle(row).backgroundColor)).not.toBe(normal);
   await page.screenshot({path:testInfo.outputPath(`workspace-${theme}-200-percent-equivalent.png`),fullPage:true,animations:'disabled'});
   const attention=page.getByRole('button',{name:'Needs attention',exact:true});await attention.click();await expect(attention).toHaveAttribute('aria-pressed','true');await attention.click();await expect(attention).toHaveAttribute('aria-pressed','false');
 });

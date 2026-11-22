@@ -73,14 +73,19 @@ function TaskDetail({task,vm,position,total,back,previous,next}:{task:Task;vm:Sa
       {sourceError&&<p role="alert">{sourceError}</p>}
       <div className="inbox-detail-meta"><SourceBadge task={task}/><span className={`inbox-state inbox-state-${task.state}`}>{labels[task.state]}</span><span>{areaLabels[task.area??'unassigned']}</span></div>
       <h2 id={titleId} tabIndex={-1} aria-label={`Task details: ${task.title}`}>{task.title}</h2>
+      {!!task.nextAction.trim()&&<div className="inbox-detail-context inbox-next-action">
+        <h3>Next action</h3>
+        <p className="inbox-context">{task.nextAction}</p>
+      </div>}
       {historical&&<p className="inbox-detail-date">{task.state==='dismissed'?'Dismissed':task.userDecision==='complete'?'Completed':'Resolved at source'}{task.decidedAt&&<> · <time dateTime={task.decidedAt}>{date(task.decidedAt)}</time></>}</p>}
       {task.state==='snoozed'&&task.snoozedUntil&&<p className="inbox-detail-date">Returns {date(task.snoozedUntil)}</p>}
       {task.dueDate&&<p className="inbox-detail-date">Due {plannedDate(task.dueDate)}</p>}
       {task.reviewDate&&<p className="inbox-detail-date">Review {plannedDate(task.reviewDate)}</p>}
-      <div className="inbox-detail-context"><h3>{task.provider==='personal'?'Task notes':task.provider==='manual'?'Latest sample context':'Latest source context'}</h3>
-        <p className={`inbox-context ${!task.sourceNextAction?'inbox-muted':''}`}>{task.sourceNextAction||'No additional notes.'}</p>
-      </div>
-      {task.plannedAction!==null&&task.plannedAction!==undefined&&task.plannedAction!==task.sourceNextAction&&<p className="inbox-context">Your next action: {task.plannedAction}</p>}
+      {!!task.sourceNextAction?.trim()&&task.sourceNextAction.trim()!==task.nextAction.trim()&&
+        <div className="inbox-detail-context">
+          <h3>{task.provider==='personal'?'Task notes':task.provider==='manual'?'Latest sample context':'Latest source context'}</h3>
+          <p className="inbox-context">{task.sourceNextAction}</p>
+        </div>}
       {'provenance' in task&&task.provenance&&<details><summary>Source evidence</summary><p className="inbox-context">{task.provenance.evidence}</p><p className="inbox-muted">Read by dot{task.lastCheckedAt&&<> · {date(task.lastCheckedAt)}</>}</p></details>}
       {historical&&task.userDecision&&task.provider!=='personal'&&<p className="inbox-saved-decision">Your {task.state==='done'?'completion':'dismissal'} is saved. Source updates do not reopen this task.</p>}
       <div className="inbox-detail-actions">{task.sourceUrl&&<Button variant="outline" color="secondary" size="sm" onClick={source}>{task.provider==='manual'?'Open sample source':'Open source'} <Icon name="arrow"/></Button>}
