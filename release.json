@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "4a0cb7af3c31b13a901f36763fce4dfb7fedc6b6",
+  "sourceCommit": "83d7d428af56b1e14b918f7f07dbbd32a129a070",
   "products": {
     "shelob": {
       "version": "0.11.17",
@@ -12,9 +12,9 @@
       "packageDigest": "17ae8bc7d4918a7045af840c01be1d2e39a8479f58737d6fada26c5c757d0566"
     },
     "workbench": {
-      "version": "0.4.8",
-      "inputDigest": "3caf2766b6bac727e6e96a15b7d7e11a91b71fcdb40c6100bef5c648b4d7b600",
-      "packageDigest": "21a1e833b4f1b4c016f37cc50963e433ae7f75f0033d4c25d1f7dd104179d489"
+      "version": "0.4.9",
+      "inputDigest": "4c005d870fd4591ba3d6b67addef18f6868e9477de360f3d06946906c06d169a",
+      "packageDigest": "2b1509e6a28efb6bf5b5dfff5fe1a93ae4ce5ba578bf93ad0ae36a9f1c746202"
     }
   },
   "changed": [
