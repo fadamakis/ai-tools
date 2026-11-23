@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attentionReason, cardNextAction, displayTitle, taskStatus } from '../app/presentation.mjs';
+import { attentionReason, cardNextAction, cardStatus, displayTitle, taskStatus } from '../app/presentation.mjs';
 
 test('attention explains blockers, failed checks, stale PR snapshots and evidence from another revision', () => {
   const at = Date.parse('2026-10-20T12:00:00Z');
@@ -30,6 +30,16 @@ test('card titles avoid a repeated ticket while preserving meaningful text', () 
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-123: Preserve the draft' }), 'Preserve the draft');
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-123' }), 'EX-123');
   assert.equal(displayTitle({ key: 'EX-123', title: 'EX-1234: Another task' }), 'EX-1234: Another task');
+  assert.equal(displayTitle({ key: 'EX-123', title: 'https://issues.example.com/browse/EX-123' }), 'EX-123');
+  assert.equal(displayTitle({ key: 'link-identifier', title: 'https://example.com/work' }), 'example.com');
+});
+
+test('cards name failing CI on open PRs and preserve blocker and completion status', () => {
+  const task = { stage: 'pr', status: 'waiting', pr: { state: 'OPEN', checks: 'failed' } };
+  assert.equal(cardStatus(task), 'CI failed');
+  assert.equal(cardStatus({ ...task, status: 'blocked' }), 'Blocked');
+  assert.equal(cardStatus({ ...task, pr: { ...task.pr, state: 'MERGED' } }), 'Merged · confirm delivery');
+  assert.equal(cardStatus({ ...task, stage: 'done' }), 'Merged');
 });
 
 test('completed artifacts have a delivery label without claiming a PR merge', () => {

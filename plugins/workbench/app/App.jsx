@@ -1,7 +1,7 @@
 import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { Markdown } from '@openai/apps-sdk-ui/components/Markdown';
 import { stages } from './controller.mjs';
-import { attentionReason, cardNextAction, currentLaunches, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskAction, taskChatUrl, taskTicketUrl, taskLaunch, taskStatus } from './presentation.mjs';
+import { attentionReason, cardNextAction, cardStatus, currentLaunches, displayTitle, evidenceLabel, launchStatus, repositoryLocation, taskAction, taskChatUrl, taskTicketUrl, taskLaunch, taskStatus } from './presentation.mjs';
 import { Button, Secondary, Quiet, Input, Textarea, Menu, Checkbox, SegmentedControl, Badge, Icon, Dialog, Select, Tooltip, TextLink, Alert, EmptyMessage, LoadingIndicator, submitForm, enterSubmits } from './ui.jsx';
 import { HowItWorks } from './HowItWorks.jsx';
 import { PublicationDetails, RemoteRunDetails } from './DeliveryDetails.jsx';
@@ -41,28 +41,31 @@ function TaskPrimaryAction({ vm, task, action, card = false }) {
     return vm.action(() => vm.recover(task), 'Preparing recovery request…');
   };
   const Control = card ? Secondary : Button;
-  return <Control className={card ? 'card-action' : 'workbench-primary'} size={card ? 'sm' : 'md'} pill={false} disabled={vm.busy} aria-label={card ? `${action.label} · ${displayTitle(task)}` : undefined}
+  const button = <Control className={card ? 'card-action' : 'workbench-primary'} size={card ? 'sm' : 'md'} disabled={vm.busy} aria-label={card ? `${action.label} · ${displayTitle(task)}` : undefined}
     aria-describedby={!card && action.kind === 'recover' ? 'recovery-draft-help' : undefined} onClick={run}>{action.label}</Control>;
+  return card && action.kind === 'recover' ? <Tooltip content="Opens a draft in the Workbench chat">{button}</Tooltip> : button;
 }
 
 function TaskCard({ vm, task, repository }) {
   const action = taskAction(task, vm.board.launches);
   const reason = attentionReason(task);
-  const next = cardNextAction(task);
+  const title = displayTitle(task);
+  const status = cardStatus(task);
+  const next = status === 'CI failed' ? cardNextAction(task).replace(/^CI failed\. /, '') : cardNextAction(task);
   const ticket = /^[A-Z][A-Z0-9]+-\d+$/i.test(task.key) ? task.key : '';
   return <article className="task-card" data-status={task.status} data-attention={Boolean(reason)}>
-    <button className="card-main" aria-label={`Open ${displayTitle(task)}`} disabled={vm.busy} onClick={() => vm.action(() => vm.select(task.id), 'Opening task…')}>
-      <div className="card-heading"><h3>{displayTitle(task)}</h3></div>
+    <button className="card-main" aria-label={`Open ${title}`} disabled={vm.busy} onClick={() => vm.action(() => vm.select(task.id), 'Opening task…')}>
+      <div className="card-heading"><h3>{title}</h3></div>
       <div className="card-context">
-        <div className="card-meta">{ticket && <span className="task-key">{ticket}</span>}<span className="repository-name">{repository?.name || 'Repository unavailable'}</span></div>
-        <Badge className="card-status" size="sm" color={reason ? 'warning' : tone(task.status)}>{task.stage === 'done' && task.completion?.kind !== 'artifact' ? 'Merged' : taskStatus(task)}</Badge>
+        <div className="card-meta">{ticket && ticket !== title && <span className="task-key">{ticket}</span>}<span className="repository-name">{repository?.name || 'Repository unavailable'}</span></div>
+        <Badge className="card-status" size="sm" color={reason ? 'warning' : tone(task.status)}>{status}</Badge>
       </div>
       {next && <p className={`card-next ${reason ? 'needs-attention' : ''}`}>{next}</p>}
     </button>
     <footer className="card-actions">
       <TaskPrimaryAction vm={vm} task={task} action={action} card/>
       {action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Tooltip content="Open chat">
-        <Quiet size="md" uniform pill={false} disabled={vm.busy} aria-label={`Open chat · ${displayTitle(task)}`} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}><Icon name="chat"/></Quiet>
+        <Quiet size="md" uniform disabled={vm.busy} aria-label={`Open chat · ${title}`} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}><Icon name="chat"/></Quiet>
       </Tooltip>}
     </footer>
   </article>;
@@ -73,19 +76,28 @@ function ChatRequests({ vm }) {
   const latest = requests.find(request => request.id === vm.lastLaunch?.id) || requests[0];
   if (!latest) return null;
   const task = vm.board.tasks.find(task => task.id === latest.taskId);
-  const description = latest.error || (latest.state === 'accepted' ? 'The worker confirmed this task in its chat.' : latest.state === 'sent' ? 'The request was delivered. Waiting for the worker to confirm the task.' : latest.state === 'prepared' ? 'Review the request in the chat composer and press Send. Work starts after you send it.' : 'Check the board chat before retrying. Unconfirmed requests are never resent automatically.');
+  const description = latest.error || (latest.state === 'accepted' ? 'The worker confirmed this task in its chat.' : latest.state === 'sent' ? 'The request was delivered. Waiting for the worker to confirm the task.' : latest.state === 'prepared' ? 'Review the draft in the Codex composer and press Send to start.' : 'Check the board chat before retrying. Unconfirmed requests are never resent automatically.');
   const earlier = requests.filter(request => request.id !== latest.id);
   return <section className="launch-status" aria-label="Chat handoff">
-    <Alert color={latest.state === 'accepted' ? 'success' : ['failed', 'uncertain'].includes(latest.state) ? 'warning' : 'info'} variant="soft" role="status" actionsPlacement="bottom"
-      title={`${launchStatus[latest.state]}${task ? ` · ${displayTitle(task)}` : ''}`} description={description}
-      actions={<div className="launch-request-actions">{taskChatUrl(task || {}) && <TextLink href={taskChatUrl(task)} onClick={event => { event.preventDefault(); vm.action(() => vm.resume(task), 'Opening chat…'); }}>Open chat</TextLink>}<Quiet size="sm" onClick={() => vm.action(() => vm.select(latest.taskId), 'Opening task…')}>View task</Quiet>{unresolvedLaunchStates.includes(latest.state) && <Quiet size="sm" disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch: latest })}>Review request</Quiet>}</div>}/>
+    <div className="launch-notice">
+      <div role="status" className="launch-notice-copy">
+        <p className="launch-notice-state" data-state={latest.state}>{launchStatus[latest.state]}</p>
+        {task && <p className="launch-notice-title">{displayTitle(task)}</p>}
+        <p>{description}</p>
+      </div>
+      <div className="launch-request-actions">
+        {task && <Secondary size="sm" disabled={vm.busy} onClick={() => vm.action(() => vm.select(latest.taskId), 'Opening task…')}>View task</Secondary>}
+        {taskChatUrl(task || {}) && <Quiet size="sm" disabled={vm.busy} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open saved worker chat</Quiet>}
+        {unresolvedLaunchStates.includes(latest.state) && <Quiet size="sm" disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch: latest })}>Release request</Quiet>}
+      </div>
+    </div>
     {earlier.length > 0 && <details><summary>{earlier.length} earlier chat request{earlier.length === 1 ? '' : 's'}</summary>{earlier.map(launch => <div className="launch-row" key={launch.id}><Quiet size="sm" onClick={() => vm.action(() => vm.select(launch.taskId), 'Opening task…')}>{vm.board.tasks.find(task => task.id === launch.taskId)?.title || 'View task'}</Quiet><Badge color={tone(launch.state)}>{launchStatus[launch.state]}</Badge>{launch.error && <span>{launch.error}</span>}</div>)}</details>}
   </section>;
 }
 
-function DeliveryBoard({ vm, tasks, repositories, filterKey }) {
+function DeliveryBoard({ vm, tasks, repositories, filterKey, hideDone }) {
   const [selection, setSelection] = useState(null);
-  const groups = stages.map(([key, label]) => {
+  const groups = stages.filter(([key]) => key !== 'done' || !hideDone).map(([key, label]) => {
     const cards = tasks.filter(task => task.stage === key);
     return { key, label, cards, blocked: cards.filter(task => task.status === 'blocked').length };
   });
@@ -99,11 +111,12 @@ function DeliveryBoard({ vm, tasks, repositories, filterKey }) {
         {blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}
       </Quiet>)}
     </nav>
-    <div className="board-scroll" role="region" aria-label="Delivery stages"><div className="board">
+    <div className="board-scroll" role="region" aria-label="Delivery stages"><div className="board"
+      style={{ '--stage-tracks': groups.map(group => group.cards.length ? 'minmax(0, 1fr)' : '5.75rem').join(' ') }}>
       {groups.map(({ key, label, cards, blocked }) => (
-        <section className="column" data-stage={key} data-active={active === key || (active === 'all' && cards.length > 0)} data-blocked={blocked > 0} key={key} aria-label={`${label}, ${cards.length} tasks`}>
+        <section className="column" data-stage={key} data-empty={cards.length === 0} data-active={active === key || (active === 'all' && cards.length > 0)} key={key} aria-label={`${label}, ${cards.length} tasks`}>
           <header className="column-header">
-            <div><span className="stage-dot"/><h2>{label}</h2>{(!blocked || blocked !== cards.length) && <span className="column-count">{cards.length}</span>}{blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}</div>
+            <div><h2>{label}</h2>{(!blocked || blocked !== cards.length) && <span className="column-count">{cards.length}</span>}{blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}</div>
             {key === 'done' && cards.length > 0 && <Quiet size="sm" disabled={vm.busy} aria-label={`Archive ${cards.length} done task${cards.length === 1 ? '' : 's'}`} onClick={() => vm.action(() => vm.archive(cards), 'Archiving completed tasks…')}>Archive all</Quiet>}
           </header>
           <div className="column-cards">
@@ -116,10 +129,10 @@ function DeliveryBoard({ vm, tasks, repositories, filterKey }) {
   </div>;
 }
 
-function EmptyResults({ archived, filtering, archivedCount, clear, showArchive, start }) {
-  const title = filtering ? 'No matching tasks' : archived ? 'No archived tasks' : archivedCount ? 'All caught up.' : 'Ready for your next task.';
+function EmptyResults({ archived, filtering, archivedCount, clear, showArchive, start, hiddenDone, showDone }) {
+  const title = hiddenDone ? 'No active tasks' : filtering ? 'No matching tasks' : archived ? 'No archived tasks' : archivedCount ? 'All caught up.' : 'Ready for your next task.';
   const copy = filtering ? 'Try another search or clear your filters.' : archived ? 'Archive completed tasks to keep the board focused. You can restore them here.' : archivedCount ? 'Your completed work is saved in Archive.' : '';
-  return <section className="empty-results"><EmptyMessage><EmptyMessage.Icon><Icon name={filtering ? 'search' : archived || archivedCount ? 'archive' : 'board'}/></EmptyMessage.Icon><EmptyMessage.Title><h2>{title}</h2></EmptyMessage.Title>{copy && <EmptyMessage.Description>{copy}</EmptyMessage.Description>}<EmptyMessage.ActionRow>{filtering ? <Secondary onClick={clear}>Clear filters</Secondary> : archivedCount && !archived ? <Secondary onClick={showArchive}>View archive</Secondary> : !archived && <Button onClick={start}>New task</Button>}</EmptyMessage.ActionRow></EmptyMessage></section>;
+  return <section className="empty-results"><EmptyMessage><EmptyMessage.Icon><Icon name={filtering ? 'search' : archived || archivedCount ? 'archive' : 'board'}/></EmptyMessage.Icon><EmptyMessage.Title><h2>{title}</h2></EmptyMessage.Title>{copy && !hiddenDone && <EmptyMessage.Description>{copy}</EmptyMessage.Description>}<EmptyMessage.ActionRow>{hiddenDone ? <Secondary onClick={showDone}>Show completed tasks</Secondary> : filtering ? <Secondary onClick={clear}>Clear filters</Secondary> : archivedCount && !archived ? <Secondary onClick={showArchive}>View archive</Secondary> : !archived && <Button onClick={start}>New task</Button>}</EmptyMessage.ActionRow></EmptyMessage></section>;
 }
 
 function BoardToolbar({ vm, view, setView, archivedCount, repositoryId, setRepositoryId, query, setQuery, setAttention, filtering, clear }) {
@@ -147,7 +160,7 @@ function AttentionFilter({ count, active, onChange }) {
   return <Quiet className="attention-filter" size="md" pill={false} aria-pressed={active} disabled={!count && !active} onClick={() => onChange(!active)}>Needs attention <Badge size="sm" color={count ? 'warning' : 'secondary'}>{count}</Badge></Quiet>;
 }
 
-function BoardContent({ vm, archived, archivedCount, filtered, filtering, clear, showArchive, start, filterKey }) {
+function BoardContent({ vm, archived, archivedCount, filtered, filtering, clear, showArchive, start, filterKey, hideDone, hiddenDone, showDone }) {
   if (!vm.hasBoard) return <section className="connecting" aria-label="Connecting to Workbench">{vm.error ? <><ActionError vm={vm}/><Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.connect(), 'Reconnecting…')}>Try again</Secondary></> : <p role="status"><LoadingIndicator/>Loading your saved work…</p>}</section>;
   return <>
     {vm.error && !vm.modal && !vm.selected && <ActionError vm={vm}/>}
@@ -155,29 +168,32 @@ function BoardContent({ vm, archived, archivedCount, filtered, filtering, clear,
     {!vm.modal && !vm.selected && <BusyStatus vm={vm}/>}
     {!archived && <ChatRequests vm={vm}/>}
     {!vm.board.repositories.length ? <RepositoryEntry vm={vm}/> :
-      !filtered.length ? <EmptyResults archived={archived} filtering={filtering} archivedCount={archivedCount} clear={clear} showArchive={showArchive} start={start}/> : archived ? <div className="archive-grid" role="region" aria-label="Archived tasks">{filtered.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={vm.board.repositories.find(repository => repository.id === task.repositoryId)}/>)}</div> : <DeliveryBoard vm={vm} tasks={filtered} repositories={vm.board.repositories} filterKey={filterKey}/>}
+      !filtered.length ? <EmptyResults {...{ archived, filtering, archivedCount, clear, showArchive, start, hiddenDone, showDone }}/> : archived ? <div className="archive-grid" role="region" aria-label="Archived tasks">{filtered.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={vm.board.repositories.find(repository => repository.id === task.repositoryId)}/>)}</div> : <DeliveryBoard vm={vm} tasks={filtered} repositories={vm.board.repositories} filterKey={filterKey} hideDone={hideDone}/>}
   </>;
 }
 
 function AppHeader({ vm, start, hasRepositories }) {
   const more = useRef(null);
   const open = kind => vm.showModal({ kind, returnFocus: more.current });
-  return <header className="app-header"><div className="brand"><span className="brand-mark"><Icon name="board"/></span><h1>Workbench</h1><Quiet className="version-info" size="sm" aria-label={`About Workbench ${__WORKBENCH_VERSION__}`} onClick={() => vm.showModal({ kind: 'help' })}><Badge variant="outline">v{__WORKBENCH_VERSION__}</Badge></Quiet></div>
-    <div className="header-actions"><Quiet className="header-secondary" pill={false} onClick={() => vm.showModal({ kind: 'help' })}>How it works</Quiet><Quiet className="header-secondary" pill={false} onClick={() => vm.showModal({ kind: 'repository' })}>Add repository</Quiet><Button className="workbench-primary" pill={false} disabled={vm.busy || !hasRepositories} onClick={start}><Icon name="plus"/>New task</Button>
+  return <header className="product-bar"><div className="product-bar-inner app-header"><div className="brand"><span className="brand-mark"><Icon name="board"/></span><h1>Workbench</h1><Quiet className="version-info" size="sm" aria-label={`About Workbench ${__WORKBENCH_VERSION__}`} onClick={() => vm.showModal({ kind: 'help' })}><Badge variant="outline">v{__WORKBENCH_VERSION__}</Badge></Quiet></div>
+    <div className="header-actions"><Quiet className="header-secondary" onClick={() => vm.showModal({ kind: 'help' })}>How it works</Quiet><Quiet className="header-secondary" onClick={() => vm.showModal({ kind: 'repository' })}>Add repository</Quiet><Button className="workbench-primary" disabled={vm.busy || !hasRepositories} onClick={start}><Icon name="plus"/>New task</Button>
       <div className="header-more"><Menu><Menu.Trigger><Quiet ref={more} uniform aria-label="More options"><Icon name="more"/></Quiet></Menu.Trigger><Menu.Content align="end" minWidth={200}><Menu.Item onSelect={() => open('help')}>How it works</Menu.Item><Menu.Item onSelect={() => open('repository')}>Add repository</Menu.Item></Menu.Content></Menu></div>
     </div>
-  </header>;
+  </div></header>;
 }
 
 export function AppView({ vm }) {
   useSyncExternalStore(vm.subscribe, vm.snapshot, vm.snapshot);
   const [repositoryId, setRepositoryId] = useState(''), [query, setQuery] = useState('');
   const [view, setView] = useState('board'), [attention, setAttention] = useState(false);
+  const [hideDone, setHideDone] = useState(false);
   const { repositories, tasks } = vm.board;
   const archived = view === 'archive', archivedCount = tasks.filter(task => task.archivedAt).length;
   const base = tasks.filter(task => Boolean(task.archivedAt) === archived && (!repositoryId || task.repositoryId === repositoryId) && `${task.title} ${task.key} ${task.branch || ''}`.toLowerCase().includes(query.toLowerCase()));
   const attentionCount = base.filter(task => attentionReason(task)).length;
-  const filtered = attention && !archived ? base.filter(task => attentionReason(task)) : base;
+  const canHideDone = !archived && tasks.some(task => task.stage === 'done' && !task.archivedAt);
+  const filtered = archived ? base : base.filter(task => (!attention || attentionReason(task)) && (!hideDone || task.stage !== 'done'));
+  const hiddenDone = !archived && hideDone && !attention && base.some(task => task.stage === 'done');
   const filtering = Boolean(repositoryId || query || attention && !archived);
   const clear = () => { setRepositoryId(''); setQuery(''); setAttention(false); };
   const start = () => vm.showModal({ kind: 'launch' });
@@ -187,11 +203,14 @@ export function AppView({ vm }) {
       {repositories.length > 0 && <div className="results-heading">
         <h2>{archived ? 'Archived tasks' : 'Delivery board'}</h2>
         <span className="results-count">{filtered.length} task{filtered.length === 1 ? '' : 's'}</span>
-        {!archived && <AttentionFilter count={attentionCount} active={attention} onChange={setAttention}/>}
+        {!archived && <div className="board-view-actions">
+          {(canHideDone || hideDone) && <Quiet size="sm" onClick={() => setHideDone(!hideDone)}>{hideDone ? 'Show Done' : 'Hide Done'}</Quiet>}
+          <AttentionFilter count={attentionCount} active={attention} onChange={setAttention}/>
+        </div>}
       </div>}
       {vm.hasBoard && <BoardToolbar {...{ vm, view, setView, archivedCount, repositoryId, setRepositoryId, query, setQuery, setAttention, filtering: filtering && filtered.length > 0, clear }}/>}
       <StatusCheckError message={vm.statusError}/>
-      <BoardContent {...{ vm, archived, archivedCount, filtered, filtering, clear, start }} showArchive={() => setView('archive')} filterKey={`${repositoryId}|${query}|${attention}`}/>
+      <BoardContent {...{ vm, archived, archivedCount, filtered, filtering, clear, start, hideDone, hiddenDone }} showDone={() => setHideDone(false)} showArchive={() => setView('archive')} filterKey={`${repositoryId}|${query}|${attention}|${hideDone}`}/>
     </main>
     {vm.selected && !vm.modal && <TaskDetail vm={vm} selected={vm.selected}/>}
     {vm.modal?.kind === 'repository' && <RepositoryForm vm={vm}/>}
@@ -265,7 +284,7 @@ function LaunchForm({ vm, task, initialRepositoryId }) {
         {vm.extensions.message && <p className="dialog-copy launch-send-help" id="launch-send-help">Review and press Send in Codex to start.</p>}
         <div className="dialog-actions">
           <Quiet pill={false} onClick={() => vm.closeModal()} disabled={vm.busy}>Cancel</Quiet>
-          <Button className="workbench-primary" pill={false} aria-describedby={vm.extensions.message ? 'launch-send-help' : undefined} loading={vm.busy} disabled={vm.busy || !vm.extensions.message} onClick={event => submitForm(event, submit)}>Open chat draft</Button>
+          <Button className="workbench-primary" aria-describedby={vm.extensions.message ? 'launch-send-help' : undefined} loading={vm.busy} disabled={vm.busy || !vm.extensions.message} onClick={event => submitForm(event, submit)}>Open chat draft</Button>
         </div>
       </div>
     </form>
@@ -335,7 +354,7 @@ function TaskDetail({ vm, selected }) {
     </div>
     {action.kind === 'recover' && <p className="dialog-copy recovery-draft-help" id="recovery-draft-help">Review and press Send in the Workbench chat to run the check.</p>}
     <BusyStatus vm={vm}/>
-    {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color={currentRequestIds.has(launch.id) ? 'warning' : 'info'} variant="soft" key={launch.id} title={`${currentRequestIds.has(launch.id) ? '' : 'Historical · '}${launchStatus[launch.state]}`} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review request</Quiet> : undefined}/>)}
+    {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color={currentRequestIds.has(launch.id) ? 'warning' : 'info'} variant="soft" key={launch.id} title={`${currentRequestIds.has(launch.id) ? '' : 'Historical · '}${launchStatus[launch.state]}`} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Release request</Quiet> : undefined}/>)}
     <TaskReconciliation vm={vm} task={task} link={link}/>
     <TaskEvidence task={task}/>
     <PublicationDetails vm={vm} task={task}/>

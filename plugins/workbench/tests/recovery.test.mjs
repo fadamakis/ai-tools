@@ -6,12 +6,12 @@ import { fixture, registered, threadId, otherThread } from './fixtures.mjs';
 
 test('saved task states expose a useful action without requiring the user to diagnose the workflow', () => {
   const task = { id: 'task', key: 'EX-123', threadId, stage: 'pr', status: 'waiting' };
-  assert.equal(taskAction({ ...task, status: 'blocked' }).label, 'Draft blocker check');
+  assert.equal(taskAction({ ...task, status: 'blocked' }).label, 'Recheck');
   assert.equal(taskAction({ ...task, pr: { state: 'MERGED', checks: 'failed' } }).label, 'Confirm delivery');
   assert.equal(taskStatus({ ...task, pr: { state: 'MERGED' } }), 'Merged · confirm delivery');
   assert.match(cardNextAction({ ...task, pr: { state: 'MERGED' }, nextAction: 'Wait for CI.' }), /PR merged/);
-  assert.equal(taskAction(task).label, 'Check and continue');
-  for (const status of ['active', 'paused', 'unverified']) assert.equal(taskAction({ ...task, status }).label, 'Recover and resume');
+  assert.equal(taskAction(task).label, 'Continue');
+  for (const status of ['active', 'paused', 'unverified']) assert.equal(taskAction({ ...task, status }).label, 'Resume');
   assert.equal(taskAction({ ...task, threadId: undefined }).kind, 'launch');
   assert.equal(taskAction({ ...task, stage: 'done' }).label, 'Archive task');
   assert.equal(taskAction({ ...task, stage: 'done', archivedAt: '2026-01-01' }).label, 'Restore to Done');
@@ -20,7 +20,7 @@ test('saved task states expose a useful action without requiring the user to dia
   const paused = { ...task, status: 'paused', pause: { kind: 'user' }, pr: { state: 'MERGED' }, nextAction: 'Wait for my review.' };
   assert.equal(cardNextAction(paused), 'Wait for my review.');
   assert.equal(taskStatus(paused), 'Paused');
-  assert.equal(taskAction(paused).label, 'Recover and resume');
+  assert.equal(taskAction(paused).label, 'Resume');
 });
 
 test('pending receipts and freshly running workers take precedence; stale activity permits a recovery check only', () => {
@@ -30,7 +30,7 @@ test('pending receipts and freshly running workers take precedence; stale activi
   assert.equal(taskAction({ ...task, reconciliation: { worker: { ...worker, observedAt: '2020-01-01' } } }, [], at).kind, 'recover');
   assert.equal(taskAction({ ...task, reconciliation: { worker: { ...worker, threadId: otherThread } } }, [], at).kind, 'recover');
   const launch = { taskId: task.id, state: 'uncertain' };
-  assert.deepEqual(taskAction(task, [launch]), { kind: 'request', label: 'Review request', launch });
+  assert.deepEqual(taskAction(task, [launch]), { kind: 'request', label: 'Release request', launch });
 });
 
 test('old failed handoffs remain in history without displacing newer worker progress on the board', () => {
