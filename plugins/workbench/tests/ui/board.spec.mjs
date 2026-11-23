@@ -11,9 +11,14 @@ async function open(page, query = '') {
   const app = page.frameLocator('iframe'); await expect(app.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible();
   if (!query.includes('deferBoard')) {
     await expect.poll(() => page.evaluate(() => window.__workbenchPreview.requests.some(request => request.method === 'tools/call' && request.params.name === 'workbench.reconcile'))).toBe(true);
-    await expect(app.getByRole('button', { name: 'Check status', exact: true })).toBeEnabled();
+    await expect(app.getByRole('button', { name: 'Check delivery status', exact: true })).toBeEnabled();
   }
   return { app, errors };
+}
+
+async function reloadSavedBoard(app) {
+  await app.getByRole('button', { name: 'Board options', exact: true }).click();
+  await app.getByRole('menuitem', { name: 'Reload saved board', exact: true }).click();
 }
 
 async function revealFilters(app) {
@@ -81,10 +86,10 @@ test('desktop columns stay equal and stationary when a task empties a stage or s
   }
 });
 
-test('board fits all stages on desktop and uses stage selection before horizontal overflow at smaller widths', async ({ page }) => {
+test('board keeps every stage visible by default in compact and desktop views', async ({ page }) => {
   const { app, errors } = await open(page);
   const visibleColumns = app.locator('.column:visible');
-  const stageNavigation = app.getByRole('navigation', { name: 'Jump to delivery stage' });
+  const stageNavigation = app.getByRole('navigation', { name: 'Filter by delivery stage' });
   const assertNoOverflow = async () => {
     const bounds = await app.locator('.board-scroll').evaluate(node => ({ client: node.clientWidth, scroll: node.scrollWidth, page: document.documentElement.scrollWidth, viewport: innerWidth }));
     expect(bounds.scroll).toBeLessThanOrEqual(bounds.client);
@@ -95,6 +100,7 @@ test('board fits all stages on desktop and uses stage selection before horizonta
     if (width >= 1404) {
       await expect(visibleColumns).toHaveCount(7);
       await expect(stageNavigation).not.toBeVisible();
+      await expect(app.getByRole('button', { name: /Archive \d+ done tasks?/ })).toBeInViewport({ ratio: 1 });
       const columns = await visibleColumns.evaluateAll(nodes => nodes.map(node => {
         const { left, right, width } = node.getBoundingClientRect();
         return { left, right, width };
@@ -102,19 +108,32 @@ test('board fits all stages on desktop and uses stage selection before horizonta
       expect(Math.min(...columns.map(column => column.left))).toBeGreaterThanOrEqual(0);
       expect(Math.max(...columns.map(column => column.right))).toBeLessThanOrEqual(width);
       expect(Math.max(...columns.map(column => column.width)) - Math.min(...columns.map(column => column.width))).toBeLessThan(1);
+      const statusTextFits = await app.locator('.card-status').evaluateAll(badges => badges.every(badge => {
+        const range = document.createRange();
+        range.selectNodeContents(badge);
+        const text = range.getBoundingClientRect(), box = badge.getBoundingClientRect();
+        return text.top >= box.top - 1 && text.bottom <= box.bottom + 1 && text.right <= box.right + 1;
+      }));
+      expect(statusTextFits).toBe(true);
     } else {
-      await expect(visibleColumns).toHaveCount(1);
-      await expect(stageNavigation.getByRole('button')).toHaveCount(7);
+      const allStages = stageNavigation.getByRole('button', { name: 'All stages', exact: true });
+      await expect(allStages).toHaveAttribute('aria-pressed', 'true');
+      await expect(visibleColumns).toHaveCount(7);
+      await expect(stageNavigation.getByRole('button', { name: /Verify.*1 blocked/ })).toBeVisible();
+      await expect(app.locator('.column[data-stage=verify] .task-card')).toContainText('Blocked');
       await stageNavigation.getByRole('button', { name: /^Done/ }).click();
+      await expect(visibleColumns).toHaveCount(1);
       await expect(app.locator('.column[data-stage=done]')).toBeVisible();
+      await expect(app.getByRole('button', { name: /Archive \d+ done tasks?/ })).toBeInViewport({ ratio: 1 });
+      await allStages.click();
+      await expect(visibleColumns).toHaveCount(7);
     }
-    await expect(app.getByRole('button', { name: /Archive \d+ done tasks?/ })).toBeInViewport({ ratio: 1 });
     await assertNoOverflow();
     if ([2861, 390].includes(width)) await page.screenshot({ path: `dist/workbench-preview-verification/no-horizontal-scroll/board-${width}.png`, fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await app.locator('html').evaluate(root => { root.style.fontSize = '200%'; });
-  await expect(visibleColumns).toHaveCount(1);
+  await expect(visibleColumns).toHaveCount(7);
   await expect(stageNavigation).toBeVisible();
   await assertNoOverflow();
   expect(errors).toEqual([]);
@@ -139,7 +158,9 @@ test('Autopilot is off each time and native environment plus explicit consent tr
   await app.getByLabel('Ticket or desired outcome').fill(`UI-${Date.now()} Test action`);
   await app.getByRole('radio', { name: 'Worktree', exact: true }).click();
   await app.getByRole('checkbox', { name: 'Autopilot', exact: true }).check();
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  const openDraft = app.getByRole('button', { name: 'Open chat draft', exact: true });
+  await expect(openDraft).toHaveAccessibleDescription('Review and press Send in Codex to start.');
+  await openDraft.click();
   await expect(app.getByRole('dialog', { name: 'Start a task' })).toHaveCount(0);
   const messages = await page.evaluate(() => window.__workbenchPreview.messages);
   expect(messages).toHaveLength(1); expect(messages[0]._meta['openai/message']).toEqual({ target: 'new', send: false }); expect(messages[0].content[0].text).toContain('Select this repository and Worktree'); expect(messages[0].content[0].text).toContain('Autopilot is on: commits');
@@ -163,7 +184,8 @@ test('resume opens the saved worker while a new continuation is an explicit task
   await app.getByRole('button', { name: 'Open chat', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toHaveLength(1);
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
-  await app.getByRole('button', { name: 'Start new chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Task options', exact: true }).press('Enter');
+  await app.getByRole('menuitem', { name: 'Start new chat', exact: true }).press('Enter');
   const dialog = app.getByRole('dialog', { name: 'Start a new chat', exact: true });
   await expect(dialog.getByRole('radio', { name: 'Worktree', exact: true })).toBeVisible();
   await expect(dialog.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
@@ -185,7 +207,7 @@ test('save errors preserve the repository draft, and Enter works without sandbox
 test('unsupported message capability disables launch and explains the fallback', async ({ page }) => {
   const { app } = await open(page, '?noMessages');
   await app.getByRole('button', { name: 'New task', exact: true }).click();
-  await expect(app.getByRole('button', { name: 'Continue in chat', exact: true })).toBeDisabled();
+  await expect(app.getByRole('button', { name: 'Open chat draft', exact: true })).toBeDisabled();
   await expect(app.getByRole('dialog')).toContainText('does not support launching chats');
   expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(0);
 });
@@ -221,7 +243,7 @@ test('task details label passed evidence from an earlier revision after a new ch
     const saved = await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: task.id, expectedRevision: task.revision, stage: 'review', status: 'paused', summary: 'Revision changed after verification.', nextAction: 'Recheck the change.', threadId: task.threadId, head, ...(evidence ? { evidence } : {}) } } });
     task = (await saved.json()).structuredContent.task;
   }
-  await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
+  await reloadSavedBoard(app);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-115');
   await app.locator('.task-card').click();
   const details = app.getByRole('dialog', { name: 'Task details' });
@@ -237,7 +259,7 @@ test('board drafts start no work until Send and then preserve the same worker ch
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   await app.getByLabel('Ticket or desired outcome').fill(`${key} Simulated handoff only`);
   await app.getByRole('radio', { name: 'Worktree', exact: true }).click();
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Open chat draft', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task' })).toHaveCount(0);
   expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toHaveLength(0);
   await expect(app.getByRole('region', { name: 'Chat handoff' })).toContainText('Awaiting Send in chat');
@@ -383,8 +405,8 @@ test('initial discovery offers existing notes for explicit one-click import', as
 test('compact board keeps every stage reachable and Done archive inline beside the chat-sized viewport', async ({ page }) => {
   await page.setViewportSize({ width: 980, height: 900 });
   const { app, errors } = await open(page);
-  const stages = app.getByRole('navigation', { name: 'Jump to delivery stage' });
-  await expect(stages.getByRole('button')).toHaveCount(7);
+  const stages = app.getByRole('navigation', { name: 'Filter by delivery stage' });
+  await expect(stages.getByRole('button')).toHaveCount(8);
   await stages.getByRole('button', { name: /^Done/ }).click();
   const column = app.locator('.column[data-stage=done]');
   await expect(column).toBeVisible();
@@ -418,7 +440,7 @@ test('SDK repository selector stays inside the modal focus flow and Escape close
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Start a task' });
   const close = dialog.getByRole('button', { name: 'Close start a task', exact: true });
-  const submit = dialog.getByRole('button', { name: 'Continue in chat', exact: true });
+  const submit = dialog.getByRole('button', { name: 'Open chat draft', exact: true });
   await close.press('Shift+Tab'); await expect(submit).toBeFocused();
   await submit.press('Tab'); await expect(close).toBeFocused();
   const repository = dialog.getByRole('button', { name: /^Repository:/ });
@@ -480,11 +502,11 @@ test('connection has its own loading state, retains saved work on refresh and sh
     await route.continue();
   });
   const cardsBefore = await app.locator('.task-card').allTextContents();
-  await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
-  await expect(app.getByRole('status', { name: 'Operation progress' })).toContainText('Checking saved progress');
+  await reloadSavedBoard(app);
+  await expect(app.getByRole('status', { name: 'Operation progress' })).toContainText('Reloading saved board');
   expect(await app.locator('.task-card').allTextContents()).toEqual(cardsBefore);
   releaseRefresh();
-  await expect(app.getByRole('button', { name: 'Refresh board', exact: true })).toBeEnabled();
+  await expect(app.getByRole('button', { name: 'Board options', exact: true })).toBeEnabled();
   let releaseCheck;
   const check = new Promise(resolve => { releaseCheck = resolve; });
   await page.route('**/rpc', async route => {
@@ -505,7 +527,7 @@ test('long saved keys stay searchable and readable in details while enlarged tex
   const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const key = 'WB_PREVIEW_SMOKE_20261020_DESIGN';
   await page.request.post('/rpc', { data: { name: 'workbench.task_register', arguments: { repositoryId: board.repositories[0].id, key, title: 'A useful human task title', threadId: '33345678-1234-4123-8123-123456789abc', checkout: board.repositories[0].path } } });
-  await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
+  await reloadSavedBoard(app);
   await revealFilters(app);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill(key);
   await expect(app.locator('.task-card')).toHaveCount(1);
@@ -554,7 +576,7 @@ test('an unstarted task keeps Start task on its card and prepares the launch in 
   await expect(details).toContainText('No saved note yet.');
   await details.getByRole('button', { name: 'Start task', exact: true }).click();
   const launch = app.getByRole('dialog', { name: 'Start task', exact: true });
-  await expect(launch.getByRole('button', { name: 'Continue in chat', exact: true })).toBeVisible();
+  await expect(launch.getByRole('button', { name: 'Open chat draft', exact: true })).toBeVisible();
   await expect(launch).not.toContainText('continuation');
   await expect(launch).not.toContainText('saved note');
   await expect(launch.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
@@ -569,7 +591,7 @@ test('the visible version opens update guidance that distinguishes refreshing ta
   await version.click();
   const help = app.getByRole('dialog', { name: 'How it works' });
   await expect(help).toContainText(`This panel is running ${label}`);
-  await expect(help).toContainText('Refresh board checks saved task progress.');
+  await expect(help).toContainText('Choose Reload saved board from Board options to see saved task progress.');
   await expect(help).toContainText('quit and reopen Codex');
   await help.getByRole('button', { name: 'Close how it works' }).press('Escape');
   await expect(version).toBeFocused();
@@ -647,7 +669,7 @@ test('desired outcome grows across lines and Enter never starts a chat before th
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(0);
   await expect(app.getByRole('checkbox', { name: 'Autopilot', exact: true })).not.toBeChecked();
   await page.screenshot({ path: 'dist/workbench-preview-verification/frontend-implementation/new-task.png', fullPage: true });
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Open chat draft', exact: true }).click();
   await expect(app.getByRole('dialog', { name: 'Start a task', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.__workbenchPreview.messages)).toHaveLength(1);
   const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
@@ -682,7 +704,7 @@ test('task evidence precedes the saved note and full technical facts expand only
 test('attention stays near the board and a zero-result selection can always be switched off', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const { app } = await open(page);
-  await app.getByRole('navigation', { name: 'Jump to delivery stage' }).getByRole('button', { name: /^Build/ }).click();
+  await app.getByRole('navigation', { name: 'Filter by delivery stage' }).getByRole('button', { name: /^Build/ }).click();
   const attention = app.getByRole('button', { name: /Needs attention/ });
   await expect(app.locator('.results-heading').getByRole('button', { name: /Needs attention/ })).toBeVisible();
   await attention.click();
@@ -702,7 +724,7 @@ test('release pending request requires confirmation and never dispatches a chat'
   const repositoryId = listing.structuredContent.repositories[0].id;
   const prepared = await (await page.request.post('/rpc', { data: { name: 'workbench.launch_prepare', arguments: { repositoryId, title: 'REC-901 Recover an undelivered request', autopilot: true } } })).json();
   expect(prepared.isError).not.toBe(true);
-  await app.getByRole('button', { name: 'Refresh board', exact: true }).click();
+  await reloadSavedBoard(app);
   await app.getByRole('button', { name: 'Review request', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Release chat request' });
   await expect(dialog.getByRole('button', { name: 'Release request', exact: true })).toBeDisabled();
@@ -721,7 +743,7 @@ test('release pending request requires confirmation and never dispatches a chat'
 
 test('delivery status checks expose freshness without requesting a worker or external mutation', async ({ page }) => {
   const { app, errors } = await open(page);
-  await app.getByRole('button', { name: 'Check status', exact: true }).click();
+  await app.getByRole('button', { name: 'Check delivery status', exact: true }).click();
   await expect(app.getByRole('status', { name: 'Board update' })).toContainText('checked');
   await app.locator('.task-card').filter({ hasText: 'WEB-112' }).click();
   const status = app.getByRole('region', { name: 'Delivery status' });
@@ -774,7 +796,7 @@ for (const width of [1440, 390]) test(`URL tickets and worker chats stay linked 
   const ticket = 'https://issues.example.com/browse/LINK-123';
   await app.getByRole('button', { name: 'New task', exact: true }).click();
   await app.getByLabel('Ticket or desired outcome').fill(ticket);
-  await app.getByRole('button', { name: 'Continue in chat', exact: true }).click();
+  await app.getByRole('button', { name: 'Open chat draft', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Send launch request', exact: true })).toBeVisible();
   const draft = await page.evaluate(() => window.__workbenchPreview.draft);
   expect(draft._meta['openai/message']).toEqual({ target: 'new', send: false });

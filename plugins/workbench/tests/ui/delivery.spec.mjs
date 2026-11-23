@@ -20,7 +20,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
     });
     await page.setViewportSize({ width, height: 1000 }); await page.goto(`/?theme=${theme}`);
     const app = page.frameLocator('iframe');
-    if (width < 1404) await app.getByRole('navigation', { name: 'Jump to delivery stage' }).getByRole('button', { name: /^PR/ }).click();
+    if (width < 1404) await app.getByRole('navigation', { name: 'Filter by delivery stage' }).getByRole('button', { name: /^PR/ }).click();
     await app.getByRole('button', { name: 'Open Fix keyboard navigation in the editor' }).click();
     const detail = app.getByRole('dialog', { name: 'Task details', exact: true });
     await expect(detail.getByText('Observed CI', { exact: true })).toBeVisible();

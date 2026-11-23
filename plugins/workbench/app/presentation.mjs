@@ -41,7 +41,7 @@ export function taskAction(task, launches = [], at = Date.now()) {
   const worker = task.reconciliation?.worker;
   const age = at - Date.parse(worker?.observedAt);
   if (worker?.state === 'running' && worker.threadId === task.threadId && worker.taskKey === task.key && age >= 0 && age <= 10 * 60 * 1000) return { kind: 'chat', label: 'Open running chat' };
-  if (task.status === 'blocked') return { kind: 'recover', label: 'Recheck blocker' };
+  if (task.status === 'blocked') return { kind: 'recover', label: 'Draft blocker check' };
   if (task.status === 'paused' && task.pause?.kind === 'user') return { kind: 'recover', label: 'Recover and resume' };
   if (task.pr?.state === 'MERGED') return { kind: 'recover', label: 'Confirm delivery' };
   if (task.status === 'waiting') return { kind: 'recover', label: 'Check and continue' };

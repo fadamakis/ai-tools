@@ -40,7 +40,9 @@ function TaskPrimaryAction({ vm, task, action, card = false }) {
     if (action.kind === 'chat') return vm.action(() => vm.resume(task), 'Opening chat…');
     return vm.action(() => vm.recover(task), 'Preparing recovery request…');
   };
-  return <Secondary size="md" disabled={vm.busy} aria-label={card ? `${action.label} · ${displayTitle(task)}` : action.label} onClick={run}>{action.label}</Secondary>;
+  const Control = card ? Secondary : Button;
+  return <Control className={card ? 'card-action' : 'workbench-primary'} size={card ? 'sm' : 'md'} pill={false} disabled={vm.busy} aria-label={card ? `${action.label} · ${displayTitle(task)}` : undefined}
+    aria-describedby={!card && action.kind === 'recover' ? 'recovery-draft-help' : undefined} onClick={run}>{action.label}</Control>;
 }
 
 function TaskCard({ vm, task, repository }) {
@@ -51,11 +53,18 @@ function TaskCard({ vm, task, repository }) {
   return <article className="task-card" data-status={task.status} data-attention={Boolean(reason)}>
     <button className="card-main" aria-label={`Open ${displayTitle(task)}`} disabled={vm.busy} onClick={() => vm.action(() => vm.select(task.id), 'Opening task…')}>
       <div className="card-heading"><h3>{displayTitle(task)}</h3></div>
-      <div className="card-meta">{ticket && <span className="task-key">{ticket}</span>}<span className="repository-name">{repository?.name || 'Repository unavailable'}</span></div>
-      <Badge size="md" color={reason ? 'warning' : tone(task.status)}>{task.stage === 'done' && task.completion?.kind !== 'artifact' ? 'Merged' : taskStatus(task)}</Badge>
+      <div className="card-context">
+        <div className="card-meta">{ticket && <span className="task-key">{ticket}</span>}<span className="repository-name">{repository?.name || 'Repository unavailable'}</span></div>
+        <Badge className="card-status" size="sm" color={reason ? 'warning' : tone(task.status)}>{task.stage === 'done' && task.completion?.kind !== 'artifact' ? 'Merged' : taskStatus(task)}</Badge>
+      </div>
       {next && <p className={`card-next ${reason ? 'needs-attention' : ''}`}>{next}</p>}
     </button>
-    <footer className="card-actions"><TaskPrimaryAction vm={vm} task={task} action={action} card/>{action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Quiet size="sm" disabled={vm.busy} aria-label={`Open chat · ${displayTitle(task)}`} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open chat</Quiet>}</footer>
+    <footer className="card-actions">
+      <TaskPrimaryAction vm={vm} task={task} action={action} card/>
+      {action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Tooltip content="Open chat">
+        <Quiet size="md" uniform pill={false} disabled={vm.busy} aria-label={`Open chat · ${displayTitle(task)}`} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}><Icon name="chat"/></Quiet>
+      </Tooltip>}
+    </footer>
   </article>;
 }
 
@@ -76,20 +85,35 @@ function ChatRequests({ vm }) {
 
 function DeliveryBoard({ vm, tasks, repositories, filterKey }) {
   const [selection, setSelection] = useState(null);
-  const groups = stages.map(([key, label]) => ({ key, label, cards: tasks.filter(task => task.stage === key) }));
-  const active = selection?.filterKey === filterKey ? selection.stage : groups.find(group => group.cards.length)?.key || 'backlog';
+  const groups = stages.map(([key, label]) => {
+    const cards = tasks.filter(task => task.stage === key);
+    return { key, label, cards, blocked: cards.filter(task => task.status === 'blocked').length };
+  });
+  const active = selection?.filterKey === filterKey ? selection.stage : 'all';
   return <div className="delivery-board">
-    <nav className="stage-navigation" aria-label="Jump to delivery stage">{groups.map(({ key, label, cards }) => <Quiet key={key} size="lg" aria-current={active === key ? 'true' : undefined} onClick={() => setSelection({ filterKey, stage: key })}>{label}<span className="column-count">{cards.length}</span></Quiet>)}</nav>
+    <nav className="stage-navigation" aria-label="Filter by delivery stage">
+      <Quiet size="md" pill={false} aria-pressed={active === 'all'} onClick={() => setSelection(null)}>All stages</Quiet>
+      {groups.map(({ key, label, cards, blocked }) => <Quiet key={key} size="md" pill={false} aria-pressed={active === key} onClick={() => setSelection({ filterKey, stage: key })}>
+        {label}
+        {(!blocked || blocked !== cards.length) && <span className="column-count">{cards.length}<span className="sr-only"> tasks</span></span>}
+        {blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}
+      </Quiet>)}
+    </nav>
     <div className="board-scroll" role="region" aria-label="Delivery stages"><div className="board">
-    {groups.map(({ key, label, cards }) => {
-      return <section className="column" data-stage={key} data-active={active === key} key={key} aria-label={`${label}, ${cards.length} tasks`}>
-        <header className="column-header"><div><span className="stage-dot"/><h2>{label}</h2><span className="column-count">{cards.length}</span></div>
-          {key === 'done' && cards.length > 0 && <Quiet size="sm" disabled={vm.busy} aria-label={`Archive ${cards.length} done task${cards.length === 1 ? '' : 's'}`} onClick={() => vm.action(() => vm.archive(cards), 'Archiving completed tasks…')}>Archive all</Quiet>}
-        </header>
-        <div className="column-cards">{cards.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={repositories.find(repository => repository.id === task.repositoryId)}/>)}{!cards.length && <p className="empty-stage">No tasks in {label}.</p>}</div>
-      </section>;
-    })}
-  </div></div></div>;
+      {groups.map(({ key, label, cards, blocked }) => (
+        <section className="column" data-stage={key} data-active={active === key || (active === 'all' && cards.length > 0)} data-blocked={blocked > 0} key={key} aria-label={`${label}, ${cards.length} tasks`}>
+          <header className="column-header">
+            <div><span className="stage-dot"/><h2>{label}</h2>{(!blocked || blocked !== cards.length) && <span className="column-count">{cards.length}</span>}{blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}</div>
+            {key === 'done' && cards.length > 0 && <Quiet size="sm" disabled={vm.busy} aria-label={`Archive ${cards.length} done task${cards.length === 1 ? '' : 's'}`} onClick={() => vm.action(() => vm.archive(cards), 'Archiving completed tasks…')}>Archive all</Quiet>}
+          </header>
+          <div className="column-cards">
+            {cards.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={repositories.find(repository => repository.id === task.repositoryId)}/>)}
+            {!cards.length && <p className="empty-stage">No tasks in {label}.</p>}
+          </div>
+        </section>
+      ))}
+    </div></div>
+  </div>;
 }
 
 function EmptyResults({ archived, filtering, archivedCount, clear, showArchive, start }) {
@@ -105,30 +129,33 @@ function BoardToolbar({ vm, view, setView, archivedCount, repositoryId, setRepos
     <SegmentedControl aria-label="Task views" value={view} onChange={value => { setView(value); if (value === 'archive') setAttention(false); }} size="lg" pill={false}>
       <SegmentedControl.Option value="board">Board</SegmentedControl.Option><SegmentedControl.Option value="archive">Archive <span className="view-count">{archivedCount}</span></SegmentedControl.Option>
     </SegmentedControl>
-    <Quiet className="filter-toggle" size="lg" aria-expanded={filtersOpen} aria-controls="board-filter-fields" onClick={() => setFiltersOpen(!filtersOpen)}><Icon name="filters"/>Filters{filterCount > 0 && <Badge size="sm">{filterCount}<span className="sr-only"> active</span></Badge>}</Quiet>
+    <Quiet className="filter-toggle" size="lg" pill={false} aria-expanded={filtersOpen} aria-controls="board-filter-fields" onClick={() => setFiltersOpen(!filtersOpen)}><Icon name="filters"/>Filters{filterCount > 0 && <Badge size="sm">{filterCount}<span className="sr-only"> active</span></Badge>}</Quiet>
     <div className="filters" id="board-filter-fields" data-open={filtersOpen}><div className="repository-filter"><RepositorySelect repositories={vm.board.repositories} value={repositoryId} onChange={setRepositoryId}/></div><Input className="task-search" size="lg" pill={false} aria-label="Search tasks" placeholder="Find a task…" value={query} onChange={event => setQuery(event.target.value)} startAdornment={<Icon name="search"/>} endAdornment={query ? <Quiet uniform size="sm" aria-label="Clear search" onClick={() => setQuery('')}><Icon name="close"/></Quiet> : undefined}/>{filtering && <Quiet size="sm" onClick={clear}>Clear filters</Quiet>}</div>
     <div className="toolbar-actions">
-      {vm.board.reconciliation?.available && <Tooltip content="Check delivery status. Linked PRs are checked every five minutes while this board is open. Jira and chat evidence need a connected check."><Quiet uniform size="lg" aria-label="Check status" disabled={vm.busy || vm.statusChecking} loading={vm.statusChecking} onClick={() => vm.action(() => vm.reconcile(true), 'Checking delivery status…')}><Icon name="status"/></Quiet></Tooltip>}
-      <Tooltip content="Refresh saved progress"><Quiet uniform size="lg" aria-label="Refresh board" loading={vm.busy && vm.busyLabel === 'Checking saved progress…'} disabled={vm.busy} onClick={() => vm.action(() => vm.refresh(), 'Checking saved progress…')}><Icon name="refresh"/></Quiet></Tooltip>
+      {vm.board.reconciliation?.available && <Tooltip content="Linked PRs are checked every five minutes while this board is open. Jira and chat evidence need a connected check.">
+        <Quiet size="lg" pill={false} disabled={vm.busy || vm.statusChecking} loading={vm.statusChecking} onClick={() => vm.action(() => vm.reconcile(true), 'Checking delivery status…')}><Icon name="status"/>Check delivery status</Quiet>
+      </Tooltip>}
+      <Menu>
+        <Menu.Trigger><Quiet uniform size="lg" pill={false} aria-label="Board options" loading={vm.busy && vm.busyLabel === 'Reloading saved board…'} disabled={vm.busy}><Icon name="more"/></Quiet></Menu.Trigger>
+        <Menu.Content align="end"><Menu.Item onSelect={() => vm.action(() => vm.refresh(), 'Reloading saved board…')}>Reload saved board</Menu.Item></Menu.Content>
+      </Menu>
     </div>
   </section>;
 }
 
 function AttentionFilter({ count, active, onChange }) {
-  return <Quiet className="attention-filter" size="md" aria-pressed={active} disabled={!count && !active} onClick={() => onChange(!active)}>Needs attention <Badge size="sm" color={count ? 'warning' : 'secondary'}>{count}</Badge></Quiet>;
+  return <Quiet className="attention-filter" size="md" pill={false} aria-pressed={active} disabled={!count && !active} onClick={() => onChange(!active)}>Needs attention <Badge size="sm" color={count ? 'warning' : 'secondary'}>{count}</Badge></Quiet>;
 }
 
-function BoardContent({ vm, archived, archivedCount, filtered, filtering, clear, showArchive, start, attention, attentionCount, setAttention, filterKey }) {
+function BoardContent({ vm, archived, archivedCount, filtered, filtering, clear, showArchive, start, filterKey }) {
   if (!vm.hasBoard) return <section className="connecting" aria-label="Connecting to Workbench">{vm.error ? <><ActionError vm={vm}/><Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.connect(), 'Reconnecting…')}>Try again</Secondary></> : <p role="status"><LoadingIndicator/>Loading your saved work…</p>}</section>;
   return <>
     {vm.error && !vm.modal && !vm.selected && <ActionError vm={vm}/>}
     {vm.notice && <Alert className="notice-banner" role="status" aria-label="Board update" color="info" variant="soft" description={vm.notice} actions={vm.undoArchive ? <Quiet size="sm" disabled={vm.busy} onClick={() => vm.action(() => vm.archive(vm.undoArchive, false), 'Restoring tasks…')}>Undo</Quiet> : undefined}/>}
     {!vm.modal && !vm.selected && <BusyStatus vm={vm}/>}
     {!archived && <ChatRequests vm={vm}/>}
-    {!vm.board.repositories.length ? <RepositoryEntry vm={vm}/> : <>
-      <div className="results-heading"><div><h2>{archived ? 'Archived tasks' : attention ? 'Needs attention' : 'Delivery board'}</h2><span>{filtered.length} task{filtered.length === 1 ? '' : 's'}</span></div>{!archived && <AttentionFilter count={attentionCount} active={attention} onChange={setAttention}/>}</div>
-      {!filtered.length ? <EmptyResults archived={archived} filtering={filtering} archivedCount={archivedCount} clear={clear} showArchive={showArchive} start={start}/> : archived ? <div className="archive-grid" role="region" aria-label="Archived tasks">{filtered.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={vm.board.repositories.find(repository => repository.id === task.repositoryId)}/>)}</div> : <DeliveryBoard vm={vm} tasks={filtered} repositories={vm.board.repositories} filterKey={filterKey}/>}
-    </>}
+    {!vm.board.repositories.length ? <RepositoryEntry vm={vm}/> :
+      !filtered.length ? <EmptyResults archived={archived} filtering={filtering} archivedCount={archivedCount} clear={clear} showArchive={showArchive} start={start}/> : archived ? <div className="archive-grid" role="region" aria-label="Archived tasks">{filtered.map(task => <TaskCard key={task.id} vm={vm} task={task} repository={vm.board.repositories.find(repository => repository.id === task.repositoryId)}/>)}</div> : <DeliveryBoard vm={vm} tasks={filtered} repositories={vm.board.repositories} filterKey={filterKey}/>}
   </>;
 }
 
@@ -136,7 +163,7 @@ function AppHeader({ vm, start, hasRepositories }) {
   const more = useRef(null);
   const open = kind => vm.showModal({ kind, returnFocus: more.current });
   return <header className="app-header"><div className="brand"><span className="brand-mark"><Icon name="board"/></span><h1>Workbench</h1><Quiet className="version-info" size="sm" aria-label={`About Workbench ${__WORKBENCH_VERSION__}`} onClick={() => vm.showModal({ kind: 'help' })}><Badge variant="outline">v{__WORKBENCH_VERSION__}</Badge></Quiet></div>
-    <div className="header-actions"><Quiet className="header-secondary" onClick={() => vm.showModal({ kind: 'help' })}>How it works</Quiet><Quiet className="header-secondary" onClick={() => vm.showModal({ kind: 'repository' })}>Add repository</Quiet><Button disabled={vm.busy || !hasRepositories} onClick={start}><Icon name="plus"/>New task</Button>
+    <div className="header-actions"><Quiet className="header-secondary" pill={false} onClick={() => vm.showModal({ kind: 'help' })}>How it works</Quiet><Quiet className="header-secondary" pill={false} onClick={() => vm.showModal({ kind: 'repository' })}>Add repository</Quiet><Button className="workbench-primary" pill={false} disabled={vm.busy || !hasRepositories} onClick={start}><Icon name="plus"/>New task</Button>
       <div className="header-more"><Menu><Menu.Trigger><Quiet ref={more} uniform aria-label="More options"><Icon name="more"/></Quiet></Menu.Trigger><Menu.Content align="end" minWidth={200}><Menu.Item onSelect={() => open('help')}>How it works</Menu.Item><Menu.Item onSelect={() => open('repository')}>Add repository</Menu.Item></Menu.Content></Menu></div>
     </div>
   </header>;
@@ -157,9 +184,14 @@ export function AppView({ vm }) {
   return <>
     <AppHeader vm={vm} start={start} hasRepositories={repositories.length > 0}/>
     <main className="main-content">
-      {vm.hasBoard && <BoardToolbar {...{ vm, view, setView, archivedCount, repositoryId, setRepositoryId, query, setQuery, attention, setAttention, attentionCount, filtering: filtering && filtered.length > 0, clear }}/>}
+      {repositories.length > 0 && <div className="results-heading">
+        <h2>{archived ? 'Archived tasks' : 'Delivery board'}</h2>
+        <span className="results-count">{filtered.length} task{filtered.length === 1 ? '' : 's'}</span>
+        {!archived && <AttentionFilter count={attentionCount} active={attention} onChange={setAttention}/>}
+      </div>}
+      {vm.hasBoard && <BoardToolbar {...{ vm, view, setView, archivedCount, repositoryId, setRepositoryId, query, setQuery, setAttention, filtering: filtering && filtered.length > 0, clear }}/>}
       <StatusCheckError message={vm.statusError}/>
-      <BoardContent {...{ vm, archived, archivedCount, filtered, filtering, clear, start, attention, attentionCount, setAttention }} showArchive={() => setView('archive')} filterKey={`${repositoryId}|${query}|${attention}`}/>
+      <BoardContent {...{ vm, archived, archivedCount, filtered, filtering, clear, start }} showArchive={() => setView('archive')} filterKey={`${repositoryId}|${query}|${attention}`}/>
     </main>
     {vm.selected && !vm.modal && <TaskDetail vm={vm} selected={vm.selected}/>}
     {vm.modal?.kind === 'repository' && <RepositoryForm vm={vm}/>}
@@ -219,16 +251,23 @@ function LaunchForm({ vm, task, initialRepositoryId }) {
   const { title: modalTitle, description } = taskLaunch(task, continuation);
   const submit = () => vm.action(() => vm.launch({ ...(task ? { taskId: task.id } : { repositoryId, title }), environment, autopilot, continuation }), 'Preparing chat request…');
   return <Dialog title={modalTitle} close={() => vm.closeModal()} busy={vm.busy}>
-    <form onSubmit={event => submitForm(event, submit)} onKeyDown={event => enterSubmits(event, submit)}>
+    <form className="launch-form" onSubmit={event => submitForm(event, submit)} onKeyDown={event => enterSubmits(event, submit)}>
       {task ? <div className="resume-task"><span className="task-key">{task.key}</span><h3>{displayTitle(task)}</h3><p className="dialog-copy">{description}</p></div> : <>
         <label className="field-label" htmlFor="task-description">Ticket or desired outcome</label><Textarea id="task-description" size="lg" rows={2} maxRows={8} autoResize required maxLength={2000} value={title} onChange={event => setTitle(event.target.value)} placeholder="A ticket, link, or what you want to build" disabled={vm.busy}/>
         <p className="field-label">Repository</p><RepositorySelect includeAll={false} repositories={vm.board.repositories} value={repositoryId} onChange={setRepositoryId} disabled={vm.busy}/>
       </>}
-      <p className="field-label">Run in</p><SegmentedControl aria-label="Native Codex environment" value={environment} onChange={setEnvironment} disabled={vm.busy}><SegmentedControl.Option value="local">Local</SegmentedControl.Option><SegmentedControl.Option value="worktree">Worktree</SegmentedControl.Option></SegmentedControl>
-      <p className="dialog-copy">A new draft opens for this task. Select its repository and Local or Worktree mode in Codex, then review and Send. This draft becomes the worker chat.</p>
+      <p className="field-label">Run in</p><SegmentedControl aria-label="Native Codex environment" pill={false} value={environment} onChange={setEnvironment} disabled={vm.busy}><SegmentedControl.Option value="local">Local</SegmentedControl.Option><SegmentedControl.Option value="worktree">Worktree</SegmentedControl.Option></SegmentedControl>
+      <p className="dialog-copy launch-environment-help">Choose the same repository and run mode in Codex when the draft opens.</p>
       <div className="autopilot-field"><Checkbox id="autopilot" checked={autopilot} onCheckedChange={setAutopilot} label="Autopilot" disabled={vm.busy}/><p>{autopilot ? 'Includes commits, ordinary pushes, a draft PR and addressed review replies during this run. Stops when waiting for CI or review. Never merges.' : 'Continue the next Workbench stage. Commits, pushes, PR publication and review replies require separate authorization.'}</p></div>
       {!vm.extensions.message && <Alert color="warning" variant="soft" description="This host does not support launching chats from the board. Use /workbench:start in a native project chat."/>}
-      <ActionError vm={vm}/><BusyStatus vm={vm}/><div className="dialog-actions"><Quiet onClick={() => vm.closeModal()} disabled={vm.busy}>Cancel</Quiet><Button loading={vm.busy} disabled={vm.busy || !vm.extensions.message} onClick={event => submitForm(event, submit)}>Continue in chat</Button></div>
+      <ActionError vm={vm}/><BusyStatus vm={vm}/>
+      <div className="launch-footer">
+        {vm.extensions.message && <p className="dialog-copy launch-send-help" id="launch-send-help">Review and press Send in Codex to start.</p>}
+        <div className="dialog-actions">
+          <Quiet pill={false} onClick={() => vm.closeModal()} disabled={vm.busy}>Cancel</Quiet>
+          <Button className="workbench-primary" pill={false} aria-describedby={vm.extensions.message ? 'launch-send-help' : undefined} loading={vm.busy} disabled={vm.busy || !vm.extensions.message} onClick={event => submitForm(event, submit)}>Open chat draft</Button>
+        </div>
+      </div>
     </form>
   </Dialog>;
 }
@@ -255,11 +294,13 @@ function TaskEvidence({ task }) {
 function TaskReconciliation({ vm, task, link }) {
   if (!vm.board.reconciliation?.available && !task.reconciliation && !task.completion) return null;
   const check = task.reconciliation;
-  return <section className="task-evidence" aria-label="Delivery status"><h4>Delivery status</h4><dl className="task-facts">
+  return <section className="task-evidence" aria-label="Delivery status">
+  <header className="evidence-heading"><h4>Delivery status</h4>{vm.board.reconciliation?.available && <Quiet size="sm" pill={false} disabled={vm.busy || vm.statusChecking} onClick={() => vm.action(() => vm.reconcile(true, task.id), 'Checking delivery status…')}>Check status now</Quiet>}</header>
+  <dl className="task-facts">
     <dt>Last checked</dt><dd>{date(check?.checkedAt)}</dd>
     {check?.reason && <><dt>Result</dt><dd>{check.reason}</dd></>}
     {task.completion?.artifactUrl && <><dt>Completed artifact</dt><dd><TextLink href={task.completion.artifactUrl} onClick={link(task.completion.artifactUrl)}>Open verified result</TextLink></dd></>}
-  </dl>{vm.board.reconciliation?.available && <Quiet disabled={vm.busy || vm.statusChecking} onClick={() => vm.action(() => vm.reconcile(true, task.id), 'Checking delivery status…')}>Check status now</Quiet>}
+  </dl>
     {check?.history?.length > 0 && <details><summary>Status history</summary><ul>{[...check.history].reverse().map(item => <li key={`${item.checkedAt}:${item.outcome}:${item.reason}`}>{date(item.checkedAt)} · {item.reason}</li>)}</ul></details>}
   </section>;
 }
@@ -273,22 +314,27 @@ function TaskDetail({ vm, selected }) {
   const action = taskAction(task, vm.board.launches);
   const currentRequestIds = new Set(currentLaunches([task], launches).map(launch => launch.id));
   const next = cardNextAction(task);
+  const canStartNewChat = task.threadId && task.stage !== 'done';
   const stage = stages.find(([key]) => key === task.stage)?.[1] || 'Unverified';
   const link = url => event => { event.preventDefault(); vm.action(() => vm.openLink(url), 'Opening link…'); };
   return <Dialog title="Task details" close={() => vm.closeDetail()} busy={vm.busy} wide>
-    <div className="detail-title"><span className="task-key">{task.key} · {repository.name}</span><h3>{displayTitle(task)}</h3><div className="detail-badges"><Badge>{task.archivedAt ? 'Archived' : stage}</Badge><Badge color={tone(task.status)}>{taskStatus(task)}</Badge></div></div>
+    <div className="detail-title"><h3>{displayTitle(task)}</h3><div className="detail-badges"><div className="card-meta"><span className="task-key">{task.key}</span><span className="repository-name">{repository.name}</span></div><Badge>{task.archivedAt ? 'Archived' : stage}</Badge><Badge color={tone(task.status)}>{taskStatus(task)}</Badge></div></div>
     {task.summary && <p className="dialog-copy">{task.summary}</p>}
+    {task.stage === 'done' ? <p className="merge-confirmed">{task.completion?.kind === 'artifact' ? 'Accepted scope and artifact verification recorded.' : `Merged ${date(task.pr?.mergedAt)}.`} Checks below are a historical snapshot.</p> : next && next !== task.summary && <section className="next-action" data-blocked={task.status === 'blocked'}><h4>Next action</h4><p>{next}</p></section>}
     <div className="detail-actions">
       <TaskPrimaryAction vm={vm} task={task} action={action}/>
-      {action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open chat</Secondary>}
-      {task.threadId && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.showModal({ kind: 'launch', task })}>Start new chat</Secondary>}
+      {action.kind !== 'chat' && task.stage !== 'done' && taskChatUrl(task) && <Secondary pill={false} disabled={vm.busy} onClick={() => vm.action(() => vm.resume(task), 'Opening chat…')}>Open chat</Secondary>}
+      {canStartNewChat && <Menu>
+        <Menu.Trigger><Quiet uniform aria-label="Task options" disabled={vm.busy}><Icon name="more"/></Quiet></Menu.Trigger>
+        <Menu.Content align="start"><Menu.Item onSelect={() => vm.showModal({ kind: 'launch', task })}>Start new chat</Menu.Item></Menu.Content>
+      </Menu>}
       {task.stage === 'done' && taskChatUrl(task) && <TextLink href={taskChatUrl(task)} onClick={link(taskChatUrl(task))}>Open chat</TextLink>}
       {taskTicketUrl(task) && <TextLink href={taskTicketUrl(task)} onClick={link(taskTicketUrl(task))}>Open ticket</TextLink>}
       {task.threadId && task.requirements && task.stage !== 'done' && <Secondary disabled={vm.busy} onClick={() => vm.action(() => vm.refreshEvidence(), 'Checking evidence freshness…')}>Recheck evidence</Secondary>}
       {task.prUrl && <><Secondary disabled={vm.busy} loading={vm.busy && vm.busyLabel === 'Checking pull request…'} onClick={() => vm.action(() => vm.refreshPr(), 'Checking pull request…')}>Check PR now</Secondary><TextLink href={task.prUrl} onClick={link(task.prUrl)}>Open pull request</TextLink></>}
     </div>
+    {action.kind === 'recover' && <p className="dialog-copy recovery-draft-help" id="recovery-draft-help">Review and press Send in the Workbench chat to run the check.</p>}
     <BusyStatus vm={vm}/>
-    {task.stage === 'done' ? <p className="merge-confirmed">{task.completion?.kind === 'artifact' ? 'Accepted scope and artifact verification recorded.' : `Merged ${date(task.pr?.mergedAt)}.`} Checks below are a historical snapshot.</p> : next && next !== task.summary && <section className="next-action"><h4>Next action</h4><p>{next}</p></section>}
     {launches.filter(launch => unresolvedLaunchStates.includes(launch.state) || launch.state === 'failed').map(launch => <Alert className="request-errors" color={currentRequestIds.has(launch.id) ? 'warning' : 'info'} variant="soft" key={launch.id} title={`${currentRequestIds.has(launch.id) ? '' : 'Historical · '}${launchStatus[launch.state]}`} description={launch.error || 'Check the board chat before retrying.'} actions={unresolvedLaunchStates.includes(launch.state) ? <Quiet disabled={vm.busy} onClick={() => vm.showModal({ kind: 'recovery', launch })}>Review request</Quiet> : undefined}/>)}
     <TaskReconciliation vm={vm} task={task} link={link}/>
     <TaskEvidence task={task}/>
