@@ -35,19 +35,26 @@ for (const [theme, width] of [['light', 1800], ['dark', 390]]) {
     expect(draft.content[0].text).toContain('Recheck blockers');
     expect(draft.content[0].text).toContain('Autopilot is off');
     expect(await page.evaluate(() => window.__workbenchPreview.submissions)).toEqual([]);
-    await expect(card.getByRole('button', { name: /^Review request/ })).toBeVisible();
-    await card.getByRole('button', { name: /^Review request/ }).click();
+    const handoff = app.getByRole('region', { name: 'Chat handoff' });
+    await handoff.getByRole('button', { name: 'Open saved worker chat', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__workbenchPreview.openedLinks)).toHaveLength(1);
+    await expect(card.getByRole('button', { name: /^Release request/ })).toBeVisible();
+    await card.getByRole('button', { name: /^Release request/ }).click();
     await expect(app.getByRole('dialog', { name: 'Release chat request', exact: true })).toBeVisible();
     expect(await page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(1);
   });
 }
 
-test('blocked cards retain the full unblock action and prepare a bounded recheck', async ({ page }) => {
+test('blocked cards summarize the unblock action and retain the full text in details', async ({ page }) => {
   await page.goto('/'); const app = page.frameLocator('iframe');
   const card = app.locator('.task-card').filter({ has: app.getByRole('heading', { name: 'Show a useful empty state', exact: true }) });
   await expect(card).toContainText('Make the test account available, then rerun verification.');
-  expect(await card.locator('.card-next').evaluate(node => getComputedStyle(node).webkitLineClamp)).toBe('none');
-  await card.getByRole('button', { name: /^Draft blocker check/ }).click();
+  expect(await card.locator('.card-next').evaluate(node => getComputedStyle(node).webkitLineClamp)).toBe('2');
+  await card.getByRole('button', { name: 'Open Show a useful empty state', exact: true }).click();
+  const detail = app.getByRole('dialog', { name: 'Task details' });
+  await expect(detail.getByText('Make the test account available, then rerun verification.', { exact: true }).first()).toBeVisible();
+  await detail.getByRole('button', { name: 'Close task details' }).click();
+  await card.getByRole('button', { name: /^Recheck/ }).click();
   await expect.poll(() => page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(1);
   expect((await page.evaluate(() => window.__workbenchPreview.messages))[0].content[0].text).toContain('do not assume they are fixed');
 });

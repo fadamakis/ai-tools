@@ -60,7 +60,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
   });
 }
 
-test('desktop columns stay equal and stationary when a task empties a stage or search filters its contents', async ({ page }) => {
+test('desktop keeps populated lanes equal and collapses empty lanes during updates and search', async ({ page }) => {
   const { app } = await open(page);
   const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const original = board.tasks.find(task => task.key === 'WEB-104');
@@ -77,10 +77,16 @@ test('desktop columns stay equal and stationary when a task empties a stage or s
     const result = await moved.json(); expect(result.isError).not.toBe(true); current = result.structuredContent.task;
     await expect(app.locator('.column[data-stage=plan] .task-card')).toHaveCount(0, { timeout: 6000 });
     await expect(app.locator('.column[data-stage=build] .task-card')).toHaveCount(2);
-    expect(await geometry()).toEqual(before);
+    const movedColumns = await geometry();
+    const emptyPlan = movedColumns.find(column => column.stage === 'plan');
+    const populated = movedColumns.filter(column => column.stage !== 'plan');
+    expect(emptyPlan.width).toBeLessThan(populated[0].width);
+    expect(Math.max(...populated.map(column => column.width)) - Math.min(...populated.map(column => column.width))).toBeLessThan(1);
     await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104');
     await expect(app.locator('.task-card')).toHaveCount(1);
-    expect(await geometry()).toEqual(before);
+    const searched = await geometry();
+    expect(searched.find(column => column.stage === 'build').width).toBeGreaterThan(populated[0].width);
+    expect(searched.filter(column => column.stage !== 'build').every(column => column.width === emptyPlan.width)).toBe(true);
   } finally {
     if (current) await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: current.revision, stage: original.workbenchStage, status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
   }
@@ -137,6 +143,16 @@ test('board keeps every stage visible by default in compact and desktop views', 
   await expect(stageNavigation).toBeVisible();
   await assertNoOverflow();
   expect(errors).toEqual([]);
+});
+
+test('hide Done can be reversed even when a completed task is the only search match', async ({ page }) => {
+  const { app } = await open(page);
+  await app.getByRole('button', { name: 'Hide Done', exact: true }).click();
+  await expect(app.locator('.column[data-stage=done]')).toHaveCount(0);
+  await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-101');
+  await expect(app.getByRole('heading', { name: 'No active tasks' })).toBeVisible();
+  await app.getByRole('button', { name: 'Show completed tasks', exact: true }).click();
+  await expect(app.locator('.column[data-stage=done] .task-card')).toContainText('WEB-101');
 });
 
 test('board renders all stages, filters tasks and reads the original note without external requests', async ({ page }) => {
@@ -725,7 +741,7 @@ test('release pending request requires confirmation and never dispatches a chat'
   const prepared = await (await page.request.post('/rpc', { data: { name: 'workbench.launch_prepare', arguments: { repositoryId, title: 'REC-901 Recover an undelivered request', autopilot: true } } })).json();
   expect(prepared.isError).not.toBe(true);
   await reloadSavedBoard(app);
-  await app.getByRole('button', { name: 'Review request', exact: true }).click();
+  await app.getByRole('region', { name: 'Chat handoff' }).getByRole('button', { name: 'Release request', exact: true }).click();
   const dialog = app.getByRole('dialog', { name: 'Release chat request' });
   await expect(dialog.getByRole('button', { name: 'Release request', exact: true })).toBeDisabled();
   await dialog.getByRole('checkbox', { name: 'I checked that this request was not delivered' }).check();
@@ -805,7 +821,10 @@ for (const width of [1440, 390]) test(`URL tickets and worker chats stay linked 
   await page.getByRole('button', { name: 'Send launch request', exact: true }).click();
   await revealFilters(app);
   await app.getByRole('textbox', { name: 'Search tasks' }).fill('LINK-123');
-  await app.locator('.task-card').click();
+  const card = app.locator('.task-card');
+  await expect(card.getByRole('heading', { name: 'LINK-123', exact: true })).toBeVisible();
+  await expect(card).not.toContainText(ticket);
+  await card.click();
   const details = app.getByRole('dialog', { name: 'Task details', exact: true });
   await details.getByRole('link', { name: 'Open ticket', exact: true }).click();
   await details.getByRole('button', { name: 'Open chat', exact: true }).click();

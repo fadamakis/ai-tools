@@ -20,6 +20,13 @@ export function attentionReason(task, at = Date.now()) {
 }
 
 export function displayTitle(task) {
+  const title = task.title.trim();
+  if (/^https?:\/\/\S+$/i.test(title)) {
+    try {
+      const url = new URL(title);
+      return /^[A-Z][A-Z0-9]+-\d+$/i.test(task.key) ? task.key : url.hostname;
+    } catch { /* Keep the saved title if it is not a valid URL. */ }
+  }
   const escaped = task.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return task.title.replace(new RegExp(`^${escaped}(?:\\s*[:–—-]\\s*|\\s+)`, 'i'), '') || task.title;
 }
@@ -36,16 +43,16 @@ export function cardNextAction(task) {
 export function taskAction(task, launches = [], at = Date.now()) {
   if (task.stage === 'done') return { kind: 'archive', label: task.archivedAt ? 'Restore to Done' : 'Archive task' };
   const pending = launches.find(launch => launch.taskId === task.id && unresolvedLaunchStates.includes(launch.state));
-  if (pending) return { kind: 'request', label: 'Review request', launch: pending };
+  if (pending) return { kind: 'request', label: 'Release request', launch: pending };
   if (!taskChatUrl(task)) return { kind: 'launch', label: 'Start task' };
   const worker = task.reconciliation?.worker;
   const age = at - Date.parse(worker?.observedAt);
   if (worker?.state === 'running' && worker.threadId === task.threadId && worker.taskKey === task.key && age >= 0 && age <= 10 * 60 * 1000) return { kind: 'chat', label: 'Open running chat' };
-  if (task.status === 'blocked') return { kind: 'recover', label: 'Draft blocker check' };
-  if (task.status === 'paused' && task.pause?.kind === 'user') return { kind: 'recover', label: 'Recover and resume' };
+  if (task.status === 'blocked') return { kind: 'recover', label: 'Recheck' };
+  if (task.status === 'paused' && task.pause?.kind === 'user') return { kind: 'recover', label: 'Resume' };
   if (task.pr?.state === 'MERGED') return { kind: 'recover', label: 'Confirm delivery' };
-  if (task.status === 'waiting') return { kind: 'recover', label: 'Check and continue' };
-  return { kind: 'recover', label: 'Recover and resume' };
+  if (task.status === 'waiting') return { kind: 'recover', label: 'Continue' };
+  return { kind: 'recover', label: 'Resume' };
 }
 
 export function currentLaunches(tasks, launches) {
@@ -69,6 +76,12 @@ export function taskStatus(task) {
   if (task.stage === 'done' && task.completion?.kind === 'artifact') return 'Delivery verified';
   if (task.stage !== 'done' && task.pr?.state === 'MERGED' && task.status !== 'blocked' && task.pause?.kind !== 'user') return 'Merged · confirm delivery';
   return { active: 'In progress · reported', unverified: 'Unverified', complete: 'Merge verified', blocked: 'Blocked', paused: 'Paused', waiting: 'Waiting' }[task.status] || task.status;
+}
+
+export function cardStatus(task) {
+  if (task.stage === 'done' && task.completion?.kind !== 'artifact') return 'Merged';
+  if (task.stage !== 'done' && task.status !== 'blocked' && task.pr?.state === 'OPEN' && task.pr.checks === 'failed') return 'CI failed';
+  return taskStatus(task);
 }
 
 export function repositoryLocation(path) {
