@@ -1,0 +1,54 @@
+plugins/workbench/app/app.css
+  s_db5161079f8698::t_c6074a0ba289af 14-16,37-43,46,50-51,58-61,75-77,79-81,85,88,95,98,100,102,106-107,112-113,115-119,123,125,149-152,154,156-157,163-164,169,220,226,234-235,244
+  s_db5161079f8698::t_5f178c5b380fc9 103-104
+  s_db5161079f8698::t_54dc5205cbf088 236
+  s_db5161079f8698::t_dc5845cd2688c2 93,96-97,126-127,250,256-260
+  s_db5161079f8698::t_6e0f6d3478e614 86,99,101,105,110-111,114,148,158-160,168,239-243
+  s_db5161079f8698::t_201e8579afb909 17,25
+plugins/workbench/app/HowItWorks.jsx
+  s_db5161079f8698::t_4bd1d285f27f19 23,32
+plugins/workbench/app/ui.jsx
+  s_db5161079f8698::t_9879c9cd9bb9fd 5,21
+plugins/workbench/tests/ui/board.spec.mjs
+  s_db5161079f8698::t_5695e6fd4b2acc 111-117
+  s_cf4afc458babb6::t_0af1e69072a768 14,19-23,89,92,103,119-123,125,127-129,136,161-163,187-188,210,246,262,408-409,443,505-506,509,530,579,594,672,707,727,746,799
+plugins/workbench/app/presentation.mjs
+  s_db5161079f8698::t_ad98ee105d4f47 44
+plugins/workbench/app/App.jsx
+  s_db5161079f8698::t_ea0fa86c41768a 44,62-67,95-96,132,136,139,147,150,157-158,166,187-192,194,254,259,264-269,297-299,303,321,323,326
+  s_db5161079f8698::t_b0c04c54e27ebc 43,45,88-92,94,100-101,103,105,107-116,135,137-138,140-141,260,263,270,317,327,330,336
+  s_db5161079f8698::t_7b5229a027ac02 104,328-329
+  s_db5161079f8698::t_9be47ee1f47e83 58
+  s_db5161079f8698::t_f953119c0cb8b8 106
+  s_db5161079f8698::t_8bbd10a0c241e0 56-57,59,97-99
+plugins/workbench/tests/recovery.test.mjs
+  s_db5161079f8698::t_0cb1c5087a812b 9
+plugins/workbench/tests/ui/delivery.spec.mjs
+  s_db5161079f8698::t_6ea6748dc8399a 23
+plugins/workbench/tests/ui/recovery.spec.mjs
+  s_db5161079f8698::t_c3c76eecdcb4af 22,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "37f700a0b7e9309fb2ff5df70f6de1451f625953",
+  "prompts": {},
+  "sessions": {
+    "s_cf4afc458babb6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20348-5fb1-7fd1-b480-94628142cfa6",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    },
+    "s_db5161079f8698": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2032a-3b1d-7b13-82b6-8d68550387e5",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
