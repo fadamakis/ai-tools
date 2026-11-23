@@ -6,7 +6,7 @@ import { fixture, registered, threadId, otherThread } from './fixtures.mjs';
 
 test('saved task states expose a useful action without requiring the user to diagnose the workflow', () => {
   const task = { id: 'task', key: 'EX-123', threadId, stage: 'pr', status: 'waiting' };
-  assert.equal(taskAction({ ...task, status: 'blocked' }).label, 'Recheck blocker');
+  assert.equal(taskAction({ ...task, status: 'blocked' }).label, 'Draft blocker check');
   assert.equal(taskAction({ ...task, pr: { state: 'MERGED', checks: 'failed' } }).label, 'Confirm delivery');
   assert.equal(taskStatus({ ...task, pr: { state: 'MERGED' } }), 'Merged · confirm delivery');
   assert.match(cardNextAction({ ...task, pr: { state: 'MERGED' }, nextAction: 'Wait for CI.' }), /PR merged/);

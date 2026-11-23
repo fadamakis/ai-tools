@@ -19,7 +19,7 @@ for (const [theme, width] of [['light', 1800], ['dark', 390]]) {
     const app = page.frameLocator('iframe');
     await expect(app.getByRole('heading', { name: 'Delivery board', exact: true })).toBeVisible();
     await expect(app.getByText('Historical failed handoff')).toHaveCount(0);
-    if (width < 1404) await app.getByRole('navigation', { name: 'Jump to delivery stage' }).getByRole('button', { name: /^PR/ }).click();
+    if (width < 1404) await app.getByRole('navigation', { name: 'Filter by delivery stage' }).getByRole('button', { name: /^PR/ }).click();
     const card = app.locator('.task-card').filter({ has: app.getByRole('heading', { name: 'Fix keyboard navigation in the editor', exact: true }) });
     await expect(card).toContainText('Merged · confirm delivery');
     await expect(card).toContainText('PR merged. Confirm the remaining scope and delivery evidence.');
@@ -47,7 +47,7 @@ test('blocked cards retain the full unblock action and prepare a bounded recheck
   const card = app.locator('.task-card').filter({ has: app.getByRole('heading', { name: 'Show a useful empty state', exact: true }) });
   await expect(card).toContainText('Make the test account available, then rerun verification.');
   expect(await card.locator('.card-next').evaluate(node => getComputedStyle(node).webkitLineClamp)).toBe('none');
-  await card.getByRole('button', { name: /^Recheck blocker/ }).click();
+  await card.getByRole('button', { name: /^Draft blocker check/ }).click();
   await expect.poll(() => page.evaluate(() => window.__workbenchPreview.messages.length)).toBe(1);
   expect((await page.evaluate(() => window.__workbenchPreview.messages))[0].content[0].text).toContain('do not assume they are fixed');
 });
