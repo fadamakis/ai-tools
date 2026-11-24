@@ -11,7 +11,7 @@
   --muted: var(--color-text-secondary);
   --line: var(--color-border-primary, var(--color-border));
   --surface: var(--color-surface-secondary);
-  --product-width: 100rem;
+  --product-width: 100%;
   --product-gutter: 24px;
   --workbench-action: #303030;
   --workbench-action-hover: #454545;
@@ -85,7 +85,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 .stage-navigation button { gap: 6px; height: auto; min-height: 36px; white-space: normal; }
 .stage-navigation button[aria-pressed=true] { color: var(--brand); background: var(--brand-soft); font-weight: 600; }
 .board-scroll { padding: 1px; }
-.board { display: grid; grid-template-columns: var(--stage-tracks); overflow: clip; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.board { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: clip; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .column { min-width: 0; }
 .column + .column { border-inline-start: 1px solid var(--line); }
 .column-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding-inline: 16px 6px; min-height: 36px; border-bottom: 1px solid var(--line); }
