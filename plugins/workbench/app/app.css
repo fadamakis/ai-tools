@@ -96,6 +96,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex="0"]:foc
 .empty-stage { display: none; padding: 32px 16px; text-align: center; color: var(--muted); }
 @container (width >= 84.75rem) {
   .column[data-empty=true] .column-header { padding-inline: 10px; }
+  .column[data-empty=true] .column-header > div { flex-wrap: nowrap; white-space: nowrap; }
   .column[data-empty=true] .column-header h2 { color: var(--muted); }
 }
 /* Keep the grouped list when the panel cannot fit seven populated lanes. */

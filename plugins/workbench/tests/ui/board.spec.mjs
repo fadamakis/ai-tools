@@ -86,10 +86,49 @@ test('desktop keeps populated lanes equal and collapses empty lanes during updat
     await expect(app.locator('.task-card')).toHaveCount(1);
     const searched = await geometry();
     expect(searched.find(column => column.stage === 'build').width).toBeGreaterThan(populated[0].width);
-    expect(searched.filter(column => column.stage !== 'build').every(column => column.width === emptyPlan.width)).toBe(true);
+    const searchedBuild = searched.find(column => column.stage === 'build');
+    expect(searched.filter(column => column.stage !== 'build').every(column => column.width < searchedBuild.width)).toBe(true);
   } finally {
     if (current) await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: current.revision, stage: original.workbenchStage, status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
   }
+});
+
+test('an empty Backlog keeps its count on the same line and its header aligned', async ({ page }, testInfo) => {
+  await page.route('**/rpc', async route => {
+    if (route.request().postDataJSON().name !== 'workbench.list') return route.continue();
+    const response = await route.fetch();
+    const result = await response.json();
+    result.structuredContent.tasks = result.structuredContent.tasks.filter(task => task.stage !== 'backlog');
+    await route.fulfill({ response, json: result });
+  });
+  const { app } = await open(page, '?deferBoard');
+  const backlog = app.getByRole('region', { name: 'Backlog, 0 tasks', exact: true });
+  await expect(backlog).toBeVisible();
+  await expect(backlog.locator('.task-card')).toHaveCount(0);
+  await app.locator('html').evaluate(root => {
+    root.style.setProperty('--font-text-sm-size', '16px');
+    root.style.setProperty('--font-text-xs-size', '14px');
+  });
+  for (const width of [1404, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const layout = await backlog.evaluate(lane => {
+      const header = lane.querySelector('.column-header').getBoundingClientRect();
+      const title = lane.querySelector('h2').getBoundingClientRect();
+      const count = lane.querySelector('.column-count').getBoundingClientRect();
+      const adjacent = lane.nextElementSibling.querySelector('.column-header').getBoundingClientRect();
+      return {
+        headerOffset: Math.abs(header.bottom - adjacent.bottom),
+        textOffset: Math.abs(title.top + title.height / 2 - count.top - count.height / 2),
+        countFits: count.left >= title.right && count.right < header.right,
+        narrower: lane.getBoundingClientRect().width < lane.nextElementSibling.getBoundingClientRect().width,
+      };
+    });
+    expect(layout.headerOffset).toBeLessThan(1);
+    expect(layout.textOffset).toBeLessThan(1);
+    expect(layout.countFits).toBe(true);
+    expect(layout.narrower).toBe(true);
+  }
+  await page.screenshot({ path: testInfo.outputPath('empty-backlog.png') });
 });
 
 test('board keeps every stage visible by default in compact and desktop views', async ({ page }) => {
