@@ -1,0 +1,23 @@
+plugins/workbench/tests/ui/board.spec.mjs
+  s_5354b63a64c22a::t_e01691a88702b1 63,81,85,118,124
+plugins/workbench/app/app.css
+  s_5354b63a64c22a::t_e01691a88702b1 88
+plugins/workbench/app/App.jsx
+  s_5354b63a64c22a::t_8cc75125b746fa 114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "53cdc84965543f356477333b2fc72f51c977ba9a",
+  "prompts": {},
+  "sessions": {
+    "s_5354b63a64c22a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20db8-de60-78e0-b3c0-8598aa9ab1b8",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
