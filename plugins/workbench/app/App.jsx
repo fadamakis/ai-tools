@@ -111,8 +111,7 @@ function DeliveryBoard({ vm, tasks, repositories, filterKey, hideDone }) {
         {blocked > 0 && <Badge size="sm" color="warning">{blocked} blocked</Badge>}
       </Quiet>)}
     </nav>
-    <div className="board-scroll" role="region" aria-label="Delivery stages"><div className="board"
-      style={{ '--stage-tracks': groups.map(group => group.cards.length ? 'minmax(0, 1fr)' : 'minmax(5.75rem, max-content)').join(' ') }}>
+    <div className="board-scroll" role="region" aria-label="Delivery stages"><div className="board">
       {groups.map(({ key, label, cards, blocked }) => (
         <section className="column" data-stage={key} data-empty={cards.length === 0} data-active={active === key || (active === 'all' && cards.length > 0)} key={key} aria-label={`${label}, ${cards.length} tasks`}>
           <header className="column-header">
