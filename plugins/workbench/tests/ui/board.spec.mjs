@@ -60,7 +60,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]]) {
   });
 }
 
-test('desktop keeps populated lanes equal and collapses empty lanes during updates and search', async ({ page }) => {
+test('desktop keeps all lanes equal during updates and search', async ({ page }) => {
   const { app } = await open(page);
   const board = (await (await page.request.post('/rpc', { data: { name: 'workbench.list', arguments: {} } })).json()).structuredContent;
   const original = board.tasks.find(task => task.key === 'WEB-104');
@@ -78,16 +78,11 @@ test('desktop keeps populated lanes equal and collapses empty lanes during updat
     await expect(app.locator('.column[data-stage=plan] .task-card')).toHaveCount(0, { timeout: 6000 });
     await expect(app.locator('.column[data-stage=build] .task-card')).toHaveCount(2);
     const movedColumns = await geometry();
-    const emptyPlan = movedColumns.find(column => column.stage === 'plan');
-    const populated = movedColumns.filter(column => column.stage !== 'plan');
-    expect(emptyPlan.width).toBeLessThan(populated[0].width);
-    expect(Math.max(...populated.map(column => column.width)) - Math.min(...populated.map(column => column.width))).toBeLessThan(1);
+    expect(movedColumns).toEqual(before);
     await app.getByRole('textbox', { name: 'Search tasks' }).fill('WEB-104');
     await expect(app.locator('.task-card')).toHaveCount(1);
     const searched = await geometry();
-    expect(searched.find(column => column.stage === 'build').width).toBeGreaterThan(populated[0].width);
-    const searchedBuild = searched.find(column => column.stage === 'build');
-    expect(searched.filter(column => column.stage !== 'build').every(column => column.width < searchedBuild.width)).toBe(true);
+    expect(searched).toEqual(before);
   } finally {
     if (current) await page.request.post('/rpc', { data: { name: 'workbench.progress', arguments: { taskId: original.id, expectedRevision: current.revision, stage: original.workbenchStage, status: original.status, summary: original.summary, nextAction: original.nextAction, threadId: original.threadId } } });
   }
@@ -120,13 +115,13 @@ test('an empty Backlog keeps its count on the same line and its header aligned',
         headerOffset: Math.abs(header.bottom - adjacent.bottom),
         textOffset: Math.abs(title.top + title.height / 2 - count.top - count.height / 2),
         countFits: count.left >= title.right && count.right < header.right,
-        narrower: lane.getBoundingClientRect().width < lane.nextElementSibling.getBoundingClientRect().width,
+        widthDifference: Math.abs(lane.getBoundingClientRect().width - lane.nextElementSibling.getBoundingClientRect().width),
       };
     });
     expect(layout.headerOffset).toBeLessThan(1);
     expect(layout.textOffset).toBeLessThan(1);
     expect(layout.countFits).toBe(true);
-    expect(layout.narrower).toBe(true);
+    expect(layout.widthDifference).toBeLessThan(1);
   }
   await page.screenshot({ path: testInfo.outputPath('empty-backlog.png') });
 });
