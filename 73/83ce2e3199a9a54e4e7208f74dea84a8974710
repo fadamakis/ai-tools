@@ -1,0 +1,25 @@
+plugins/workbench/app/App.jsx
+  s_db5161079f8698::t_edbb1539e78e21 115
+plugins/workbench/tests/ui/board.spec.mjs
+  s_db5161079f8698::t_f0a7fa9373d372 89-90,96-125,130-131
+  s_db5161079f8698::t_edbb1539e78e21 126-129
+  s_db5161079f8698::t_daa4cf85814147 132-133
+plugins/workbench/app/app.css
+  s_db5161079f8698::t_edbb1539e78e21 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7383ce2e3199a9a54e4e7208f74dea84a8974710",
+  "prompts": {},
+  "sessions": {
+    "s_db5161079f8698": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2032a-3b1d-7b13-82b6-8d68550387e5",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Fotis Adamakis <fotis.adamakis@preply.com>"
+    }
+  }
+}
