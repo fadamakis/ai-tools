@@ -145,7 +145,8 @@ test('board keeps every stage visible by default in compact and desktop views', 
         const { left, right, width } = node.getBoundingClientRect();
         return { left, right, width };
       }));
-      expect(Math.min(...columns.map(column => column.left))).toBeGreaterThanOrEqual(0);
+      expect(columns[0].left).toBeCloseTo(24, -1);
+      expect(width - columns.at(-1).right).toBeCloseTo(24, -1);
       expect(Math.max(...columns.map(column => column.right))).toBeLessThanOrEqual(width);
       expect(Math.max(...columns.map(column => column.width)) - Math.min(...columns.map(column => column.width))).toBeLessThan(1);
       const statusTextFits = await app.locator('.card-status').evaluateAll(badges => badges.every(badge => {

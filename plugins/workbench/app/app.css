@@ -11,7 +11,7 @@
   --muted: var(--color-text-secondary);
   --line: var(--color-border-primary, var(--color-border));
   --surface: var(--color-surface-secondary);
-  --product-width: 100rem;
+  --product-width: 100%;
   --product-gutter: 24px;
   --workbench-action: #303030;
   --workbench-action-hover: #454545;
